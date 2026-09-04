@@ -4,12 +4,10 @@ import { notFound } from "next/navigation";
 import { ALL_PRODUCTS, getProductBySlug } from "@/lib/repositories/product-repository";
 import { getCompleteSetup, getSimilarProducts } from "@/lib/services/recommendation-service";
 import { brandOrigin } from "@/lib/data/products";
-import { formatDate } from "@/lib/utils/format";
 import { ProductPurchasePanel } from "@/components/product/product-purchase-panel";
 import { ProductCard } from "@/components/product/product-card";
 import { RecentlyViewedClient } from "@/components/product/recently-viewed";
-import { EmptyState } from "@/components/ui/states";
-import { RatingStars } from "@/components/ui/rating-stars";
+import { ReviewsSection } from "@/components/product/reviews-section";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -154,43 +152,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       </div>
 
       {/* Reviews */}
-      <section className="flex flex-col gap-space-md" aria-label="Đánh giá của khách hàng">
-        <div className="flex items-center justify-between">
-          <h2 className="font-headline-md text-headline-md text-on-surface">Đánh Giá Từ Chủ Nhân ({product.reviewCount})</h2>
-          <span className="flex items-center gap-space-xs">
-            <RatingStars rating={product.rating} />
-            <span className="font-telemetry-data text-telemetry-data text-primary">{product.rating.toFixed(1)}/5</span>
-          </span>
-        </div>
-        {product.reviews && product.reviews.length > 0 ? (
-          <div className="grid grid-cols-1 gap-space-md md:grid-cols-2">
-            {product.reviews.map((review) => (
-              <article key={review.id} className="flex flex-col gap-space-xs rounded-xl bg-surface-container p-space-lg">
-                <div className="flex items-center justify-between">
-                  <RatingStars rating={review.rating} size={14} />
-                  <span className="font-telemetry-xs text-telemetry-xs text-outline">{formatDate(review.date)}</span>
-                </div>
-                <h3 className="font-headline-sm text-headline-sm text-on-surface">{review.title}</h3>
-                <p className="font-body-sm text-body-sm text-on-surface-variant">{review.body}</p>
-                <footer className="flex items-center gap-space-xs pt-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-outline">
-                  <span className="text-on-surface">{review.author}</span>
-                  {review.verified && (
-                    <span className="flex items-center gap-space-2xs text-primary">
-                      <span className="material-symbols-outlined text-[12px]" aria-hidden="true">verified</span> ĐÃ MUA TẠI LUMINA
-                    </span>
-                  )}
-                </footer>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon="rate_review"
-            title="Chưa có đánh giá chi tiết"
-            description={`Sản phẩm mới được cập nhật vault. Trở thành chủ nhân đầu tiên chia sẻ trải nghiệm về ${product.name}.`}
-          />
-        )}
-      </section>
+      <ReviewsSection product={product} />
 
       {/* Complete your setup */}
       {completeSetup.length > 0 && (
