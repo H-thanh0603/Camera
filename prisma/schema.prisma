@@ -1,0 +1,93 @@
+// Prisma schema — SQLite cho môi trường dev/demo.
+// Deploy production: đổi provider sang "postgresql" + DATABASE_URL (Supabase/Neon),
+// schema không đổi gì khác.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  sessions     Session[]
+  orders       Order[]
+  reviews      Review[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  number     String      @unique
+  // null = khách vãng lai (guest checkout)
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status     String      @default("pending") // pending|paid|processing|shipped|delivered|cancelled|refunded
+  // bước timeline hiện tại: order_placed..delivered (xem ORDER_STEP_ORDER)
+  currentStep String     @default("confirmed")
+  contact    Json
+  shipping   Json
+  delivery   String
+  payment    String
+  // snapshot tổng tiền do SERVER tính — client không được tin giá tự tính
+  totals     Json
+  lines      OrderLine[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model OrderLine {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  variantId  String?
+  name       String
+  variantName String?
+  // giá server đã verify tại thời điểm đặt hàng
+  unitPrice  Int
+  quantity   Int
+  image      String
+  sku        String
+
+  @@index([orderId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  // null = guest review
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  author    String
+  rating    Int
+  title     String
+  body      String
+  // review phải qua kiểm duyệt trước khi hiển thị công khai
+  approved  Boolean  @default(false)
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@index([approved])
+}
