@@ -51,7 +51,7 @@ jobs:
       - name: Setup database
         run: npx prisma migrate deploy
         env:
-          DATABASE_URL: "file:./prisma/dev.db"
+          DATABASE_URL: "file:./dev.db"
 
       - name: Production build
         run: npm run build

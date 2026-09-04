@@ -24,6 +24,9 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
+      DATABASE_URL: "file:./dev.db",
+      PAYMENT_DEMO_MODE: "true",
+      NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true",
       NEXT_PUBLIC_ORDER_FAILURE_RATE: "0",
       NEXT_PUBLIC_REVIEW_FAILURE_RATE: "0",
     },
