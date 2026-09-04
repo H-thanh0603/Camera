@@ -1,5 +1,7 @@
 # LUMINA Optics — Camera E-Commerce Platform
 
+[![CI](https://github.com/H-thanh0603/Camera/actions/workflows/ci.yml/badge.svg)](https://github.com/H-thanh0603/Camera/actions/workflows/ci.yml)
+
 Nền tảng thương mại điện tử bán máy ảnh / ống kính / phụ kiện cao cấp, được nâng cấp
 từ UI prototype **LUMINA Optics** (giữ nguyên 100% design system: gold accent, dark
 luxury aesthetic, telemetry HUD, typography Syne / Hanken Grotesk / JetBrains Mono).
