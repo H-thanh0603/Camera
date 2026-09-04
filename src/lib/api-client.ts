@@ -1,4 +1,4 @@
-import type { Order, SessionUser } from "@/lib/types";
+import type { Order, Review, SessionUser } from "@/lib/types";
 
 /**
  * API client — cầu nối UI ↔ API routes.
@@ -104,6 +104,6 @@ export async function apiSubmitReview(input: {
   return request<{ ok: true }>("/api/reviews", { method: "POST", body: JSON.stringify(input) });
 }
 
-export async function apiGetProductReviews(productId: string): Promise<{ approved: unknown[]; pending: unknown[] }> {
+export async function apiGetProductReviews(productId: string): Promise<{ approved: Review[]; pending: Review[] }> {
   return request(`/api/products/${productId}/reviews`);
 }

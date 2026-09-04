@@ -1,57 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Product, Review } from "@/lib/types";
-import { getProductReviews, submitReview, type ReviewDraft } from "@/lib/services/review-service";
+import { apiGetProductReviews, apiSubmitReview, ApiError } from "@/lib/api-client";
 import { formatDate, cn } from "@/lib/utils/format";
+import { minLength } from "@/lib/utils/validation";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { EmptyState, Spinner } from "@/components/ui/states";
 import { useStore } from "@/state/store";
 
 /**
- * ReviewsSection — hiển thị đánh giá + form gửi review.
- * Review người dùng gửi qua mock được đánh dấu "chờ kiểm duyệt" (trung thực
- * với trạng thái client-only), không cộng vào điểm trung bình seed.
+ * ReviewsSection — hiển thị đánh giá + form gửi review qua POST /api/reviews.
+ * Review mới vào DB với approved=false ("chờ kiểm duyệt") và KHÔNG cộng
+ * vào điểm trung bình — chống review ảo. Verified chỉ backend đối chiếu
+ * đơn hàng mới gắn.
  */
+
+const minBody = minLength("Nội dung", 20);
+const minTitle = minLength("Tiêu đề", 4);
+
 export function ReviewsSection({ product }: { product: Product }) {
-  const { user } = useStore();
-  const [reviews, setReviews] = useState<Review[] | null>(null);
+  const { user, hydrated, pushToast } = useStore();
+  const [pending, setPending] = useState<Review[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [draft, setDraft] = useState<ReviewDraft>({ author: "", rating: 0, title: "", body: "" });
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ReviewDraft, string>>>({});
+  const [draft, setDraft] = useState({ author: "", rating: 0, title: "", body: "" });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitFailed, setSubmitFailed] = useState(false);
   const [submittedOk, setSubmittedOk] = useState(false);
 
-  const allReviews = reviews ?? getProductReviews(product.id, product.reviews ?? []);
-  const seedCount = (product.reviews ?? []).length;
-  const localReviews = allReviews.slice(seedCount);
+  const refreshPending = useCallback(() => {
+    if (!hydrated) return;
+    apiGetProductReviews(product.id)
+      .then((r) => setPending(r.pending))
+      .catch(() => undefined); // pending là Enhancement — lỗi im lặng
+  }, [product.id, hydrated]);
 
-  const setField = (key: keyof ReviewDraft, value: string | number) => {
+  useEffect(() => {
+    refreshPending();
+  }, [refreshPending]);
+
+  const seedReviews = product.reviews ?? [];
+
+  const setField = (key: keyof typeof draft, value: string | number) => {
     setDraft((d) => ({ ...d, [key]: value }));
-    setFieldErrors((e) => ({ ...e, [key]: undefined }));
+    setFieldErrors((e) => ({ ...e, [key]: "" }));
+  };
+
+  const validateLocally = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!Number.isInteger(draft.rating) || draft.rating < 1 || draft.rating > 5) errors.rating = "Vui lòng chọn số sao từ 1 đến 5.";
+    if (draft.author.trim().length < 2) errors.author = "Vui lòng nhập tên của bạn.";
+    const titleErr = minTitle(draft.title);
+    if (titleErr) errors.title = titleErr;
+    const bodyErr = minBody(draft.body);
+    if (bodyErr) errors.body = bodyErr;
+    return errors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors = validateLocally();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
     setSubmitting(true);
     setSubmitFailed(false);
     try {
-      const result = await submitReview(product.id, draft);
-      if (result.ok) {
-        setReviews(getProductReviews(product.id, product.reviews ?? []));
-        setSubmittedOk(true);
-        setShowForm(false);
-        setDraft({ author: "", rating: 0, title: "", body: "" });
+      await apiSubmitReview({ productId: product.id, ...draft });
+      setSubmittedOk(true);
+      setShowForm(false);
+      setDraft({ author: "", rating: 0, title: "", body: "" });
+      refreshPending();
+    } catch (error) {
+      if (error instanceof ApiError && error.fieldErrors) {
+        setFieldErrors(error.fieldErrors);
+      } else if (error instanceof ApiError) {
+        pushToast(error.message, "error");
       } else {
-        setFieldErrors(result.fieldErrors);
+        setSubmitFailed(true);
       }
-    } catch {
-      setSubmitFailed(true);
     } finally {
       setSubmitting(false);
     }
   };
+
+  const allReviews: { review: Review; pending: boolean }[] = [
+    ...seedReviews.map((review) => ({ review, pending: false })),
+    ...pending.map((review) => ({ review, pending: true })),
+  ];
 
   return (
     <section className="flex flex-col gap-space-md" aria-label="Đánh giá của khách hàng">
@@ -175,7 +213,7 @@ export function ReviewsSection({ product }: { product: Product }) {
         />
       ) : (
         <div className="grid grid-cols-1 gap-space-md md:grid-cols-2">
-          {allReviews.map((review) => (
+          {allReviews.map(({ review, pending: isPending }) => (
             <article key={review.id} className="flex flex-col gap-space-xs rounded-xl bg-surface-container p-space-lg">
               <div className="flex items-center justify-between">
                 <RatingStars rating={review.rating} size={14} />
@@ -185,23 +223,17 @@ export function ReviewsSection({ product }: { product: Product }) {
               <p className="font-body-sm text-body-sm text-on-surface-variant">{review.body}</p>
               <footer className="flex items-center gap-space-xs pt-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-outline">
                 <span className="text-on-surface">{review.author}</span>
-                {review.verified ? (
+                {isPending ? (
+                  <span className="text-tertiary">CHỜ KIỂM DUYỆT</span>
+                ) : review.verified ? (
                   <span className="flex items-center gap-space-2xs text-primary">
                     <span className="material-symbols-outlined text-[12px]" aria-hidden="true">verified</span> ĐÃ MUA TẠI LUMINA
                   </span>
-                ) : (
-                  <span className="text-tertiary">CHỜ KIỂM DUYỆT</span>
-                )}
+                ) : null}
               </footer>
             </article>
           ))}
         </div>
-      )}
-
-      {localReviews.length > 0 && (
-        <p className="font-telemetry-xs text-telemetry-xs uppercase text-outline">
-          {localReviews.length} đánh giá của bạn đang chờ kiểm duyệt (chưa tính vào điểm trung bình).
-        </p>
       )}
     </section>
   );
