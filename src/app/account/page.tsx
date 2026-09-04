@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Order, OrderStep } from "@/lib/types";
 import { ORDER_STEP_ORDER } from "@/lib/types";
 import { listOrders, cancelOrder } from "@/lib/services/order-service";
@@ -38,7 +38,15 @@ export default function AccountPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<AuthError | null>(null);
   const [busy, setBusy] = useState(false);
-  const [orders] = useState<Order[]>(() => listOrders());
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    listOrders()
+      .then(setOrders)
+      .catch(() => setOrdersError("Không tải được đơn hàng. Vui lòng thử lại sau."));
+  }, [user]);
 
   if (!hydrated || authLoading) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
 
@@ -130,7 +138,7 @@ export default function AccountPage() {
 
       <section className="grid grid-cols-2 gap-space-md sm:grid-cols-4" aria-label="Tổng quan tài khoản">
         {[
-          { icon: "receipt_long", label: "Đơn hàng", value: orders.length },
+          { icon: "receipt_long", label: "Đơn hàng", value: orders?.length ?? 0 },
           { icon: "favorite", label: "Yêu thích", href: "/wishlist", value: "Xem" },
           { icon: "compare_arrows", label: "So sánh", href: "/compare", value: "Xem" },
           { icon: "explore", label: "Camera Finder", href: "/camera-finder", value: "Mở" },
@@ -153,7 +161,12 @@ export default function AccountPage() {
 
       <section className="flex flex-col gap-space-md" aria-label="Lịch sử đơn hàng">
         <h2 className="font-headline-md text-headline-md text-on-surface">Đơn Hàng & Theo Dõi</h2>
-        {orders.length === 0 ? (
+        {ordersError && (
+          <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{ordersError}</p>
+        )}
+        {ordersError ? null : orders === null ? (
+          <div className="flex justify-center py-space-lg"><Spinner className="border-primary border-t-transparent" /></div>
+        ) : orders.length === 0 ? (
           <EmptyState
             icon="receipt_long"
             title="Chưa có đơn hàng nào"
@@ -186,9 +199,14 @@ export default function AccountPage() {
                       {(order.status === "pending" || order.status === "paid" || order.status === "processing") && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const updated = cancelOrder(order.id);
-                            pushToast(updated ? "Đã hủy đơn hàng." : "Không thể hủy đơn ở giai đoạn này.", updated ? "info" : "error");
+                          onClick={async () => {
+                            try {
+                              const updated = await cancelOrder(order.id);
+                              setOrders((prev) => prev?.map((o) => (o.id === updated.id ? updated : o)) ?? prev);
+                              pushToast("Đã hủy đơn hàng.", "info");
+                            } catch {
+                              pushToast("Không thể hủy đơn ở giai đoạn này.", "error");
+                            }
                           }}
                           className="font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-error"
                         >

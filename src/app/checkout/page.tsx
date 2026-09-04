@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ContactInfo, DeliveryMethod, Order, PaymentMethod, ShippingInfo } from "@/lib/types";
-import { placeOrder, OutOfStockError } from "@/lib/services/order-service";
+import { placeOrder } from "@/lib/services/order-service";
+import { ApiError, apiPayDemo } from "@/lib/api-client";
 import { formatVND, cn } from "@/lib/utils/format";
 import { validateAll, required, email as emailValidator, phoneVN } from "@/lib/utils/validation";
 import { useStore } from "@/state/store";
@@ -26,13 +27,14 @@ const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; desc: string }[] =
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cartSnapshot, clearCart, hydrated, user } = useStore();
+  const { cartSnapshot, clearCart, hydrated, user, pushToast } = useStore();
   const { lines, totals } = cartSnapshot;
 
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
+  const [paying, setPaying] = useState(false);
 
   const [contact, setContact] = useState<ContactInfo>({ fullName: user?.name ?? "", email: user?.email ?? "", phone: "" });
   const [shipping, setShipping] = useState<ShippingInfo>({ address: "", ward: "", district: "", city: "" });
@@ -60,10 +62,48 @@ export default function CheckoutPage() {
               <p className="font-telemetry-data text-telemetry-data text-primary uppercase">{placedOrder.status === "paid" ? "Đã thanh toán" : "Chờ thanh toán"}</p>
             </div>
             <div className="rounded-lg bg-surface-container-low p-space-sm text-left">
-              <p className="text-outline">Tổng giá trị</p>
+              <p className="text-outline">Tổng giá trị (server xác minh)</p>
               <p className="font-telemetry-data text-telemetry-data text-on-surface">{formatVND(placedOrder.totals.total)}</p>
             </div>
           </div>
+
+          {placedOrder.status === "pending" && (
+            <div className="flex w-full flex-col gap-space-sm rounded-lg bg-surface-container-low p-space-md text-left">
+              <p className="font-telemetry-xs text-telemetry-xs uppercase text-primary">HƯỚNG DẪN THANH TOÁN</p>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                {placedOrder.payment === "bank_transfer"
+                  ? `Chuyển khoản đúng số tiền ${formatVND(placedOrder.totals.total)} với nội dung "${placedOrder.number}" tới STK 0123456789 — LUMINA OPTICS (VCB).`
+                  : placedOrder.payment === "cod"
+                    ? "Chuẩn bị số tiền đúng khi nhận máy. Kỹ thuật viên sẽ hỗ trợ kiểm tra thiết bị trước khi thanh toán."
+                    : "Quẹt thẻ tại chỗ với kỹ thuật viên khi nhận máy (Visa/Master/JCB)."}
+              </p>
+              {process.env.NEXT_PUBLIC_PAYMENT_DEMO_MODE === "true" && (
+                <div className="flex items-center justify-between gap-space-sm border-t border-surface-container-high pt-space-sm">
+                  <p className="font-telemetry-xs text-[10px] uppercase leading-relaxed text-outline">
+                    DEMO — không có giao dịch thật. Nút dưới mô phỏng webhook của cổng payment để test order tracking.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={paying}
+                    onClick={async () => {
+                      setPaying(true);
+                      try {
+                        setPlacedOrder(await apiPayDemo(placedOrder.id));
+                      } catch {
+                        pushToast("Không xác nhận được thanh toán demo. Thử lại.", "error");
+                      } finally {
+                        setPaying(false);
+                      }
+                    }}
+                    className="shrink-0 rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-surface-container-highest disabled:opacity-50"
+                  >
+                    {paying ? "Đang xử lý..." : "Mô phỏng đã thanh toán"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-space-sm pt-space-sm">
             <Link href="/account" className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
               Theo dõi đơn hàng
@@ -134,7 +174,8 @@ export default function CheckoutPage() {
       clearCart();
       setPlacedOrder(order);
     } catch (error) {
-      if (error instanceof OutOfStockError) {
+      if (error instanceof ApiError) {
+        // Lỗi nghiệp vụ từ server (hết hàng, dữ liệu lệch) — message tiếng Việt từ API
         setSubmitError(error.message);
       } else {
         setSubmitError("Không thể đặt hàng do lỗi mạng. Vui lòng thử lại — nếu tiếp tục lỗi, liên hệ concierge qua hotline.");

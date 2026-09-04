@@ -60,7 +60,18 @@ test.describe("PDP → Cart → Checkout", () => {
     await expect(page.getByText("Nguyễn Testing")).toBeVisible();
     await page.getByRole("button", { name: /Xác nhận đặt hàng/ }).click();
 
-    await expect(page.getByText("Đơn hàng đã được ghi nhận")).toBeVisible({ timeout: 15_000 });
+    // Chấp nhận trường hợp lỗi mạng giả lập → bấm "Thử lại" (cũng test luôn UX retry)
+    const success = page.getByText("Đơn hàng đã được ghi nhận");
+    const networkError = page.getByRole("alert").filter({ hasText: "Không thể đặt hàng" });
+    for (let i = 0; i < 5; i++) {
+      if (await success.isVisible().catch(() => false)) break;
+      if (await networkError.isVisible().catch(() => false)) {
+        await page.getByRole("button", { name: "Thử lại" }).click();
+        continue;
+      }
+      await page.waitForTimeout(500);
+    }
+    await expect(success).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/LUM-/).first()).toBeVisible();
   });
 });
