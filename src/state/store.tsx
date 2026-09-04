@@ -4,8 +4,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { CartLine, CartSnapshot, Product, SessionUser, WishlistEntry } from "@/lib/types";
 import { buildCartSnapshot, clampQuantity, mergeLine } from "@/lib/services/cart-service";
 import { getProductById } from "@/lib/repositories/product-repository";
-import { loadJSON, removeKey, saveJSON } from "@/lib/repositories/storage-repository";
-import * as AuthService from "@/lib/services/auth-service";
+import { loadJSON, saveJSON } from "@/lib/repositories/storage-repository";
+import { apiLogin, apiLogout, apiMe, apiRegister } from "@/lib/api-client";
 
 /* ================= Toast ================= */
 
@@ -118,8 +118,9 @@ interface StoreContextValue {
   recent: string[];
   trackView: (productId: string) => void;
   user: SessionUser | null;
-  login: typeof AuthService.login;
-  register: typeof AuthService.register;
+  authLoading: boolean;
+  login: (email: string, password: string) => Promise<SessionUser>;
+  register: (name: string, email: string, password: string) => Promise<SessionUser>;
   logout: () => void;
   toasts: Toast[];
   pushToast: (message: string, tone?: Toast["tone"], action?: Toast["action"]) => void;
@@ -141,6 +142,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     user: null,
   });
   const [hydrated, setHydrated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -155,10 +157,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         wishlist: loadJSON<WishlistEntry[]>("wishlist", []),
         compare: loadJSON<string[]>("compare", []),
         recent: loadJSON<string[]>("recent", []),
-        user: AuthService.getSession(),
       },
     });
     setHydrated(true);
+    // Phiên đăng nhập nằm trong cookie httpOnly — xác thực qua server
+    apiMe()
+      .then((user) => dispatch({ type: "auth/set", user }))
+      .catch(() => dispatch({ type: "auth/set", user: null }))
+      .finally(() => setAuthLoading(false));
   }, []);
 
   // Persist khi thay đổi (chỉ sau khi hydrate xong)
@@ -234,19 +240,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       recent: state.recent,
       trackView: (productId) => dispatch({ type: "recent/add", productId }),
       user: state.user,
+      authLoading,
       login: async (email, password) => {
-        const u = await AuthService.login(email, password);
+        const u = await apiLogin(email, password);
         dispatch({ type: "auth/set", user: u });
         return u;
       },
       register: async (name, email, password) => {
-        const u = await AuthService.register(name, email, password);
+        const u = await apiRegister(name, email, password);
         dispatch({ type: "auth/set", user: u });
         return u;
       },
       logout: () => {
-        AuthService.logout();
-        removeKey("auth.session");
+        apiLogout().catch(() => undefined);
         dispatch({ type: "auth/set", user: null });
         pushToast("Đã đăng xuất.", "info");
       },
@@ -258,7 +264,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       searchOpen,
       setSearchOpen,
     };
-  }, [hydrated, state, cartSnapshot, toasts, cartDrawerOpen, searchOpen, pushToast, dismissToast]);
+  }, [hydrated, state, authLoading, cartSnapshot, toasts, cartDrawerOpen, searchOpen, pushToast, dismissToast]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Order, OrderStep } from "@/lib/types";
 import { ORDER_STEP_ORDER } from "@/lib/types";
 import { listOrders, cancelOrder } from "@/lib/services/order-service";
-import type { AuthError } from "@/lib/services/auth-service";
+import { toAuthError, type AuthError } from "@/lib/api-client";
 import { useStore } from "@/state/store";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 import { EmptyState, Spinner } from "@/components/ui/states";
@@ -31,7 +31,7 @@ const STEP_LABEL: Record<OrderStep, string> = {
 };
 
 export default function AccountPage() {
-  const { user, hydrated, login, register, logout, pushToast } = useStore();
+  const { user, hydrated, authLoading, login, register, logout, pushToast } = useStore();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,7 +40,7 @@ export default function AccountPage() {
   const [busy, setBusy] = useState(false);
   const [orders] = useState<Order[]>(() => listOrders());
 
-  if (!hydrated) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
+  if (!hydrated || authLoading) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
 
   if (!user) {
     const submit = async (e: React.FormEvent) => {
@@ -52,7 +52,7 @@ export default function AccountPage() {
         else await register(name, email, password);
         pushToast("Đăng nhập thành công. Chào mừng đến Lumina Optics!", "success");
       } catch (err) {
-        setError(err as AuthError);
+        setError(toAuthError(err));
       } finally {
         setBusy(false);
       }
