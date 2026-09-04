@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { formatVND } from "@/lib/utils/format";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/services/cart-service";
@@ -9,6 +10,7 @@ import { EmptyState } from "@/components/ui/states";
 
 export function CartDrawer() {
   const { cartDrawerOpen, setCartDrawerOpen, cartSnapshot, setQuantity, removeFromCart } = useStore();
+  const pathname = usePathname();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -17,6 +19,12 @@ export function CartDrawer() {
     if (cartDrawerOpen) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [cartDrawerOpen, setCartDrawerOpen]);
+
+  // Đóng drawer khi điều hướng xong — KHÔNG đóng trong onClick của Link:
+  // unmount Link ngay khi click khiến App Router hủy navigation.
+  useEffect(() => {
+    setCartDrawerOpen(false);
+  }, [pathname, setCartDrawerOpen]);
 
   if (!cartDrawerOpen) return null;
 
@@ -54,7 +62,6 @@ export function CartDrawer() {
             action={
               <Link
                 href="/products"
-                onClick={() => setCartDrawerOpen(false)}
                 className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim"
               >
                 Khám phá thiết bị
@@ -141,14 +148,12 @@ export function CartDrawer() {
               <div className="grid grid-cols-2 gap-space-xs pt-space-2xs">
                 <Link
                   href="/cart"
-                  onClick={() => setCartDrawerOpen(false)}
                   className="rounded-lg bg-surface-container-high py-space-xs text-center font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest"
                 >
                   Xem giỏ hàng
                 </Link>
                 <Link
                   href="/checkout"
-                  onClick={() => setCartDrawerOpen(false)}
                   className="rounded-lg bg-primary py-space-xs text-center font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim"
                 >
                   Thanh toán

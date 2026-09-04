@@ -37,7 +37,8 @@ function orderNumber(): string {
 export async function placeOrder(draft: PlaceOrderDraft): Promise<Order> {
   // Giả lập độ trễ network + failure để UI xử lý loading/error thật.
   await new Promise((r) => setTimeout(r, 1200));
-  if (Math.random() < 0.08) {
+  const failureRate = Number(process.env.NEXT_PUBLIC_ORDER_FAILURE_RATE ?? "0.08");
+  if (Math.random() < failureRate) {
     throw new Error("NETWORK");
   }
 

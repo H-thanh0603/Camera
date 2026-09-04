@@ -85,8 +85,11 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "compare/remove":
       return { ...state, compare: state.compare.filter((id) => id !== action.productId) };
-    case "recent/add":
+    case "recent/add": {
+      // No-op nếu đã ở đầu danh sách — tránh tạo state mới gây re-render vòng lặp
+      if (state.recent[0] === action.productId) return state;
       return { ...state, recent: [action.productId, ...state.recent.filter((id) => id !== action.productId)].slice(0, 12) };
+    }
     case "auth/set":
       return { ...state, user: action.user };
     default:
@@ -231,8 +234,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       recent: state.recent,
       trackView: (productId) => dispatch({ type: "recent/add", productId }),
       user: state.user,
-      login: AuthService.login,
-      register: AuthService.register,
+      login: async (email, password) => {
+        const u = await AuthService.login(email, password);
+        dispatch({ type: "auth/set", user: u });
+        return u;
+      },
+      register: async (name, email, password) => {
+        const u = await AuthService.register(name, email, password);
+        dispatch({ type: "auth/set", user: u });
+        return u;
+      },
       logout: () => {
         AuthService.logout();
         removeKey("auth.session");

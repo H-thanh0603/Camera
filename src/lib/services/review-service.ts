@@ -55,7 +55,8 @@ export async function submitReview(productId: string, draft: ReviewDraft): Promi
 
   // Giả lập network để UI xử lý loading/error thật
   await new Promise((r) => setTimeout(r, 800));
-  if (Math.random() < 0.05) {
+  const failureRate = Number(process.env.NEXT_PUBLIC_REVIEW_FAILURE_RATE ?? "0.05");
+  if (Math.random() < failureRate) {
     throw new Error("NETWORK");
   }
 
