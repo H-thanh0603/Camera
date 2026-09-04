@@ -16,6 +16,7 @@ export function HeroHud() {
           alt="Lumina X-1 Monolith 61MP Flagship Mirrorless Camera"
           className="h-full w-full scale-105 object-cover object-center contrast-[1.12] brightness-[0.78]"
           src={IMG.heroBackdrop}
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-surface-container-lowest/60 to-surface-container-lowest/80" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background" />

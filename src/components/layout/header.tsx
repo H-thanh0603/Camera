@@ -38,7 +38,7 @@ export function Header() {
     <header className="fixed top-0 z-50 w-full bg-surface-container-lowest/85 shadow-[0_1px_8px_rgba(0,0,0,0.04)] backdrop-blur-xl">
       <div className="mx-auto flex h-20 w-full max-w-container-max items-center justify-between gap-space-md px-gutter-mobile lg:px-gutter-desktop">
         <div className="flex shrink-0 items-center gap-space-lg">
-          <Link href="/" className="group flex items-center gap-space-xs" aria-label="LUMINA Optics — trang chủ">
+          <Link href="/" className="group flex items-center gap-space-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img alt="LUMINA Optics Logo" className="h-8 w-auto object-contain" src={IMG.logo} />
             <span className="flex flex-col">

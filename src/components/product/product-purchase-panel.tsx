@@ -59,7 +59,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === "Enter" && setZoom(true)}
-            aria-label="Phóng to ảnh sản phẩm"
+            aria-label="Phóng to ảnh sản phẩm (NHẤP ĐỂ ZOOM)"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={displayImage.url} alt={displayImage.alt} className="h-full w-full object-contain" />
@@ -123,7 +123,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
             {product.monthlyFrom && (
               <span className="font-telemetry-xs text-telemetry-xs text-outline">Trả góp 0% từ {formatVND(product.monthlyFrom)}/tháng qua thẻ tín dụng VIP</span>
             )}
-            <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">SKU: {sku}</span>
+            <span className="font-telemetry-xs text-telemetry-xs uppercase text-on-surface-variant">SKU: {sku}</span>
           </div>
 
           {/* Variant selector */}
@@ -147,7 +147,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
                   >
                     <span className="flex flex-col">
                       <span className="font-body-sm text-body-sm font-semibold text-on-surface">{v.name}</span>
-                      <span className="font-telemetry-xs text-telemetry-xs text-outline">{v.sku}</span>
+                      <span className="font-telemetry-xs text-telemetry-xs text-on-surface-variant">{v.sku}</span>
                     </span>
                     <span className="flex flex-col items-end">
                       <span className="font-telemetry-data text-telemetry-data font-bold text-primary">{formatVND(v.price)}</span>
