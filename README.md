@@ -9,12 +9,18 @@ luxury aesthetic, telemetry HUD, typography Syne / Hanken Grotesk / JetBrains Mo
 ## Chạy dự án
 
 ```bash
-npm install
-npm run dev        # dev server
-npm run build      # production build
-npm run start      # production server
-npx vitest run     # unit tests (cart / finder / catalogue logic)
+npm install              # tự động `prisma generate` (postinstall)
+npx prisma migrate deploy  # tạo SQLite DB (prisma/dev.db)
+npm run dev              # dev server
+npm run build && npm run start   # production
+npx vitest run           # 57 unit tests
+npx playwright test      # 9 E2E tests (cần `npm run build` trước)
+npm run db:reset         # xóa sạch DB về trạng thái ban đầu
 ```
+
+Env (xem `.env.example`): `DATABASE_URL` (SQLite dev / Postgres production),
+`NEXT_PUBLIC_SITE_URL`, `PAYMENT_DEMO_MODE` + `NEXT_PUBLIC_PAYMENT_DEMO_MODE`
+(bật nút "mô phỏng đã thanh toán" — tắt ở production thật).
 
 ## Kiến trúc
 
@@ -31,13 +37,29 @@ src/
   components/             # UI theo domain: product, cart, catalog, home, layout, search, ui
   lib/
     types.ts              # Domain model (Product, Variant, Cart, Order, Finder…)
-    data/                 # Seed data — chỉ tồn tại ở lớp mock repository
-    repositories/         # Nơi truy cập dữ liệu (thay bằng API khi có backend)
-    services/             # Business logic thuần hàm (cart, finder, recommendation, order, auth, search)
-    utils/                # format VND, validation, URL params, availability
+    data/                 # Catalogue seed (read-only) — sản phẩm chưa cần admin CRUD
+    repositories/         # Truy cập catalogue (server + client dùng chung seed snapshot)
+    services/             # Business logic thuần hàm (cart, finder, recommendation, search, orders client)
+    server/               # Server-only: Prisma, scrypt password, session, đặt hàng + verify
+    api-client.ts         # Cầu nối UI → API routes, xử lý lỗi thống nhất
+    utils/                # format VND, validation, URL params, rate-limit
+  app/api/                # auth (register/login/logout/me), orders (+cancel, pay-demo), reviews
   state/store.tsx         # Global state (cart/wishlist/compare/auth/recent/toast) + persistence
-tests/                    # Vitest — cart calc, finder scoring, filter/URL sync
+tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filter, order verification, luồng mua thật
 ```
+
+### Backend hiện trạng
+
+- **Database (Prisma + SQLite)**: `users`, `sessions`, `orders` + `order_lines`, `reviews`.
+  Catalogue sản phẩm vẫn là seed read-only (chưa có admin CRUD) — khi thêm admin,
+  chuyển sang bảng `products` và `DbProductRepository`.
+- **Auth thật**: scrypt hash, session token (cookie httpOnly, DB chỉ lưu SHA-256),
+  rate limit login/register. Không còn thông tin user trong localStorage.
+- **Đặt hàng**: client chỉ gửi productId/variantId/quantity — **server tự lấy giá,
+  kẹp stock và tính lại toàn bộ totals** trước khi ghi DB.
+- **Payment**: abstraction qua endpoint; `pay-demo` chỉ chạy khi `PAYMENT_DEMO_MODE=true`
+  (đồ án). Production: thay bằng webhook VNPay/MoMo/Stripe verify chữ ký HMAC.
+- **Reviews**: ghi DB với `approved=false`, hiển thị công khai sau kiểm duyệt.
 
 ### Nguyên tắc
 
@@ -52,9 +74,9 @@ tests/                    # Vitest — cart calc, finder scoring, filter/URL syn
 - **A11y**: semantic HTML, ARIA cho modal/tab/progressbar, focus-visible,
   `prefers-reduced-motion`.
 
-## Việc cần làm khi nối backend
+## Việc cần làm tiếp theo (production)
 
-1. `MockProductRepository` → `ApiProductRepository` (giữ nguyên interface).
-2. `OrderService.placeOrder` → `POST /orders` (backend verify giá, stock, payment).
-3. `AuthService` → JWT/session cookie (httpOnly), bỏ mock session trong localStorage.
-4. Ảnh sản phẩm → CDN + responsive images (`next/image` với `remotePatterns`).
+1. Deploy: Vercel + Postgres (Supabase/Neon) — đổi `provider` + `DATABASE_URL`, chạy `prisma migrate deploy`.
+2. Payment thật: webhook VNPay/MoMo/Stripe thay `pay-demo`, xóa endpoint demo.
+3. Admin panel (role-based) + CRUD sản phẩm vào DB, chuyển catalogue sang DB reads (ISR).
+4. Email (xác nhận đơn, reset password), ảnh CDN + `next/image`, Sentry.

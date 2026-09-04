@@ -44,9 +44,7 @@ function orderNumber(): string {
   return `LUM-${stamp}${rand}`;
 }
 
-export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
-  const { contact, shipping, delivery, payment } = input;
-
+export function verifyInput(contact: ContactInfo, shipping: ShippingInfo, delivery: string, payment: string, lines: IncomingLine[]): void {
   if (!DELIVERY_OPTIONS.has(delivery)) throw new OrderValidationError("Phương thức giao nhận không hợp lệ.");
   if (!PAYMENT_OPTIONS.has(payment)) throw new OrderValidationError("Phương thức thanh toán không hợp lệ.");
   if (!contact?.fullName?.trim() || !contact?.email || !contact?.phone) {
@@ -55,17 +53,20 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   if (!shipping?.address?.trim() || !shipping?.ward?.trim() || !shipping?.district?.trim() || !shipping?.city?.trim()) {
     throw new OrderValidationError("Địa chỉ giao hàng chưa đầy đủ.");
   }
-  if (!input.lines?.length) throw new OrderValidationError("Đơn hàng trống.");
+  if (!lines?.length) throw new OrderValidationError("Đơn hàng trống.");
+}
 
+/** Verify line với catalogue + tính totals — thuần hàm, unit-test được. */
+export function verifyAndPriceLines(inputLines: IncomingLine[], delivery: string): { finalLines: OrderLine[]; totals: CartTotals } {
   // Verify từng line với catalogue server
   const lines: OrderLine[] = [];
-  const productIds = [...new Set(input.lines.map((l) => l.productId))];
+  const productIds = [...new Set(inputLines.map((l) => l.productId))];
   const resolved = getProductsByIds(productIds);
   if (resolved.length !== productIds.length) {
     throw new OrderValidationError("Một số sản phẩm không còn tồn tại. Vui lòng xóa khỏi giỏ và thử lại.");
   }
 
-  for (const line of input.lines) {
+  for (const line of inputLines) {
     const product = getProductById(line.productId);
     if (!product) throw new OrderValidationError(`Sản phẩm ${line.productId} không còn tồn tại.`);
     const variant = resolveVariant(product, line.variantId);
@@ -116,6 +117,13 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
     totals.shipping += EXPRESS_FEE;
     totals.total += EXPRESS_FEE;
   }
+  return { finalLines, totals };
+}
+
+export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
+  const { contact, shipping, delivery, payment } = input;
+  verifyInput(contact, shipping, delivery, payment, input.lines);
+  const { finalLines, totals } = verifyAndPriceLines(input.lines, delivery);
 
   const user = await getSessionUser();
   const dbOrder = await prisma.order.create({
