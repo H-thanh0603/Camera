@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    overscroll-behavior-y: none;
+  }
+  /* Accessible focus ring for keyboard users only */
+  :focus-visible {
+    outline: 2px solid #f2ca50;
+    outline-offset: 2px;
+  }
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-container-max px-gutter-mobile lg:px-gutter-desktop;
+  }
+  .section-telemetry {
+    @apply font-telemetry-xs text-telemetry-xs text-primary uppercase tracking-widest;
+  }
+}
