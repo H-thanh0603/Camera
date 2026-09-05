@@ -49,16 +49,22 @@ export function ProductCard({ product, priority = false }: { product: Product; p
         </Link>
 
         <div className="absolute left-3 top-3 flex flex-col items-start gap-1">
-          {(discount !== null ? [...product.badges.slice(0, 1), `GIẢM ${discount}%`] : product.badges.slice(0, 2)).map(
-            (badge) => (
+          {(() => {
+            // Badge "GIẢM x%" tính từ compareAtPrice; bỏ badge seed trùng để tránh duplicate key
+            const seeded = product.badges.slice(0, 1);
+            const list =
+              discount !== null
+                ? [...seeded.filter((b) => !b.toUpperCase().startsWith("GIẢM")), `GIẢM ${discount}%`]
+                : seeded;
+            return list.map((badge, i) => (
               <span
-                key={badge}
+                key={`${badge}-${i}`}
                 className="rounded bg-surface-container-high/90 px-space-xs py-0.5 font-telemetry-xs text-[10px] font-bold uppercase text-primary"
               >
                 {badge}
               </span>
-            ),
-          )}
+            ));
+          })()}
           <span className={cn("rounded bg-surface-container-low/80 px-space-xs py-0.5 font-telemetry-xs text-[10px]", AVAILABILITY_CLASS[product.availability])}>
             {AVAILABILITY_LABEL[product.availability]}
           </span>
