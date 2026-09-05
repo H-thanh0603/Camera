@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "rangeStrategy": "bump",
+  "vulnerabilityAlerts": { "labels": ["security"] },
+  "packageRules": [
+    { "description": "Gộp patch updates thành 1 PR/tuần để giảm nhiễu", "matchUpdateTypes": ["patch"], "schedule": ["before 9am on monday"] },
+    { "description": "Major updates cần review thủ công", "matchUpdateTypes": ["major"], "dependencyDashboardApproval": true }
+  ]
+}

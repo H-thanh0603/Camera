@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "postinstall": "prisma generate",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "prepare": "husky",
+    "check:bundle": "node scripts/check-bundle.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -23,6 +25,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "^3",
     "@google/design.md": "^0.4.0",
     "@playwright/test": "^1.62.1",
@@ -32,6 +35,8 @@
     "autoprefixer": "^10.5.5",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.5.0",
     "postcss": "^8.5.23",
     "prisma": "^6.19.3",
     "tailwindcss": "^3.4.17",
@@ -45,5 +50,11 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "bash -c 'npx tsc --noEmit'"
+    ]
   }
 }

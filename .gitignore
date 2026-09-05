@@ -46,3 +46,4 @@ prisma/dev.db-journal
 
 # env example được commit
 !.env.example
+.husky/_

@@ -48,6 +48,15 @@ src/
 tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filter, order verification, luồng mua thật
 ```
 
+### Công cụ chất lượng
+
+- **Zod + React Hook Form**: validation một nguồn (`lib/schemas.ts`) dùng chung client/server.
+- **TanStack Query**: cache/refetch server state (admin orders/reviews, optimistic update).
+- **Husky + lint-staged**: pre-commit chạy eslint + `tsc --noEmit` trên file thay đổi.
+- **axe-core trong E2E** (`tests/e2e/a11y.spec.ts`): chặn regression a11y trên 6 trang chính.
+- **Bundle budget**: `npm run check:bundle` sau build — CI chặn nếu JS vượt 1.5 MB.
+- **Renovate**: tự PR nâng dependency (major cần approve trên dashboard).
+
 ### Vận hành / Observability
 
 - **`GET /api/health`** — health check app + DB (503 khi DB down) cho uptime monitor.
@@ -102,3 +111,4 @@ tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filt
 2. Payment thật: webhook VNPay/MoMo/Stripe thay `pay-demo`, xóa endpoint demo.
 3. Email (xác nhận đơn, reset password), ảnh CDN + `next/image`, Sentry.
 4. Snapshot API → phân trang server-side khi catalogue lên hàng nghìn SP.
+5. Checklist khi có tài khoản: Auth.js (social login), Sentry, Resend, Upstash Redis, VNPay/MoMo, next-intl.
