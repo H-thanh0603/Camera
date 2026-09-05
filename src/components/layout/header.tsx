@@ -52,18 +52,6 @@ export function Header() {
           </div>
         </div>
 
-        <nav className="hidden items-center gap-space-md lg:flex" aria-label="Điều hướng chính">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className="px-space-xs py-space-2xs font-body-sm text-body-sm uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
         <div className="flex shrink-0 items-center gap-space-sm">
           <div className="hidden items-center rounded-lg bg-surface-container px-space-xs py-space-2xs sm:flex" aria-label="Đơn vị tiền tệ: VND">
             <button type="button" className="px-space-2xs font-telemetry-xs text-telemetry-xs text-primary" aria-pressed="true">VND</button>
@@ -129,6 +117,21 @@ export function Header() {
           </button>
         </div>
       </div>
+
+      {/* Desktop category nav — hàng riêng (h-11) để 6 nhãn dài không chèn ép hàng logo */}
+      <nav className="hidden border-t border-surface-container-high/60 lg:block" aria-label="Điều hướng chính">
+        <div className="mx-auto flex h-11 w-full max-w-container-max items-center gap-space-md overflow-x-auto whitespace-nowrap px-gutter-mobile [scrollbar-width:none] lg:px-gutter-desktop [&::-webkit-scrollbar]:hidden">
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.label}
+              href={link.href}
+              className="shrink-0 px-space-xs py-space-2xs font-body-sm text-body-sm uppercase tracking-wider text-on-surface-variant transition-colors hover:text-on-surface"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      </nav>
 
       {/* Mobile nav drawer */}
       {mobileOpen && (

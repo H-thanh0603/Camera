@@ -29,7 +29,7 @@ const PRIVILEGES = [
 /** Section 6 — Social Proof & Privilege Concierge (port nguyên vẹn). */
 export function Testimonials() {
   return (
-    <section id="concierge" className="relative w-full overflow-hidden bg-surface-container-lowest py-space-4xl">
+    <section id="concierge" className="relative w-full scroll-mt-24 overflow-hidden bg-surface-container-lowest py-space-4xl lg:scroll-mt-[132px]">
       <div className="mx-auto flex w-full max-w-container-max flex-col gap-space-3xl px-gutter-mobile lg:px-gutter-desktop">
         <div className="mx-auto flex max-w-2xl flex-col gap-space-xs text-center">
           <span className="section-telemetry font-bold">BẢO CHỨNG TỪ NHỮNG BẬC THẦY HÌNH ẢNH</span>

@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-background font-body-md text-on-surface antialiased">
         <StoreProvider>
           <Header />
-          <main id="main" className="w-full bg-background pt-20">
+          <main id="main" className="w-full bg-background pt-20 lg:pt-[125px]">
             {children}
           </main>
           <Footer />
