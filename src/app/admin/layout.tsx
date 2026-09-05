@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/server/admin";
 
 /**
@@ -16,23 +17,8 @@ const NAV = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await isAdmin();
 
-  if (!admin) {
-    return (
-      <div className="container-page flex min-h-[60vh] flex-col items-center justify-center gap-space-md py-space-3xl text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-container-high">
-          <span className="material-symbols-outlined text-[32px] text-error" aria-hidden="true">lock</span>
-        </div>
-        <span className="section-telemetry">VÙNG HẠN CHẾ</span>
-        <h1 className="font-headline-md text-headline-md text-on-surface">Chỉ Admin Mới Vào Được</h1>
-        <p className="max-w-md font-body-md text-body-md text-on-surface-variant">
-          Đăng nhập bằng tài khoản admin (seed mặc định: admin@lumina.vn) rồi quay lại đây.
-        </p>
-        <Link href="/account" className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
-          Đến trang đăng nhập
-        </Link>
-      </div>
-    );
-  }
+  // Chặn trước khi render: redirect thay vì render lock UI (tránh streaming double-render)
+  if (!admin) redirect("/account");
 
   return (
     <div className="container-page flex flex-col gap-space-lg py-space-lg">

@@ -12,14 +12,12 @@ async function adminLogin(page: import("@playwright/test").Page) {
 }
 
 test.describe("Admin panel", () => {
-  test("không đăng nhập → màn khóa; customer thường → vẫn bị chặn", async ({ page }) => {
+  test("không đăng nhập → redirect /account; customer thường → cũng bị chặn", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page.getByText("Chỉ Admin Mới Vào Được")).toBeVisible();
+    await expect(page).toHaveURL(/\/account/);
 
     // customer thường (không phải admin) cũng bị chặn
     const email = `cust-${Date.now()}@lumina.vn`;
-    await page.goto("/account");
-    await page.waitForLoadState("networkidle");
     await page.getByRole("tab", { name: "Đăng ký" }).click();
     await page.getByLabel("Họ và tên").fill("Khach Thuong");
     await page.getByLabel("Email", { exact: true }).fill(email);
@@ -28,7 +26,7 @@ test.describe("Admin panel", () => {
     await expect(page.getByRole("heading", { name: /Xin chào/ })).toBeVisible({ timeout: 10_000 });
 
     await page.goto("/admin");
-    await expect(page.getByText("Chỉ Admin Mới Vào Được")).toBeVisible();
+    await expect(page).toHaveURL(/\/account/);
   });
 
   test("admin: dashboard → tạo sản phẩm mới → hiện trên catalogue → xóa", async ({ page }) => {
