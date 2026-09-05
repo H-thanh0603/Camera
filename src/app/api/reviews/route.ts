@@ -3,6 +3,7 @@ import { prisma } from "@/lib/server/prisma";
 import { getSessionUser } from "@/lib/server/session";
 import { createRateLimiter } from "@/lib/utils/rate-limit";
 import { dbGetProductById } from "@/lib/server/product-db";
+import { reviewSchema, zodFieldErrors } from "@/lib/schemas";
 
 /**
  * POST /api/reviews — gửi đánh giá.
@@ -26,23 +27,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
   }
 
-  const productId = body.productId ?? "";
-  const author = (body.author ?? "").trim();
-  const title = (body.title ?? "").trim();
-  const reviewBody = (body.body ?? "").trim();
-  const rating = body.rating;
-
   const fieldErrors: Record<string, string> = {};
-  if (Object.keys(fieldErrors).length === 0) {
-    const product = await dbGetProductById(productId);
-    if (!product) fieldErrors.productId = "Sản phẩm không tồn tại.";
+  const parsed = reviewSchema.safeParse({ author: body.author, rating: body.rating, title: body.title, body: body.body });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Đánh giá chưa hợp lệ.", fieldErrors: { ...fieldErrors, ...zodFieldErrors(parsed.error) } }, { status: 422 });
   }
-  if (author.length < 2) fieldErrors.author = "Vui lòng nhập tên của bạn.";
-  if (!Number.isInteger(rating) || (rating as number) < 1 || (rating as number) > 5) fieldErrors.rating = "Vui lòng chọn số sao từ 1 đến 5.";
-  if (title.length < 4) fieldErrors.title = "Tiêu đề cần tối thiểu 4 ký tự.";
-  if (reviewBody.length < 20) fieldErrors.body = "Nội dung cần tối thiểu 20 ký tự.";
-  if (Object.keys(fieldErrors).length > 0) {
-    return NextResponse.json({ error: "Đánh giá chưa hợp lệ.", fieldErrors }, { status: 422 });
+
+  const productId = body.productId ?? "";
+  const product = await dbGetProductById(productId);
+  if (!product) {
+    return NextResponse.json({ error: "Sản phẩm không tồn tại.", fieldErrors: { productId: "Sản phẩm không tồn tại." } }, { status: 422 });
   }
 
   const user = await getSessionUser();
@@ -51,10 +45,10 @@ export async function POST(request: NextRequest) {
     data: {
       productId,
       userId: user?.id ?? null,
-      author,
-      rating: rating as number,
-      title,
-      body: reviewBody,
+      author: parsed.data.author,
+      rating: parsed.data.rating,
+      title: parsed.data.title,
+      body: parsed.data.body,
       approved: false,
       verified: false,
     },

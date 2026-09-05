@@ -14,8 +14,6 @@ import { getSessionUser } from "./session";
 
 export const EXPRESS_FEE = 500_000;
 
-const DELIVERY_OPTIONS = new Set(["standard", "express", "pickup"]);
-const PAYMENT_OPTIONS = new Set(["bank_transfer", "cod", "card_on_delivery"]);
 
 export class OrderValidationError extends Error {
   constructor(message: string) {
@@ -44,18 +42,6 @@ function orderNumber(): string {
   const stamp = Date.now().toString(36).toUpperCase();
   const rand = Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, "0");
   return `LUM-${stamp}${rand}`;
-}
-
-export function verifyInput(contact: ContactInfo, shipping: ShippingInfo, delivery: string, payment: string, lines: IncomingLine[]): void {
-  if (!DELIVERY_OPTIONS.has(delivery)) throw new OrderValidationError("Phương thức giao nhận không hợp lệ.");
-  if (!PAYMENT_OPTIONS.has(payment)) throw new OrderValidationError("Phương thức thanh toán không hợp lệ.");
-  if (!contact?.fullName?.trim() || !contact?.email || !contact?.phone) {
-    throw new OrderValidationError("Thông tin liên hệ chưa đầy đủ.");
-  }
-  if (!shipping?.address?.trim() || !shipping?.ward?.trim() || !shipping?.district?.trim() || !shipping?.city?.trim()) {
-    throw new OrderValidationError("Địa chỉ giao hàng chưa đầy đủ.");
-  }
-  if (!lines?.length) throw new OrderValidationError("Đơn hàng trống.");
 }
 
 /** Verify line với catalogue server (DB) + tính totals. */
@@ -143,7 +129,6 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
     }
   }
 
-  verifyInput(contact, shipping, delivery, payment, input.lines);
   const finalProducts: Product[] = [];
   const { finalLines, totals } = await verifyAndPriceLines(input.lines, delivery, async (id) => {
     const p = await dbGetProductById(id);

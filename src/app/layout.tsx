@@ -32,7 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={`dark ${syne.variable} ${hanken.variable} ${jetbrains.variable}`}>
       <head>
-        {/* display=block cho icon font: tránh flash text ligature gây layout shift (CLS) */}
+        {/* display=block cho icon font: tránh flash text ligature gây layout shift (CLS).
+            2 warning next/font không áp dụng: đây là icon font trong App Router. */}
+        {/* eslint-disable-next-line @next/next/google-font-display, @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=block"
           rel="stylesheet"

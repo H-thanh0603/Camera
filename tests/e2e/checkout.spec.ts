@@ -36,7 +36,7 @@ test.describe("PDP → Cart → Checkout", () => {
 
     // Step 1: validation chặn submit rỗng
     await page.getByRole("button", { name: "Tiếp tục" }).click();
-    await expect(page.getByText("Họ tên là bắt buộc.")).toBeVisible();
+    await expect(page.getByText("Vui lòng nhập họ tên.")).toBeVisible();
 
     await page.getByLabel("Họ và tên").fill("Nguyễn Testing");
     await page.getByLabel("Email", { exact: true }).fill("testing@lumina.vn");

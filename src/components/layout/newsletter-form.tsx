@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { email as emailValidator } from "@/lib/utils/validation";
+import { contactSchema } from "@/lib/schemas";
 import { useStore } from "@/state/store";
 
 export function NewsletterForm() {
@@ -12,9 +12,9 @@ export function NewsletterForm() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const message = emailValidator(value);
-    if (message) {
-      setError(message);
+    const parsed = contactSchema.shape.email.safeParse(value);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Email không hợp lệ.");
       return;
     }
     setError(undefined);

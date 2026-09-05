@@ -4,6 +4,7 @@ import { getUserOrders } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
 import { createRateLimiter } from "@/lib/utils/rate-limit";
 import { logger } from "@/lib/server/logger";
+import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
 
 /**
  * POST /api/orders — đặt hàng (server verify giá/stock, ghi DB).
@@ -25,9 +26,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
   }
 
+  const parsed = placeOrderSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Dữ liệu đơn hàng chưa hợp lệ.", fieldErrors: zodFieldErrors(parsed.error) },
+      { status: 422 },
+    );
+  }
+
   try {
     const idempotencyKey = request.headers.get("idempotency-key") ?? undefined;
-    const order = await placeOrderServer({ ...body, idempotencyKey });
+    const order = await placeOrderServer({ ...parsed.data, idempotencyKey });
     return NextResponse.json({ order }, { status: 201 });
   } catch (error) {
     if (error instanceof OrderValidationError) {

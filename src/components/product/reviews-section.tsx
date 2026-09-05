@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Product, Review } from "@/lib/types";
 import { apiGetProductReviews, apiSubmitReview, ApiError } from "@/lib/api-client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { reviewSchema, type ReviewInput } from "@/lib/schemas";
 import { formatDate, cn } from "@/lib/utils/format";
-import { minLength } from "@/lib/utils/validation";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { EmptyState, Spinner } from "@/components/ui/states";
 import { useStore } from "@/state/store";
@@ -16,18 +18,20 @@ import { useStore } from "@/state/store";
  * đơn hàng mới gắn.
  */
 
-const minBody = minLength("Nội dung", 20);
-const minTitle = minLength("Tiêu đề", 4);
 
 export function ReviewsSection({ product }: { product: Product }) {
   const { user, hydrated, pushToast } = useStore();
   const [pending, setPending] = useState<Review[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [draft, setDraft] = useState({ author: "", rating: 0, title: "", body: "" });
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [submitFailed, setSubmitFailed] = useState(false);
   const [submittedOk, setSubmittedOk] = useState(false);
+
+  const form = useForm<ReviewInput>({
+    resolver: zodResolver(reviewSchema),
+    defaultValues: { author: "", rating: 0, title: "", body: "" },
+  });
+  const rating = form.watch("rating");
 
   const refreshPending = useCallback(() => {
     if (!hydrated) return;
@@ -42,47 +46,26 @@ export function ReviewsSection({ product }: { product: Product }) {
 
   const seedReviews = product.reviews ?? [];
 
-  const setField = (key: keyof typeof draft, value: string | number) => {
-    setDraft((d) => ({ ...d, [key]: value }));
-    setFieldErrors((e) => ({ ...e, [key]: "" }));
-  };
+  const fieldError = (key: keyof ReviewInput): string | undefined =>
+    form.formState.errors[key]?.message ?? serverErrors[key];
 
-  const validateLocally = (): Record<string, string> => {
-    const errors: Record<string, string> = {};
-    if (!Number.isInteger(draft.rating) || draft.rating < 1 || draft.rating > 5) errors.rating = "Vui lòng chọn số sao từ 1 đến 5.";
-    if (draft.author.trim().length < 2) errors.author = "Vui lòng nhập tên của bạn.";
-    const titleErr = minTitle(draft.title);
-    if (titleErr) errors.title = titleErr;
-    const bodyErr = minBody(draft.body);
-    if (bodyErr) errors.body = bodyErr;
-    return errors;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const errors = validateLocally();
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      return;
-    }
-    setSubmitting(true);
+  const onSubmit = async (values: ReviewInput) => {
     setSubmitFailed(false);
     try {
-      await apiSubmitReview({ productId: product.id, ...draft });
+      await apiSubmitReview({ productId: product.id, ...values });
       setSubmittedOk(true);
       setShowForm(false);
-      setDraft({ author: "", rating: 0, title: "", body: "" });
+      form.reset({ author: "", rating: 0, title: "", body: "" });
+      setServerErrors({});
       refreshPending();
     } catch (error) {
       if (error instanceof ApiError && error.fieldErrors) {
-        setFieldErrors(error.fieldErrors);
+        setServerErrors(error.fieldErrors);
       } else if (error instanceof ApiError) {
         pushToast(error.message, "error");
       } else {
         setSubmitFailed(true);
       }
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -121,7 +104,7 @@ export function ReviewsSection({ product }: { product: Product }) {
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg">
+        <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg">
           <fieldset className="flex items-center gap-space-xs">
             <legend className="sr-only">Số sao đánh giá</legend>
             <span className="mr-space-xs font-telemetry-xs text-telemetry-xs uppercase text-outline">Đánh giá của bạn:</span>
@@ -129,32 +112,31 @@ export function ReviewsSection({ product }: { product: Product }) {
               <button
                 key={star}
                 type="button"
-                onClick={() => setField("rating", star)}
+                onClick={() => form.setValue("rating", star, { shouldValidate: true })}
                 aria-label={`${star} sao`}
-                aria-pressed={draft.rating === star}
+                aria-pressed={rating === star}
                 className="p-space-2xs"
               >
                 <span
-                  className={cn("material-symbols-outlined text-[24px]", draft.rating >= star ? "text-primary" : "text-outline")}
+                  className={cn("material-symbols-outlined text-[24px]", rating >= star ? "text-primary" : "text-outline")}
                   aria-hidden="true"
                 >
-                  {draft.rating >= star ? "star" : "star_border"}
+                  {rating >= star ? "star" : "star_border"}
                 </span>
               </button>
             ))}
-            {fieldErrors.rating && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldErrors.rating}</p>}
+            {fieldError("rating") && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldError("rating")}</p>}
           </fieldset>
 
           <div className="flex flex-col gap-space-2xs">
             <label htmlFor="review-title" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Tiêu đề</label>
             <input
               id="review-title"
-              value={draft.title}
-              onChange={(e) => setField("title", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.title)}
-              className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none", fieldErrors.title ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")}
+              {...form.register("title")}
+              aria-invalid={Boolean(fieldError("title"))}
+              className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none", fieldError("title") ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")}
             />
-            {fieldErrors.title && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldErrors.title}</p>}
+            {fieldError("title") && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldError("title")}</p>}
           </div>
 
           <div className="flex flex-col gap-space-2xs">
@@ -162,12 +144,11 @@ export function ReviewsSection({ product }: { product: Product }) {
             <textarea
               id="review-body"
               rows={4}
-              value={draft.body}
-              onChange={(e) => setField("body", e.target.value)}
-              aria-invalid={Boolean(fieldErrors.body)}
-              className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none resize-y", fieldErrors.body ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")}
+              {...form.register("body")}
+              aria-invalid={Boolean(fieldError("body"))}
+              className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none resize-y", fieldError("body") ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")}
             />
-            {fieldErrors.body && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldErrors.body}</p>}
+            {fieldError("body") && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldError("body")}</p>}
           </div>
 
           <div className="flex flex-col gap-space-2xs">
@@ -176,19 +157,18 @@ export function ReviewsSection({ product }: { product: Product }) {
             </label>
             <input
               id="review-author"
-              value={draft.author}
-              onChange={(e) => setField("author", e.target.value)}
               placeholder={user ? user.name : "VD: Nguyễn V. A."}
-              aria-invalid={Boolean(fieldErrors.author)}
-              className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none", fieldErrors.author ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")}
+              {...form.register("author")}
+              aria-invalid={Boolean(fieldError("author"))}
+              className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none", fieldError("author") ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")}
             />
-            {fieldErrors.author && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldErrors.author}</p>}
+            {fieldError("author") && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldError("author")}</p>}
           </div>
 
           {submitFailed && (
             <div className="flex items-center justify-between gap-space-sm rounded-lg border border-error/40 bg-error-container/20 p-space-sm" role="alert">
               <p className="font-body-sm text-body-sm text-error">Không gửi được do lỗi mạng. Vui lòng thử lại.</p>
-              <button type="button" onClick={handleSubmit} disabled={submitting} className="shrink-0 rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface">
+              <button type="button" onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting} className="shrink-0 rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface">
                 Thử lại
               </button>
             </div>
@@ -196,10 +176,10 @@ export function ReviewsSection({ product }: { product: Product }) {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={form.formState.isSubmitting}
             className="flex w-fit items-center justify-center gap-space-xs rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim disabled:opacity-60"
           >
-            {submitting && <Spinner className="border-on-primary border-t-transparent" />}
+            {form.formState.isSubmitting && <Spinner className="border-on-primary border-t-transparent" />}
             Gửi đánh giá
           </button>
         </form>

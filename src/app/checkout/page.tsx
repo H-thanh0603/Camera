@@ -1,43 +1,54 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { ContactInfo, DeliveryMethod, Order, PaymentMethod, ShippingInfo } from "@/lib/types";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { ContactInfo, Order, ShippingInfo } from "@/lib/types";
 import { placeOrder } from "@/lib/services/order-service";
 import { ApiError, apiPayDemo } from "@/lib/api-client";
 import { track } from "@/lib/analytics";
+import { contactSchema, shippingSchema, type ContactInput, type ShippingInput } from "@/lib/schemas";
 import { formatVND, cn } from "@/lib/utils/format";
-import { validateAll, required, email as emailValidator, phoneVN } from "@/lib/utils/validation";
 import { useStore } from "@/state/store";
 import { EmptyState, Spinner } from "@/components/ui/states";
 
 const STEPS = ["Liên hệ", "Vận chuyển", "Giao nhận", "Thanh toán", "Xác nhận"] as const;
 
-const DELIVERY_OPTIONS: { value: DeliveryMethod; label: string; desc: string; price: number }[] = [
+const DELIVERY_OPTIONS: { value: "standard" | "express" | "pickup"; label: string; desc: string; price: number }[] = [
   { value: "standard", label: "Giao chuẩn", desc: "2–4 ngày, bảo hiểm thiết bị trọn gói", price: 0 },
   { value: "express", label: "Giao nhanh trong 24h", desc: "Kỹ thuật viên giao tận studio", price: 500_000 },
   { value: "pickup", label: "Nhận tại Vault", desc: "Quận 1 (HCM) hoặc Hoàn Kiếm (HN)", price: 0 },
 ];
 
-const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; desc: string }[] = [
+const PAYMENT_OPTIONS: { value: "bank_transfer" | "cod" | "card_on_delivery"; label: string; desc: string }[] = [
   { value: "bank_transfer", label: "Chuyển khoản ngân hàng", desc: "Xác nhận chuyển khoản trong 30 phút, hỗ trợ trả góp 0%" },
   { value: "card_on_delivery", label: "Quẹt thẻ khi nhận máy", desc: "POS di động hỗ trợ Visa/Master/JCB" },
   { value: "cod", label: "COD — Thanh toán khi nhận hàng", desc: "Chỉ áp dụng đơn dưới 200 triệu" },
 ];
 
 export default function CheckoutPage() {
-  const router = useRouter();
   const { cartSnapshot, clearCart, hydrated, user, pushToast } = useStore();
   const { lines, totals } = cartSnapshot;
 
   const [step, setStep] = useState(0);
-  const [checkoutTracked, setCheckoutTracked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [paying, setPaying] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+  const [checkoutTracked, setCheckoutTracked] = useState(false);
+
+  const [contact, setContact] = useState<ContactInfo | null>(null);
+  const [shipping, setShipping] = useState<ShippingInfo | null>(null);
+  const [delivery, setDelivery] = useState<"standard" | "express" | "pickup">("standard");
+  const [payment, setPayment] = useState<"bank_transfer" | "cod" | "card_on_delivery">("bank_transfer");
+
+  const contactForm = useForm<ContactInput>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: { fullName: user?.name ?? "", email: user?.email ?? "", phone: "" },
+  });
+  const shippingForm = useForm<ShippingInput>({ resolver: zodResolver(shippingSchema) });
 
   // Mỗi intent đặt hàng có đúng 1 idempotency key: sinh khi vào bước xác nhận,
   // hủy khi lùi lại sửa — server dùng key này để trả lại đơn cũ nếu double-submit.
@@ -45,12 +56,6 @@ export default function CheckoutPage() {
     if (step === 4) setIdempotencyKey((k) => k ?? crypto.randomUUID());
     else setIdempotencyKey(null);
   }, [step]);
-
-  const [contact, setContact] = useState<ContactInfo>({ fullName: user?.name ?? "", email: user?.email ?? "", phone: "" });
-  const [shipping, setShipping] = useState<ShippingInfo>({ address: "", ward: "", district: "", city: "" });
-  const [delivery, setDelivery] = useState<DeliveryMethod>("standard");
-  const [payment, setPayment] = useState<PaymentMethod>("bank_transfer");
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
 
   if (!hydrated) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
 
@@ -149,39 +154,11 @@ export default function CheckoutPage() {
     );
   }
 
-  const validateStep = (target: number): boolean => {
-    if (target === 0) {
-      const errors = validateAll(contact as unknown as Record<string, string>, {
-        fullName: [required("Họ tên")],
-        email: [required("Email"), emailValidator],
-        phone: [required("Số điện thoại"), phoneVN],
-      });
-      setFieldErrors(errors);
-      return Object.keys(errors).length === 0;
-    }
-    if (target === 1) {
-      const errors = validateAll(shipping as unknown as Record<string, string>, {
-        address: [required("Địa chỉ")],
-        ward: [required("Phường/xã")],
-        district: [required("Quận/huyện")],
-        city: [required("Tỉnh/thành phố")],
-      });
-      setFieldErrors(errors);
-      return Object.keys(errors).length === 0;
-    }
-    setFieldErrors({});
-    return true;
-  };
-
-  const goTo = (target: number) => {
-    if (target <= step) {
-      setStep(target);
-      return;
-    }
-    if (validateStep(step)) setStep(target);
-  };
+  const expressFee = DELIVERY_OPTIONS.find((d) => d.value === delivery)?.price ?? 0;
+  const grandTotal = totals.total + expressFee;
 
   const submitOrder = async () => {
+    if (!contact || !shipping) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -201,9 +178,6 @@ export default function CheckoutPage() {
     }
   };
 
-  const expressFee = DELIVERY_OPTIONS.find((d) => d.value === delivery)?.price ?? 0;
-  const grandTotal = totals.total + expressFee;
-
   return (
     <div className="container-page flex flex-col gap-space-xl py-space-xl">
       <header className="flex flex-col gap-space-2xs">
@@ -217,7 +191,9 @@ export default function CheckoutPage() {
           <li key={label} className="flex items-center gap-space-xs">
             <button
               type="button"
-              onClick={() => goTo(i)}
+              onClick={() => {
+                if (i <= step) setStep(i);
+              }}
               aria-current={i === step ? "step" : undefined}
               className={cn(
                 "flex items-center gap-space-2xs rounded-lg px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase transition-colors",
@@ -234,25 +210,50 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 gap-space-xl lg:grid-cols-12">
         <div className="flex flex-col gap-space-md lg:col-span-7">
           {step === 0 && (
-            <fieldset className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg">
-              <legend className="font-headline-sm text-headline-sm uppercase text-on-surface">Thông tin liên hệ</legend>
-              <TextField label="Họ và tên" id="fullName" value={contact.fullName} onChange={(v) => setContact({ ...contact, fullName: v })} error={fieldErrors.fullName} autoComplete="name" />
-              <TextField label="Email" id="email" type="email" value={contact.email} onChange={(v) => setContact({ ...contact, email: v })} error={fieldErrors.email} autoComplete="email" />
-              <TextField label="Số điện thoại" id="phone" type="tel" value={contact.phone} onChange={(v) => setContact({ ...contact, phone: v })} error={fieldErrors.phone} autoComplete="tel" placeholder="0901234567" />
-            </fieldset>
+            <form
+              onSubmit={contactForm.handleSubmit((values) => {
+                setContact(values);
+                setStep(1);
+              })}
+              noValidate
+              className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg"
+            >
+              <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Thông tin liên hệ</h2>
+              <Field label="Họ và tên" inputProps={contactForm.register("fullName")} error={contactForm.formState.errors.fullName?.message} autoComplete="name" />
+              <Field label="Email" type="email" inputProps={contactForm.register("email")} error={contactForm.formState.errors.email?.message} autoComplete="email" />
+              <Field label="Số điện thoại" type="tel" inputProps={contactForm.register("phone")} error={contactForm.formState.errors.phone?.message} autoComplete="tel" placeholder="0901234567" />
+              <button type="submit" className="self-end rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+                Tiếp tục
+              </button>
+            </form>
           )}
 
           {step === 1 && (
-            <fieldset className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg">
-              <legend className="font-headline-sm text-headline-sm uppercase text-on-surface">Địa chỉ nhận hàng</legend>
-              <TextField label="Địa chỉ" id="address" value={shipping.address} onChange={(v) => setShipping({ ...shipping, address: v })} error={fieldErrors.address} autoComplete="street-address" />
+            <form
+              onSubmit={shippingForm.handleSubmit((values) => {
+                setShipping(values);
+                setStep(2);
+              })}
+              noValidate
+              className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg"
+            >
+              <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Địa chỉ nhận hàng</h2>
+              <Field label="Địa chỉ" inputProps={shippingForm.register("address")} error={shippingForm.formState.errors.address?.message} autoComplete="street-address" />
               <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-3">
-                <TextField label="Phường/xã" id="ward" value={shipping.ward} onChange={(v) => setShipping({ ...shipping, ward: v })} error={fieldErrors.ward} />
-                <TextField label="Quận/huyện" id="district" value={shipping.district} onChange={(v) => setShipping({ ...shipping, district: v })} error={fieldErrors.district} />
-                <TextField label="Tỉnh/thành" id="city" value={shipping.city} onChange={(v) => setShipping({ ...shipping, city: v })} error={fieldErrors.city} />
+                <Field label="Phường/xã" inputProps={shippingForm.register("ward")} error={shippingForm.formState.errors.ward?.message} />
+                <Field label="Quận/huyện" inputProps={shippingForm.register("district")} error={shippingForm.formState.errors.district?.message} />
+                <Field label="Tỉnh/thành" inputProps={shippingForm.register("city")} error={shippingForm.formState.errors.city?.message} />
               </div>
-              <TextField label="Ghi chú cho kỹ thuật viên (tùy chọn)" id="notes" value={shipping.notes ?? ""} onChange={(v) => setShipping({ ...shipping, notes: v })} />
-            </fieldset>
+              <Field label="Ghi chú cho kỹ thuật viên (tùy chọn)" inputProps={shippingForm.register("notes")} />
+              <div className="flex justify-between">
+                <button type="button" onClick={() => setStep(0)} className="font-telemetry-data text-telemetry-data uppercase text-on-surface-variant transition-colors hover:text-primary">
+                  Bước trước
+                </button>
+                <button type="submit" className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+                  Tiếp tục
+                </button>
+              </div>
+            </form>
           )}
 
           {step === 2 && (
@@ -276,6 +277,14 @@ export default function CheckoutPage() {
                   <span className="font-telemetry-data text-telemetry-data text-primary">{option.price === 0 ? "0 ₫" : formatVND(option.price)}</span>
                 </label>
               ))}
+              <div className="flex justify-between pt-space-xs">
+                <button type="button" onClick={() => setStep(1)} className="font-telemetry-data text-telemetry-data uppercase text-on-surface-variant transition-colors hover:text-primary">
+                  Bước trước
+                </button>
+                <button type="button" onClick={() => setStep(3)} className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+                  Tiếp tục
+                </button>
+              </div>
             </fieldset>
           )}
 
@@ -300,10 +309,18 @@ export default function CheckoutPage() {
                   </span>
                 </label>
               ))}
+              <div className="flex justify-between pt-space-xs">
+                <button type="button" onClick={() => setStep(2)} className="font-telemetry-data text-telemetry-data uppercase text-on-surface-variant transition-colors hover:text-primary">
+                  Bước trước
+                </button>
+                <button type="button" onClick={() => setStep(4)} className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+                  Tiếp tục
+                </button>
+              </div>
             </fieldset>
           )}
 
-          {step === 4 && (
+          {step === 4 && contact && shipping && (
             <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg" aria-label="Xác nhận đơn hàng">
               <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Xem lại đơn hàng</h2>
               <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2">
@@ -343,25 +360,6 @@ export default function CheckoutPage() {
               </button>
             </section>
           )}
-
-          <div className="flex justify-between">
-            <button
-              type="button"
-              onClick={() => (step === 0 ? router.push("/cart") : setStep(step - 1))}
-              className="flex items-center gap-space-2xs font-telemetry-data text-telemetry-data uppercase text-on-surface-variant transition-colors hover:text-primary"
-            >
-              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_back</span> {step === 0 ? "Về giỏ hàng" : "Bước trước"}
-            </button>
-            {step < 4 && (
-              <button
-                type="button"
-                onClick={() => goTo(step + 1)}
-                className="flex items-center gap-space-2xs rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim"
-              >
-                Tiếp tục <span className="material-symbols-outlined text-[16px]" aria-hidden="true">arrow_forward</span>
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Summary rail */}
@@ -377,7 +375,7 @@ export default function CheckoutPage() {
             </div>
           </div>
           <p className="font-telemetry-xs text-[10px] uppercase leading-relaxed text-outline">
-            Bước thanh toán được mã hóa TLS. Đơn hàng chưa được ghi nhận cho đến khi bạn bấm “Xác nhận đặt hàng”.
+            Bước thanh toán được mã hóa TLS. Số tiền cuối cùng được server xác minh khi đặt hàng.
           </p>
         </aside>
       </div>
@@ -385,23 +383,33 @@ export default function CheckoutPage() {
   );
 }
 
-function TextField({
-  label, id, value, onChange, error, type = "text", autoComplete, placeholder,
+function Field({
+  label,
+  inputProps,
+  error,
+  type = "text",
+  autoComplete,
+  placeholder,
 }: {
-  label: string; id: string; value: string; onChange: (v: string) => void; error?: string; type?: string; autoComplete?: string; placeholder?: string;
+  label: string;
+  inputProps: Record<string, unknown>;
+  error?: string;
+  type?: string;
+  autoComplete?: string;
+  placeholder?: string;
 }) {
+  const id = (inputProps.name as string) ?? label;
   return (
     <div className="flex flex-col gap-space-2xs">
       <label htmlFor={id} className="font-telemetry-xs text-telemetry-xs uppercase text-outline">{label}</label>
       <input
         id={id}
         type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
         placeholder={placeholder}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
+        {...inputProps}
         className={cn(
           "rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none transition-colors placeholder:text-outline",
           error ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary",

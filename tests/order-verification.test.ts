@@ -1,28 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { verifyAndPriceLines, verifyInput, OrderValidationError, EXPRESS_FEE } from "@/lib/server/place-order";
+import { verifyAndPriceLines, EXPRESS_FEE } from "@/lib/server/place-order";
 import { getProductById } from "@/lib/repositories/product-repository";
-import type { ContactInfo, ShippingInfo } from "@/lib/types";
-
-const contact: ContactInfo = { fullName: "Test", email: "t@lumina.vn", phone: "0901234567" };
-const shipping: ShippingInfo = { address: "1 Lê Lợi", ward: "Bến Nghé", district: "Quận 1", city: "TP.HCM" };
-
 const resolveProduct = async (id: string) => getProductById(id) ?? null;
-
-describe("verifyInput", () => {
-  it("chấp nhận input hợp lệ", () => {
-    expect(() => verifyInput(contact, shipping, "standard", "bank_transfer", [{ productId: "p-lumina-x1", quantity: 1 }])).not.toThrow();
-  });
-
-  it("từ chối delivery/payment không hợp lệ", () => {
-    expect(() => verifyInput(contact, shipping, "drone", "bank_transfer", [{ productId: "p-lumina-x1", quantity: 1 }])).toThrow(OrderValidationError);
-    expect(() => verifyInput(contact, shipping, "standard", "crypto", [{ productId: "p-lumina-x1", quantity: 1 }])).toThrow(OrderValidationError);
-  });
-
-  it("từ chối thiếu địa chỉ hoặc giỏ trống", () => {
-    expect(() => verifyInput(contact, { ...shipping, city: "" }, "standard", "cod", [{ productId: "p-lumina-x1", quantity: 1 }])).toThrow(/địa chỉ/i);
-    expect(() => verifyInput(contact, shipping, "standard", "cod", [])).toThrow(/trống/i);
-  });
-});
 
 describe("verifyAndPriceLines — server-side price verification", () => {
   it("lấy giá từ catalogue server, bỏ qua bất cứ giá nào client gửi", async () => {

@@ -5,7 +5,11 @@ import { useEffect, useState } from "react";
 import type { Order, OrderStep } from "@/lib/types";
 import { ORDER_STEP_ORDER } from "@/lib/types";
 import { listOrders, cancelOrder } from "@/lib/services/order-service";
-import { toAuthError, type AuthError } from "@/lib/api-client";
+import { toAuthError } from "@/lib/api-client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from "@/lib/schemas";
+
 import { useStore } from "@/state/store";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 import { EmptyState, Spinner } from "@/components/ui/states";
@@ -30,14 +34,17 @@ const STEP_LABEL: Record<OrderStep, string> = {
   delivered: "Giao thành công",
 };
 
+function loginInputClass(invalid: boolean): string {
+  return `rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none ${invalid ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary"}`;
+}
+
 export default function AccountPage() {
   const { user, hydrated, authLoading, login, register, logout, pushToast } = useStore();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<AuthError | null>(null);
+  const [serverError, setServerError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const loginForm = useForm<LoginInput>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
+  const registerForm = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { name: "", email: "", password: "" } });
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [ordersError, setOrdersError] = useState<string | null>(null);
 
@@ -51,16 +58,27 @@ export default function AccountPage() {
   if (!hydrated || authLoading) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
 
   if (!user) {
-    const submit = async (e: React.FormEvent) => {
-      e.preventDefault();
+    const doLogin = async (values: LoginInput) => {
       setBusy(true);
-      setError(null);
+      setServerError(null);
       try {
-        if (mode === "login") await login(email, password);
-        else await register(name, email, password);
+        await login(values.email, values.password);
         pushToast("Đăng nhập thành công. Chào mừng đến Lumina Optics!", "success");
       } catch (err) {
-        setError(toAuthError(err));
+        setServerError(toAuthError(err).message);
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const doRegister = async (values: RegisterInput) => {
+      setBusy(true);
+      setServerError(null);
+      try {
+        await register(values.name, values.email, values.password);
+        pushToast("Tài khoản đã được tạo. Chào mừng đến Lumina Optics!", "success");
+      } catch (err) {
+        setServerError(toAuthError(err).message);
       } finally {
         setBusy(false);
       }
@@ -74,6 +92,7 @@ export default function AccountPage() {
             <h1 className="font-headline-md text-headline-md text-on-surface">{mode === "login" ? "Đăng Nhập" : "Tạo Tài Khoản"}</h1>
           </div>
 
+          {serverError && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{serverError}</p>}
           <div className="flex rounded-lg bg-surface-container-low p-space-2xs" role="tablist" aria-label="Chọn chế độ đăng nhập">
             {(["login", "register"] as const).map((m) => (
               <button
@@ -81,7 +100,7 @@ export default function AccountPage() {
                 type="button"
                 role="tab"
                 aria-selected={mode === m}
-                onClick={() => { setMode(m); setError(null); }}
+                onClick={() => { setMode(m); setServerError(null); }}
                 className={cn(
                   "flex-1 rounded px-space-sm py-space-2xs font-telemetry-data text-telemetry-data uppercase transition-colors",
                   mode === m ? "bg-primary text-on-primary" : "text-on-surface-variant hover:text-on-surface",
@@ -92,29 +111,46 @@ export default function AccountPage() {
             ))}
           </div>
 
-          <form onSubmit={submit} noValidate className="flex flex-col gap-space-sm">
-            {mode === "register" && (
+          {mode === "login" ? (
+            <form onSubmit={loginForm.handleSubmit(doLogin)} noValidate className="flex flex-col gap-space-sm">
+              <div className="flex flex-col gap-space-2xs">
+                <label htmlFor="account-email" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Email</label>
+                <input id="account-email" type="email" autoComplete="email" {...loginForm.register("email")} aria-invalid={Boolean(loginForm.formState.errors.email)} className={loginInputClass(Boolean(loginForm.formState.errors.email))} />
+                {loginForm.formState.errors.email && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{loginForm.formState.errors.email.message}</p>}
+              </div>
+              <div className="flex flex-col gap-space-2xs">
+                <label htmlFor="account-password" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mật khẩu</label>
+                <input id="account-password" type="password" autoComplete="current-password" {...loginForm.register("password")} aria-invalid={Boolean(loginForm.formState.errors.password)} className={loginInputClass(Boolean(loginForm.formState.errors.password))} />
+                {loginForm.formState.errors.password && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{loginForm.formState.errors.password.message}</p>}
+              </div>
+              <button type="submit" disabled={busy} className="mt-space-xs flex items-center justify-center gap-space-xs rounded-lg bg-primary py-space-sm font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim disabled:opacity-60">
+                {busy && <Spinner className="border-on-primary border-t-transparent" />}
+                Đăng nhập
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={registerForm.handleSubmit(doRegister)} noValidate className="flex flex-col gap-space-sm">
               <div className="flex flex-col gap-space-2xs">
                 <label htmlFor="account-name" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Họ và tên</label>
-                <input id="account-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" aria-invalid={error?.field === "name"} className="rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary" />
-                {error?.field === "name" && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{error.message}</p>}
+                <input id="account-name" autoComplete="name" {...registerForm.register("name")} aria-invalid={Boolean(registerForm.formState.errors.name)} className={loginInputClass(Boolean(registerForm.formState.errors.name))} />
+                {registerForm.formState.errors.name && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{registerForm.formState.errors.name.message}</p>}
               </div>
-            )}
-            <div className="flex flex-col gap-space-2xs">
-              <label htmlFor="account-email" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Email</label>
-              <input id="account-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" aria-invalid={error?.field === "email"} className="rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary" />
-              {error?.field === "email" && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{error.message}</p>}
-            </div>
-            <div className="flex flex-col gap-space-2xs">
-              <label htmlFor="account-password" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mật khẩu (tối thiểu 8 ký tự)</label>
-              <input id="account-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={error?.field === "password"} className="rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary" />
-              {error?.field === "password" && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{error.message}</p>}
-            </div>
-            <button type="submit" disabled={busy} className="mt-space-xs flex items-center justify-center gap-space-xs rounded-lg bg-primary py-space-sm font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim disabled:opacity-60">
-              {busy && <Spinner className="border-on-primary border-t-transparent" />}
-              {mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}
-            </button>
-          </form>
+              <div className="flex flex-col gap-space-2xs">
+                <label htmlFor="account-email" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Email</label>
+                <input id="account-email" type="email" autoComplete="email" {...registerForm.register("email")} aria-invalid={Boolean(registerForm.formState.errors.email)} className={loginInputClass(Boolean(registerForm.formState.errors.email))} />
+                {registerForm.formState.errors.email && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{registerForm.formState.errors.email.message}</p>}
+              </div>
+              <div className="flex flex-col gap-space-2xs">
+                <label htmlFor="account-password" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mật khẩu (tối thiểu 8 ký tự)</label>
+                <input id="account-password" type="password" autoComplete="new-password" {...registerForm.register("password")} aria-invalid={Boolean(registerForm.formState.errors.password)} className={loginInputClass(Boolean(registerForm.formState.errors.password))} />
+                {registerForm.formState.errors.password && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{registerForm.formState.errors.password.message}</p>}
+              </div>
+              <button type="submit" disabled={busy} className="mt-space-xs flex items-center justify-center gap-space-xs rounded-lg bg-primary py-space-sm font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim disabled:opacity-60">
+                {busy && <Spinner className="border-on-primary border-t-transparent" />}
+                Tạo tài khoản
+              </button>
+            </form>
+          )}
 
           <p className="text-center font-telemetry-xs text-telemetry-xs uppercase leading-relaxed text-outline">
             Demo authentication phía client — khi tích hợp backend sẽ dùng JWT/session cookie, không lưu thông tin nhạy cảm trong localStorage.
