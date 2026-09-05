@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/server/prisma";
 import { recentAuditLogs } from "@/lib/server/audit";
+import { OrdersChart } from "@/components/admin/orders-chart";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 
 export const metadata = { title: "Admin Dashboard" };
@@ -31,6 +32,23 @@ export default async function AdminDashboardPage() {
   // SQLite Json: tổng tiền tính ở application level từ totals.total
   const revenue = paidOrders.reduce((sum, o) => sum + ((o.totals as { total?: number })?.total ?? 0), 0);
 
+  // Đơn hàng 14 ngày gần nhất cho biểu đồ
+  const allOrders = await prisma.order.findMany({ select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 500 });
+  const chartData: { day: string; orders: number; revenue: number }[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    dayStart.setDate(dayStart.getDate() - i);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayOrders = allOrders.filter((o) => o.createdAt >= dayStart && o.createdAt < dayEnd).length;
+    chartData.push({
+      day: dayStart.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
+      orders: dayOrders,
+      revenue: 0,
+    });
+  }
+
   const stats = [
     { label: "Đơn hàng", value: String(orderCount), icon: "receipt_long", href: "/admin/orders" },
     { label: "Doanh thu xác nhận", value: formatVND(revenue), icon: "payments", href: "/admin/orders" },
@@ -53,6 +71,11 @@ export default async function AdminDashboardPage() {
             <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">{s.label}</span>
           </Link>
         ))}
+      </section>
+
+      <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg shadow-xl" aria-label="Biểu đồ đơn hàng">
+        <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Đơn Hàng 14 Ngày Gần Đây</h2>
+        <OrdersChart data={chartData} />
       </section>
 
       <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg shadow-xl" aria-label="Đơn hàng gần đây">
