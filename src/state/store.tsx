@@ -2,10 +2,11 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CartLine, CartSnapshot, Product, SessionUser, WishlistEntry } from "@/lib/types";
-import { buildCartSnapshot, clampQuantity, mergeLine } from "@/lib/services/cart-service";
+import { buildCartSnapshot, clampQuantity, mergeLine, resolveVariant, unitPriceOf } from "@/lib/services/cart-service";
 import { getProductById, setCatalogProducts } from "@/lib/repositories/product-repository";
 import { loadJSON, saveJSON } from "@/lib/repositories/storage-repository";
 import { apiLogin, apiLogout, apiMe, apiRegister } from "@/lib/api-client";
+import { track } from "@/lib/analytics";
 
 /* ================= Toast ================= */
 
@@ -224,6 +225,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         dispatch({ type: "cart/add", line: { productId: product.id, variantId, quantity: clamped, addedAt: new Date().toISOString() } });
+        track("add_to_cart", { productId: product.id, variantId: variantId ?? null, quantity: clamped, price: unitPriceOf(product, resolveVariant(product, variantId)) });
         pushToast(`Đã thêm "${product.name}" vào giỏ hàng.`, "success", { label: "Xem giỏ", href: "/cart" });
         setCartDrawerOpen(true);
         return true;

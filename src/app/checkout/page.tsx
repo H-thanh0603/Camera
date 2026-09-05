@@ -6,6 +6,7 @@ import { useState } from "react";
 import type { ContactInfo, DeliveryMethod, Order, PaymentMethod, ShippingInfo } from "@/lib/types";
 import { placeOrder } from "@/lib/services/order-service";
 import { ApiError, apiPayDemo } from "@/lib/api-client";
+import { track } from "@/lib/analytics";
 import { formatVND, cn } from "@/lib/utils/format";
 import { validateAll, required, email as emailValidator, phoneVN } from "@/lib/utils/validation";
 import { useStore } from "@/state/store";
@@ -31,6 +32,7 @@ export default function CheckoutPage() {
   const { lines, totals } = cartSnapshot;
 
   const [step, setStep] = useState(0);
+  const [checkoutTracked, setCheckoutTracked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
@@ -117,6 +119,11 @@ export default function CheckoutPage() {
     );
   }
 
+  if (lines.length > 0 && !checkoutTracked) {
+    setCheckoutTracked(true);
+    track("begin_checkout", { itemCount: totals.itemCount, total: totals.total });
+  }
+
   if (lines.length === 0) {
     return (
       <div className="container-page py-space-3xl">
@@ -173,6 +180,7 @@ export default function CheckoutPage() {
       const order = await placeOrder({ contact, shipping, delivery, payment, snapshot: cartSnapshot });
       clearCart();
       setPlacedOrder(order);
+      track("purchase", { orderId: order.id, total: order.totals.total, itemCount: order.totals.itemCount, payment: order.payment });
     } catch (error) {
       if (error instanceof ApiError) {
         // Lỗi nghiệp vụ từ server (hết hàng, dữ liệu lệch) — message tiếng Việt từ API

@@ -8,6 +8,7 @@ import { discountPercent, formatVND, cn } from "@/lib/utils/format";
 import { AVAILABILITY_CLASS, AVAILABILITY_LABEL, canPurchase } from "@/lib/utils/availability";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { useStore } from "@/state/store";
+import { track } from "@/lib/analytics";
 
 /**
  * PurchasePanel — gallery, variant selector, quantity, CTA.
@@ -33,10 +34,11 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   const purchasable = maxQuantity > 0 && canPurchase(availability);
   const sku = variant?.sku ?? product.sku;
 
-  // Ghi nhận lượt xem cho Recently Viewed
+  // Ghi nhận lượt xem cho Recently Viewed + analytics
   useEffect(() => {
     trackView(product.id);
-  }, [product.id, trackView]);
+    track("view_item", { productId: product.id, price: product.price, category: product.category });
+  }, [product.id, product.price, product.category, trackView]);
 
   const displayImage = useMemo(() => {
     if (variant?.image) return variant.image;

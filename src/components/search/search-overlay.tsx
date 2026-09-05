@@ -8,6 +8,7 @@ import { formatVND } from "@/lib/utils/format";
 import { useDebounce } from "@/hooks/useDebounce";
 import { loadJSON, saveJSON } from "@/lib/repositories/storage-repository";
 import { useStore } from "@/state/store";
+import { track } from "@/lib/analytics";
 
 const RECENT_KEY = "search.recent";
 
@@ -45,6 +46,7 @@ export function SearchOverlay() {
     const updated = [trimmed, ...loadJSON<string[]>(RECENT_KEY, []).filter((t) => t !== trimmed)].slice(0, 5);
     saveJSON(RECENT_KEY, updated);
     setSearchOpen(false);
+    track("search", { query: trimmed, results: result.total });
     router.push(`/products?search=${encodeURIComponent(trimmed)}`);
   };
 

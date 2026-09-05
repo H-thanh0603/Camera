@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SearchOverlay } from "@/components/search/search-overlay";
 import { Toaster } from "@/components/ui/toaster";
+import { WebVitalsReporter } from "@/components/analytics/web-vitals";
 
 const syne = Syne({ subsets: ["latin", "latin-ext"], variable: "--font-syne", display: "swap" });
 const hanken = Hanken_Grotesk({ subsets: ["latin", "latin-ext"], variable: "--font-hanken", display: "swap" });
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartDrawer />
           <SearchOverlay />
           <Toaster />
+          <WebVitalsReporter />
         </StoreProvider>
       </body>
     </html>
