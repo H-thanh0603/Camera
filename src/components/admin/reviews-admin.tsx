@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { formatDate, cn } from "@/lib/utils/format";
 import { Spinner } from "@/components/ui/states";
 
@@ -21,26 +22,19 @@ type Tab = "pending" | "approved" | "all";
 
 export function ReviewsAdmin() {
   const [tab, setTab] = useState<Tab>("pending");
-  const [reviews, setReviews] = useState<AdminReview[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading, error } = useQuery<{ reviews: AdminReview[] }>({
+    queryKey: ["admin", "reviews", tab],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/reviews?status=${tab}`);
+      if (!res.ok) throw new Error("Không tải được đánh giá.");
+      return res.json();
+    },
+  });
+  const reviews = data?.reviews ?? [];
 
-  const load = (t: Tab) => {
-    setReviews(null);
-    setError(null);
-    fetch(`/api/admin/reviews?status=${t}`)
-      .then((r) => r.json())
-      .then((d) => setReviews(d.reviews ?? []))
-      .catch(() => setError("Không tải được đánh giá."));
-  };
-
-  useEffect(() => {
-    load(tab);
-  }, [tab]);
-
-  const act = async (id: string, action: "approve" | "unapprove" | "delete") => {
-    setBusyId(id);
-    try {
+  const act = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: "approve" | "unapprove" | "delete" }) => {
       const res =
         action === "delete"
           ? await fetch(`/api/admin/reviews/${id}`, { method: "DELETE" })
@@ -49,12 +43,11 @@ export function ReviewsAdmin() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ approved: action === "approve" }),
             });
-      if (res.ok) setReviews((prev) => prev?.filter((r) => r.id !== id) ?? prev);
-      else setError("Thao tác thất bại.");
-    } finally {
-      setBusyId(null);
-    }
-  };
+      if (!res.ok) throw new Error("Thao tác thất bại.");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "reviews"] }),
+  });
+  const busyId = act.isPending ? act.variables?.id ?? null : null;
 
   return (
     <div className="flex flex-col gap-space-lg">
@@ -81,8 +74,8 @@ export function ReviewsAdmin() {
         ))}
       </div>
 
-      {error && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{error}</p>}
-      {reviews === null && !error ? (
+      {error && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{(error as Error).message}</p>}
+      {isLoading ? (
         <div className="flex justify-center py-space-lg"><Spinner className="border-primary border-t-transparent" /></div>
       ) : (reviews ?? []).length === 0 ? (
         <p className="rounded-xl bg-surface-container p-space-lg font-body-md text-body-md text-on-surface-variant">Không có đánh giá nào trong mục này.</p>
@@ -104,15 +97,15 @@ export function ReviewsAdmin() {
               <p className="font-body-sm text-body-sm text-on-surface-variant">{r.body}</p>
               <div className="flex gap-space-xs pt-space-2xs">
                 {r.approved ? (
-                  <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "unapprove")} className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-surface-container-highest">
+                  <button type="button" disabled={busyId === r.id} onClick={() => act.mutate({ id: r.id, action: "unapprove" })} className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-surface-container-highest">
                     Hủy duyệt
                   </button>
                 ) : (
-                  <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "approve")} className="rounded-lg bg-primary px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+                  <button type="button" disabled={busyId === r.id} onClick={() => act.mutate({ id: r.id, action: "approve" })} className="rounded-lg bg-primary px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
                     Duyệt hiển thị
                   </button>
                 )}
-                <button type="button" disabled={busyId === r.id} onClick={() => act(r.id, "delete")} className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-error">
+                <button type="button" disabled={busyId === r.id} onClick={() => act.mutate({ id: r.id, action: "delete" })} className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-error">
                   Xóa
                 </button>
               </div>

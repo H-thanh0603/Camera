@@ -8,6 +8,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SearchOverlay } from "@/components/search/search-overlay";
 import { Toaster } from "@/components/ui/toaster";
 import { WebVitalsReporter } from "@/components/analytics/web-vitals";
+import { QueryProvider } from "@/components/providers/query-provider";
 
 const syne = Syne({ subsets: ["latin", "latin-ext"], variable: "--font-syne", display: "swap" });
 const hanken = Hanken_Grotesk({ subsets: ["latin", "latin-ext"], variable: "--font-hanken", display: "swap" });
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-background font-body-md text-on-surface antialiased">
         <StoreProvider>
+          <QueryProvider>
           <Header />
           <main id="main" className="w-full bg-background pt-20 lg:pt-[125px]">
             {children}
@@ -53,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SearchOverlay />
           <Toaster />
           <WebVitalsReporter />
+          </QueryProvider>
         </StoreProvider>
       </body>
     </html>

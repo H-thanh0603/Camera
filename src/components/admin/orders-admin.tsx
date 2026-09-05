@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 import { Spinner } from "@/components/ui/states";
@@ -18,35 +19,35 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function OrdersAdmin() {
-  const [orders, setOrders] = useState<Order[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data: orders, isLoading, error } = useQuery<{ orders: Order[] }>({
+    queryKey: ["admin", "orders"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/orders");
+      if (!res.ok) throw new Error("Không tải được đơn hàng.");
+      return res.json();
+    },
+  });
 
-  useEffect(() => {
-    fetch("/api/admin/orders")
-      .then((r) => r.json())
-      .then((d) => setOrders(d.orders ?? []))
-      .catch(() => setError("Không tải được đơn hàng."));
-  }, []);
-
-  const changeStatus = async (id: string, status: OrderStatus) => {
-    setUpdatingId(id);
-    try {
+  const changeStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: OrderStatus }) => {
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (res.ok) {
-        setOrders((prev) => prev?.map((o) => (o.id === id ? { ...o, status } : o)) ?? prev);
-      } else {
-        const data = await res.json();
-        setError(data.error ?? "Cập nhật thất bại.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Cập nhật thất bại.");
       }
-    } finally {
-      setUpdatingId(null);
-    }
-  };
+    },
+    onSuccess: (_data, variables) => {
+      // Optimistic update trong cache — không cần refetch
+      queryClient.setQueryData<{ orders: Order[] }>(["admin", "orders"], (prev) =>
+        prev ? { orders: prev.orders.map((o) => (o.id === variables.id ? { ...o, status: variables.status } : o)) } : prev,
+      );
+    },
+  });
 
   return (
     <div className="flex flex-col gap-space-lg">
@@ -55,14 +56,14 @@ export function OrdersAdmin() {
         <h1 className="font-headline-md text-headline-md text-on-surface">Quản Trị Đơn Hàng</h1>
       </header>
 
-      {error && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{error}</p>}
-      {orders === null && !error ? (
+      {error && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{(error as Error).message}</p>}
+      {isLoading ? (
         <div className="flex justify-center py-space-lg"><Spinner className="border-primary border-t-transparent" /></div>
-      ) : (orders ?? []).length === 0 ? (
+      ) : (orders?.orders ?? []).length === 0 ? (
         <p className="rounded-xl bg-surface-container p-space-lg font-body-md text-body-md text-on-surface-variant">Chưa có đơn hàng nào.</p>
       ) : (
         <ul className="flex flex-col gap-space-md">
-          {(orders ?? []).map((o) => (
+          {(orders?.orders ?? []).map((o) => (
             <li key={o.id} className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg shadow-xl">
               <div className="flex flex-wrap items-center justify-between gap-space-sm">
                 <div className="flex flex-col">
@@ -77,15 +78,15 @@ export function OrdersAdmin() {
                   <select
                     id={`status-${o.id}`}
                     value={o.status}
-                    disabled={updatingId === o.id}
-                    onChange={(e) => changeStatus(o.id, e.target.value as OrderStatus)}
+                    disabled={changeStatus.isPending}
+                    onChange={(e) => changeStatus.mutate({ id: o.id, status: e.target.value as OrderStatus })}
                     className="rounded-lg bg-surface-container-low px-space-sm py-space-2xs font-telemetry-data text-telemetry-data uppercase text-on-surface outline-none focus:ring-1 focus:ring-primary"
                   >
                     {STATUSES.map((s) => (
                       <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                     ))}
                   </select>
-                  {updatingId === o.id && <Spinner className="border-primary border-t-transparent" />}
+                  {changeStatus.isPending && <Spinner className="border-primary border-t-transparent" />}
                 </div>
               </div>
               <ul className="flex flex-wrap gap-space-sm">
