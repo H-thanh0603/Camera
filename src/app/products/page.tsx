@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { queryProducts, getFacets } from "@/lib/repositories/product-repository";
+import { applyQuery } from "@/lib/repositories/product-repository";
+import { dbAllProducts } from "@/lib/server/product-db";
 import type { Category, ProductQuery } from "@/lib/types";
 import { ProductCard } from "@/components/product/product-card";
 import { EmptyState, CardSkeletonGrid } from "@/components/ui/states";
 import { CatalogControls } from "@/components/catalog/catalog-controls";
 import { parseCatalogParams } from "@/lib/utils/catalog-params";
+import { getFacets as buildFacets } from "@/lib/repositories/product-repository";
 
 export const metadata: Metadata = {
   title: "Kho Thiết Bị — Máy Ảnh, Ống Kính & Phụ Kiện",
@@ -35,8 +37,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     pageSize: 9,
   };
 
-  const result = queryProducts(query);
-  const facets = getFacets({ ...query, page: undefined, brands: undefined, categories: undefined });
+  const catalog = await dbAllProducts();
+  const result = applyQuery(catalog, query);
+  const facets = buildFacets({ ...query, page: undefined, brands: undefined, categories: undefined }, catalog);
 
   return (
     <div className="container-page flex flex-col gap-space-xl py-space-xl">

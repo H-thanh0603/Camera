@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getSessionUser } from "@/lib/server/session";
 import { createRateLimiter } from "@/lib/utils/rate-limit";
-import { getProductById } from "@/lib/repositories/product-repository";
+import { dbGetProductById } from "@/lib/server/product-db";
 
 /**
  * POST /api/reviews — gửi đánh giá.
@@ -33,7 +33,10 @@ export async function POST(request: NextRequest) {
   const rating = body.rating;
 
   const fieldErrors: Record<string, string> = {};
-  if (!getProductById(productId)) fieldErrors.productId = "Sản phẩm không tồn tại.";
+  if (Object.keys(fieldErrors).length === 0) {
+    const product = await dbGetProductById(productId);
+    if (!product) fieldErrors.productId = "Sản phẩm không tồn tại.";
+  }
   if (author.length < 2) fieldErrors.author = "Vui lòng nhập tên của bạn.";
   if (!Number.isInteger(rating) || (rating as number) < 1 || (rating as number) > 5) fieldErrors.rating = "Vui lòng chọn số sao từ 1 đến 5.";
   if (title.length < 4) fieldErrors.title = "Tiêu đề cần tối thiểu 4 ký tự.";

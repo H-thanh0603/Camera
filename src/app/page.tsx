@@ -6,6 +6,9 @@ import { SensorLab } from "@/components/home/sensor-lab";
 import { VaultBestsellers } from "@/components/home/vault-bestsellers";
 import { Testimonials } from "@/components/home/testimonials";
 
+// ISR: admin sửa giá/stock hiển thị trong ~30s
+export const revalidate = 30;
+
 export const metadata: Metadata = {
   title: "LUMINA Optics — Nghệ Thuật Thu Nhận Ánh Sáng Đẳng Cấp Thuần Khiết",
   description:

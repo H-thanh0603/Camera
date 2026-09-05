@@ -16,10 +16,58 @@ model User {
   email        String    @unique
   name         String
   passwordHash String
+  role        String    @default("customer") // customer | admin
   createdAt    DateTime  @default(now())
   sessions     Session[]
   orders       Order[]
   reviews      Review[]
+}
+
+model Product {
+  id               String           @id
+  sku              String           @unique
+  slug             String           @unique
+  name             String
+  brand            String
+  category         String
+  subcategory      String
+  description      String
+  shortDescription String
+  price            Int
+  compareAtPrice   Int?
+  currency         String           @default("VND")
+  stock            Int              @default(0)
+  availability     String           @default("in_stock")
+  images           Json
+  thumbnail        Json
+  specifications   Json
+  rating           Float            @default(0)
+  reviewCount      Int              @default(0)
+  tags             Json
+  badges           Json
+  monthlyFrom      Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  highlights       Json?
+  inTheBox         Json?
+  compatibleWith   Json?
+  variants         ProductVariant[]
+
+  @@index([category])
+  @@index([brand])
+}
+
+model ProductVariant {
+  id             String   @id
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String   @unique
+  name           String
+  price          Int
+  compareAtPrice Int?
+  stock          Int      @default(0)
+  availability   String
+  image          Json?
 }
 
 model Session {

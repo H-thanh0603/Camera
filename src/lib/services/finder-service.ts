@@ -1,5 +1,5 @@
 import type { FinderAnswers, FinderRecommendation, PhotographyStyle, Product } from "@/lib/types";
-import { ALL_PRODUCTS } from "@/lib/repositories/product-repository";
+import { getCatalog } from "@/lib/repositories/product-repository";
 
 /**
  * FinderService — chấm điểm gợi ý máy ảnh từ câu trả lời khảo sát.
@@ -83,7 +83,7 @@ function buildReasons(product: Product, answers: FinderAnswers): string[] {
 }
 
 export function findRecommendations(answers: FinderAnswers, limit = 3): FinderRecommendation[] {
-  return ALL_PRODUCTS.map((product) => ({ product, score: scoreProduct(product, answers) }))
+  return getCatalog().map((product) => ({ product, score: scoreProduct(product, answers) }))
     .filter((r) => r.score > 0.15)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
@@ -93,7 +93,7 @@ export function findRecommendations(answers: FinderAnswers, limit = 3): FinderRe
       matchPercent: Math.round(r.score * 100),
       reasons: buildReasons(r.product, answers),
       alternatives: STYLE_TAGS.includes(answers.styles[0])
-        ? ALL_PRODUCTS.filter(
+        ? getCatalog().filter(
             (p) => p.id !== r.product.id && p.category === "camera" && answers.styles.some((s) => p.tags.includes(s)),
           )
             .slice(0, 2)

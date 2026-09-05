@@ -1,10 +1,15 @@
 import type { MetadataRoute } from "next";
-import { ALL_PRODUCTS } from "@/lib/repositories/product-repository";
+import { dbAllProducts } from "@/lib/server/product-db";
 import { articles } from "@/lib/data/articles";
+
+// ISR: admin sửa giá/stock hiển thị trong ~30s
+export const revalidate = 30;
 
 export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const products = await dbAllProducts();
+
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: siteUrl, changeFrequency: "daily", priority: 1 },
     { url: `${siteUrl}/products`, changeFrequency: "daily", priority: 0.9 },
@@ -13,7 +18,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${siteUrl}/compare`, changeFrequency: "monthly", priority: 0.3 },
   ];
 
-  const productRoutes: MetadataRoute.Sitemap = ALL_PRODUCTS.map((p) => ({
+  const productRoutes: MetadataRoute.Sitemap = products.map((p) => ({
     url: `${siteUrl}/products/${p.slug}`,
     lastModified: new Date(p.updatedAt),
     changeFrequency: "weekly",

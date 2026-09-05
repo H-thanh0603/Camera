@@ -1,6 +1,7 @@
-import type { CartTotals, ContactInfo, Order, OrderLine, ShippingInfo } from "@/lib/types";
+import type { CartTotals, ContactInfo, Order, OrderLine, Product, ShippingInfo } from "@/lib/types";
 import { calculateTotals, maxQuantityOf, resolveVariant, unitPriceOf, unitCompareAtPriceOf } from "@/lib/services/cart-service";
-import { getProductById, getProductsByIds } from "@/lib/repositories/product-repository";
+import { getProductsByIds } from "@/lib/repositories/product-repository";
+import { dbGetProductById } from "./product-db";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { getSessionUser } from "./session";
@@ -56,18 +57,24 @@ export function verifyInput(contact: ContactInfo, shipping: ShippingInfo, delive
   if (!lines?.length) throw new OrderValidationError("Đơn hàng trống.");
 }
 
-/** Verify line với catalogue + tính totals — thuần hàm, unit-test được. */
-export function verifyAndPriceLines(inputLines: IncomingLine[], delivery: string): { finalLines: OrderLine[]; totals: CartTotals } {
+/** Verify line với catalogue server (DB) + tính totals. */
+export async function verifyAndPriceLines(
+  inputLines: IncomingLine[],
+  delivery: string,
+  resolveProduct: (id: string) => Promise<Product | null>,
+): Promise<{ finalLines: OrderLine[]; totals: CartTotals }> {
   // Verify từng line với catalogue server
   const lines: OrderLine[] = [];
   const productIds = [...new Set(inputLines.map((l) => l.productId))];
-  const resolved = getProductsByIds(productIds);
+  const resolved = (await Promise.all(productIds.map((id) => resolveProduct(id)))).filter(
+    (p): p is Product => Boolean(p),
+  );
   if (resolved.length !== productIds.length) {
     throw new OrderValidationError("Một số sản phẩm không còn tồn tại. Vui lòng xóa khỏi giỏ và thử lại.");
   }
 
   for (const line of inputLines) {
-    const product = getProductById(line.productId);
+    const product = await resolveProduct(line.productId);
     if (!product) throw new OrderValidationError(`Sản phẩm ${line.productId} không còn tồn tại.`);
     const variant = resolveVariant(product, line.variantId);
     if (line.variantId && !variant) throw new OrderValidationError(`Phiên bản của "${product.name}" không còn hợp lệ.`);
@@ -102,7 +109,7 @@ export function verifyAndPriceLines(inputLines: IncomingLine[], delivery: string
 
   // Server tính totals: express cộng phí vào shipping
   const detailLines = finalLines.map((l) => {
-    const product = getProductById(l.productId)!;
+    const product = resolved.find((p) => p.id === l.productId)!;
     const variant = resolveVariant(product, l.variantId);
     return {
       productId: l.productId,
@@ -123,8 +130,14 @@ export function verifyAndPriceLines(inputLines: IncomingLine[], delivery: string
 export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   const { contact, shipping, delivery, payment } = input;
   verifyInput(contact, shipping, delivery, payment, input.lines);
-  const { finalLines, totals } = verifyAndPriceLines(input.lines, delivery);
+  const finalProducts: Product[] = [];
+  const { finalLines, totals } = await verifyAndPriceLines(input.lines, delivery, async (id) => {
+    const p = await dbGetProductById(id);
+    if (p) finalProducts.push(p);
+    return p;
+  });
 
+  const productById = (id: string) => finalProducts.find((p) => p.id === id)!;
   const user = await getSessionUser();
   const dbOrder = await prisma.order.create({
     data: {
@@ -146,7 +159,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
           unitPrice: l.unitPrice,
           quantity: l.quantity,
           image: l.image,
-          sku: resolveVariant(getProductById(l.productId)!, l.variantId)?.sku ?? getProductById(l.productId)!.sku,
+          sku: resolveVariant(productById(l.productId), l.variantId)?.sku ?? productById(l.productId)!.sku,
         })),
       },
     },

@@ -9,14 +9,27 @@ import type {
 import { products as seedProducts } from "@/lib/data/products";
 
 /**
- * ProductRepository — điểm truy cập dữ liệu sản phẩm.
- * Hiện dùng seed data bất đồng bộ giả lập; khi có backend chỉ cần
- * thay thân hàm bằng fetch() sang API, UI không thay đổi.
+ * ProductRepository (client-safe) — đọc catalogue từ một cache module.
+ * Cache khởi tạo bằng seed snapshot (khớp SSR/hydration), sau đó được
+ * StoreProvider làm mới từ GET /api/products/snapshot (dữ liệu DB mà
+ * admin quản trị). Server pages KHÔNG dùng file này — chúng đọc DB trực
+ * tiếp qua src/lib/server/product-db.ts.
  */
 
-const NETWORK_DELAY_MS = 0;
+let catalog: Product[] = seedProducts;
+let byId = new Map(catalog.map((p) => [p.id, p]));
+let bySlug = new Map(catalog.map((p) => [p.slug, p]));
 
-export const ALL_PRODUCTS: Product[] = seedProducts;
+/** Thay thế catalogue cache (dùng sau khi fetch snapshot từ DB). */
+export function setCatalogProducts(products: Product[]): void {
+  catalog = products;
+  byId = new Map(products.map((p) => [p.id, p]));
+  bySlug = new Map(products.map((p) => [p.slug, p]));
+}
+
+export function getCatalog(): Product[] {
+  return catalog;
+}
 
 function matchesQuery(p: Product, q: ProductQuery): boolean {
   if (q.brands?.length && !q.brands.includes(p.brand)) return false;
@@ -44,8 +57,9 @@ const SORTERS: Record<SortOption, (a: Product, b: Product) => number> = {
   rating_desc: (a, b) => b.rating - a.rating,
 };
 
-export function queryProducts(query: ProductQuery = {}): Paginated<Product> {
-  const filtered = ALL_PRODUCTS.filter((p) => matchesQuery(p, query));
+/** Filter + sort + paginate thuần trên một danh sách — dùng chung client/server. */
+export function applyQuery(products: Product[], query: ProductQuery = {}): Paginated<Product> {
+  const filtered = products.filter((p) => matchesQuery(p, query));
   const sort: SortOption = query.sort ?? "featured";
   const sorted = [...filtered].sort(SORTERS[sort] ?? SORTERS.featured);
 
@@ -58,22 +72,24 @@ export function queryProducts(query: ProductQuery = {}): Paginated<Product> {
   return { items, total, page, pageSize, totalPages };
 }
 
+export function queryProducts(query: ProductQuery = {}): Paginated<Product> {
+  return applyQuery(catalog, query);
+}
+
 export function getProductById(id: string): Product | undefined {
-  return ALL_PRODUCTS.find((p) => p.id === id);
+  return byId.get(id);
 }
 
 export function getProductBySlug(slug: string): Product | undefined {
-  return ALL_PRODUCTS.find((p) => p.slug === slug);
+  return bySlug.get(slug);
 }
 
 export function getProductsByIds(ids: string[]): Product[] {
-  return ids
-    .map((id) => getProductById(id))
-    .filter((p): p is Product => Boolean(p));
+  return ids.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p));
 }
 
-export function getFacets(query: ProductQuery = {}): Facets {
-  const filtered = ALL_PRODUCTS.filter((p) => matchesQuery(p, { ...query, brands: undefined, categories: undefined }));
+export function getFacets(query: ProductQuery = {}, list: Product[] = catalog): Facets {
+  const filtered = list.filter((p) => matchesQuery(p, { ...query, brands: undefined, categories: undefined }));
   const brandCount = new Map<string, number>();
   const categoryCount = new Map<Category, number>();
   for (const p of filtered) {
@@ -91,15 +107,4 @@ export function getFacets(query: ProductQuery = {}): Facets {
       max: prices.length ? Math.max(...prices) : 0,
     },
   };
-}
-
-/** Trả về dữ liệu bất đồng bộ để giữ shape giống API thật. */
-export async function fetchProducts(query: ProductQuery = {}): Promise<Paginated<Product>> {
-  await new Promise((r) => setTimeout(r, NETWORK_DELAY_MS));
-  return queryProducts(query);
-}
-
-export async function fetchProductBySlug(slug: string): Promise<Product | null> {
-  await new Promise((r) => setTimeout(r, NETWORK_DELAY_MS));
-  return getProductBySlug(slug) ?? null;
 }

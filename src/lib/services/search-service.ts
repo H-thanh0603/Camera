@@ -1,5 +1,5 @@
 import type { Category, Product } from "@/lib/types";
-import { ALL_PRODUCTS } from "@/lib/repositories/product-repository";
+import { getCatalog } from "@/lib/repositories/product-repository";
 
 /**
  * SearchService — tìm kiếm phía client trên catalogue seed.
@@ -30,7 +30,7 @@ export function search(query: string, limit = 6): SearchResult {
   const trimmed = query.trim();
   if (!trimmed) return { products: [], brands: [], categories: [], total: 0 };
 
-  const matched = ALL_PRODUCTS.map((p) => ({ p, s: relevance(p, trimmed) }))
+  const matched = getCatalog().map((p) => ({ p, s: relevance(p, trimmed) }))
     .filter(({ s }) => s > 0)
     .sort((a, b) => b.s - a.s);
 

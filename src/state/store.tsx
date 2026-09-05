@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CartLine, CartSnapshot, Product, SessionUser, WishlistEntry } from "@/lib/types";
 import { buildCartSnapshot, clampQuantity, mergeLine } from "@/lib/services/cart-service";
-import { getProductById } from "@/lib/repositories/product-repository";
+import { getProductById, setCatalogProducts } from "@/lib/repositories/product-repository";
 import { loadJSON, saveJSON } from "@/lib/repositories/storage-repository";
 import { apiLogin, apiLogout, apiMe, apiRegister } from "@/lib/api-client";
 
@@ -24,6 +24,7 @@ interface AppState {
   compare: string[];
   recent: string[];
   user: SessionUser | null;
+  catalogVersion: number;
 }
 
 type Action =
@@ -37,7 +38,8 @@ type Action =
   | { type: "compare/toggle"; productId: string }
   | { type: "compare/remove"; productId: string }
   | { type: "recent/add"; productId: string }
-  | { type: "auth/set"; user: SessionUser | null };
+  | { type: "auth/set"; user: SessionUser | null }
+  | { type: "catalog/refresh" };
 
 const lineKey = (l: { productId: string; variantId?: string }) => `${l.productId}::${l.variantId ?? ""}`;
 
@@ -92,6 +94,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "auth/set":
       return { ...state, user: action.user };
+    case "catalog/refresh":
+      return { ...state, catalogVersion: state.catalogVersion + 1 };
     default:
       return state;
   }
@@ -140,6 +144,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     compare: [],
     recent: [],
     user: null,
+    catalogVersion: 0,
   });
   const [hydrated, setHydrated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -165,6 +170,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .then((user) => dispatch({ type: "auth/set", user }))
       .catch(() => dispatch({ type: "auth/set", user: null }))
       .finally(() => setAuthLoading(false));
+
+    // Làm mới catalogue từ DB (giá/stock do admin quản trị) — seed chỉ là snapshot ban đầu
+    fetch("/api/products/snapshot")
+      .then((r) => r.json())
+      .then((data: { products?: import("@/lib/types").Product[] }) => {
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          setCatalogProducts(data.products);
+          dispatch({ type: "catalog/refresh" });
+        }
+      })
+      .catch(() => undefined);
   }, []);
 
   // Persist khi thay đổi (chỉ sau khi hydrate xong)

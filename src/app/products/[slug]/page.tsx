@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ALL_PRODUCTS, getProductBySlug } from "@/lib/repositories/product-repository";
+import { dbAllProducts, dbGetProductBySlug } from "@/lib/server/product-db";
 import { getCompleteSetup, getSimilarProducts } from "@/lib/services/recommendation-service";
 import { brandOrigin } from "@/lib/data/products";
 import { ProductPurchasePanel } from "@/components/product/product-purchase-panel";
@@ -9,17 +9,21 @@ import { ProductCard } from "@/components/product/product-card";
 import { RecentlyViewedClient } from "@/components/product/recently-viewed";
 import { ReviewsSection } from "@/components/product/reviews-section";
 
+// ISR: admin sửa giá/stock hiển thị trong ~30s
+export const revalidate = 30;
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams() {
-  return ALL_PRODUCTS.map((p) => ({ slug: p.slug }));
+export async function generateStaticParams() {
+  const products = await dbAllProducts();
+  return products.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await dbGetProductBySlug(slug);
   if (!product) return { title: "Không tìm thấy sản phẩm" };
   return {
     title: `${product.name} — ${product.brand}`,
@@ -55,11 +59,12 @@ const SPEC_LABELS: Record<string, string> = {
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await dbGetProductBySlug(slug);
   if (!product) notFound();
 
+  const catalog = await dbAllProducts();
   const completeSetup = getCompleteSetup(product);
-  const similar = getSimilarProducts(product, 3);
+  const similar = getSimilarProducts(product, 3, catalog);
 
   // Product structured data (SEO)
   const jsonLd = {
