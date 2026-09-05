@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
+import { logAudit } from "@/lib/server/audit";
+import { getSessionUser } from "@/lib/server/session";
 
 /**
  * PATCH  /api/admin/reviews/:id — { approved: true | false } duyệt/hủy duyệt.
@@ -30,6 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   await prisma.review.update({ where: { id }, data: { approved: body.approved } });
   await recalcProductRating(review.productId);
   revalidatePath("/", "layout");
+  await logAudit(await getSessionUser(), body.approved ? "review.approve" : "review.unapprove", "review", id, { productId: review.productId });
   return NextResponse.json({ ok: true });
 }
 
@@ -44,6 +47,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   await prisma.review.delete({ where: { id } });
   await recalcProductRating(review.productId);
   revalidatePath("/", "layout");
+  await logAudit(await getSessionUser(), "review.delete", "review", id, { productId: review.productId });
   return NextResponse.json({ ok: true });
 }
 

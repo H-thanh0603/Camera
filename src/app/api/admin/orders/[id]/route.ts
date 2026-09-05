@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
+import { logAudit } from "@/lib/server/audit";
+import { getSessionUser } from "@/lib/server/session";
 import type { OrderStatus } from "@/lib/types";
 
 /**
@@ -42,5 +44,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const currentStep = STATUS_TO_STEP[status] ?? order.currentStep;
   await prisma.order.update({ where: { id }, data: { status, currentStep } });
+  await logAudit(await getSessionUser(), "order.status", "order", id, { from: order.status, to: status });
   return NextResponse.json({ ok: true, status, currentStep });
 }

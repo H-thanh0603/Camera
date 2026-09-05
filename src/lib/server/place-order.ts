@@ -37,6 +37,8 @@ export interface PlaceOrderInput {
   delivery: string;
   payment: string;
   lines: IncomingLine[];
+  /** Chống double-submit: key trùng → trả về đơn đã tạo thay vì tạo mới. */
+  idempotencyKey?: string;
 }
 
 function orderNumber(): string {
@@ -129,6 +131,19 @@ export async function verifyAndPriceLines(
 
 export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   const { contact, shipping, delivery, payment } = input;
+
+  // Idempotency: request trùng key (retry mạng, double-click) trả lại đơn cũ
+  if (input.idempotencyKey) {
+    const existing = await prisma.order.findUnique({
+      where: { idempotencyKey: input.idempotencyKey },
+      include: { lines: true },
+    });
+    if (existing) {
+      const { dbOrderToDomain } = await import("./order-mapper");
+      return dbOrderToDomain(existing);
+    }
+  }
+
   verifyInput(contact, shipping, delivery, payment, input.lines);
   const finalProducts: Product[] = [];
   const { finalLines, totals } = await verifyAndPriceLines(input.lines, delivery, async (id) => {
@@ -150,6 +165,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       delivery,
       payment,
       totals: totals as unknown as Prisma.InputJsonValue,
+      idempotencyKey: input.idempotencyKey ?? null,
       lines: {
         create: finalLines.map((l) => ({
           productId: l.productId,

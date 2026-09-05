@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
+import { logAudit } from "@/lib/server/audit";
+import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
 import type { Prisma } from "@prisma/client";
 
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest) {
     });
 
     revalidatePath("/", "layout");
+    await logAudit(await getSessionUser(), "product.upsert", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) }, { status: 201 });
   } catch (e) {
     const message = e instanceof Error && e.message.includes("Unique") ? "SKU hoặc slug đã tồn tại." : "Không lưu được sản phẩm.";

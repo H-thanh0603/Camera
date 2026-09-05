@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/server/prisma";
+import { recentAuditLogs } from "@/lib/server/audit";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 
 export const metadata = { title: "Admin Dashboard" };
@@ -15,7 +16,7 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 export default async function AdminDashboardPage() {
-  const [orderCount, productCount, pendingReviewCount, paidOrders, recentOrders] = await Promise.all([
+  const [orderCount, productCount, pendingReviewCount, paidOrders, recentOrders, auditLogs] = await Promise.all([
     prisma.order.count(),
     prisma.product.count(),
     prisma.review.count({ where: { approved: false } }),
@@ -24,6 +25,7 @@ export default async function AdminDashboardPage() {
       select: { totals: true },
     }),
     prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 5, include: { lines: true } }),
+    recentAuditLogs(8),
   ]);
 
   // SQLite Json: tổng tiền tính ở application level từ totals.total
@@ -67,6 +69,23 @@ export default async function AdminDashboardPage() {
                 <span className="font-telemetry-data text-telemetry-data text-primary">
                   {formatVND((o.totals as { total?: number })?.total ?? 0)}
                 </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg shadow-xl" aria-label="Nhật ký quản trị">
+        <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Nhật Ký Quản Trị</h2>
+        {auditLogs.length === 0 ? (
+          <p className="font-body-sm text-body-sm text-on-surface-variant">Chưa có thao tác nào được ghi.</p>
+        ) : (
+          <ul className="flex flex-col gap-space-2xs font-telemetry-xs text-telemetry-xs text-on-surface-variant">
+            {auditLogs.map((log) => (
+              <li key={log.id} className="flex items-center justify-between gap-space-sm rounded-lg bg-surface-container-low px-space-sm py-space-2xs">
+                <span className="text-primary uppercase">{log.action}</span>
+                <span className="text-on-surface-variant">{log.user?.email ?? "system"} → {log.targetId.slice(0, 18)}</span>
+                <span className="text-outline">{formatDate(log.createdAt.toISOString())}</span>
               </li>
             ))}
           </ul>

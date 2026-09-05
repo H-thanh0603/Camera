@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const order = await placeOrderServer(body);
+    const idempotencyKey = request.headers.get("idempotency-key") ?? undefined;
+    const order = await placeOrderServer({ ...body, idempotencyKey });
     return NextResponse.json({ order }, { status: 201 });
   } catch (error) {
     if (error instanceof OrderValidationError) {

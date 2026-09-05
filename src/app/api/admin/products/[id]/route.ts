@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
+import { logAudit } from "@/lib/server/audit";
+import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
 import type { Prisma } from "@prisma/client";
 
@@ -61,6 +63,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     revalidatePath("/", "layout");
+    await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) });
   } catch {
     return NextResponse.json({ error: "Không cập nhật được sản phẩm." }, { status: 409 });
@@ -74,5 +77,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { id } = await params;
   await prisma.product.delete({ where: { id } });
   revalidatePath("/", "layout");
+  await logAudit(await getSessionUser(), "product.delete", "product", id);
   return NextResponse.json({ ok: true });
 }

@@ -70,14 +70,21 @@ export function toAuthError(err: unknown): AuthError {
 
 /* ---------- Orders ---------- */
 
-export async function apiPlaceOrder(draft: {
-  contact: unknown;
-  shipping: unknown;
-  delivery: string;
-  payment: string;
-  lines: { productId: string; variantId?: string; quantity: number }[];
-}): Promise<Order> {
-  return request<{ order: Order }>("/api/orders", { method: "POST", body: JSON.stringify(draft) }).then((r) => r.order);
+export async function apiPlaceOrder(
+  draft: {
+    contact: unknown;
+    shipping: unknown;
+    delivery: string;
+    payment: string;
+    lines: { productId: string; variantId?: string; quantity: number }[];
+  },
+  idempotencyKey?: string,
+): Promise<Order> {
+  return request<{ order: Order }>("/api/orders", {
+    method: "POST",
+    body: JSON.stringify(draft),
+    headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+  }).then((r) => r.order);
 }
 
 export async function apiListOrders(): Promise<Order[]> {

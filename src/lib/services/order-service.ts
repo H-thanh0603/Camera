@@ -15,7 +15,7 @@ export interface PlaceOrderDraft {
   snapshot: CartSnapshot;
 }
 
-export async function placeOrder(draft: PlaceOrderDraft): Promise<Order> {
+export async function placeOrder(draft: PlaceOrderDraft, idempotencyKey?: string): Promise<Order> {
   return apiPlaceOrder({
     contact: draft.contact,
     shipping: draft.shipping,
@@ -26,7 +26,7 @@ export async function placeOrder(draft: PlaceOrderDraft): Promise<Order> {
       variantId: l.variantId,
       quantity: l.quantity,
     })),
-  });
+  }, idempotencyKey);
 }
 
 export function listOrders(): Promise<Order[]> {

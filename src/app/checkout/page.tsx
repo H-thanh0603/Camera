@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ContactInfo, DeliveryMethod, Order, PaymentMethod, ShippingInfo } from "@/lib/types";
 import { placeOrder } from "@/lib/services/order-service";
 import { ApiError, apiPayDemo } from "@/lib/api-client";
@@ -37,6 +37,14 @@ export default function CheckoutPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [paying, setPaying] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+
+  // Mỗi intent đặt hàng có đúng 1 idempotency key: sinh khi vào bước xác nhận,
+  // hủy khi lùi lại sửa — server dùng key này để trả lại đơn cũ nếu double-submit.
+  useEffect(() => {
+    if (step === 4) setIdempotencyKey((k) => k ?? crypto.randomUUID());
+    else setIdempotencyKey(null);
+  }, [step]);
 
   const [contact, setContact] = useState<ContactInfo>({ fullName: user?.name ?? "", email: user?.email ?? "", phone: "" });
   const [shipping, setShipping] = useState<ShippingInfo>({ address: "", ward: "", district: "", city: "" });
@@ -177,7 +185,7 @@ export default function CheckoutPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const order = await placeOrder({ contact, shipping, delivery, payment, snapshot: cartSnapshot });
+      const order = await placeOrder({ contact, shipping, delivery, payment, snapshot: cartSnapshot }, idempotencyKey ?? undefined);
       clearCart();
       setPlacedOrder(order);
       track("purchase", { orderId: order.id, total: order.totals.total, itemCount: order.totals.itemCount, payment: order.payment });
