@@ -48,6 +48,19 @@ src/
 tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filter, order verification, luồng mua thật
 ```
 
+### Vận hành / Observability
+
+- **`GET /api/health`** — health check app + DB (503 khi DB down) cho uptime monitor.
+- **Tracking**: `track()` abstraction (sendBeacon → `POST /api/metrics`) đo `view_item`,
+  `add_to_cart`, `begin_checkout`, `purchase`, `search`; Web Vitals người dùng thật qua
+  `useReportWebVitals`; `GET /api/metrics` xem counters từ lúc server start.
+- **Error reporting (client)**: `lib/monitoring.ts` bắt lỗi error boundary + unhandled;
+  Sentry-ready (thay `captureException` một chỗ).
+- **Structured logging (server)**: `lib/server/logger.ts` — dòng JSON một hàng, request-id
+  từ middleware.
+- **Idempotency**: checkout gửi `Idempotency-Key`, server trả lại đơn cũ nếu trùng.
+- **Audit log**: mọi thao tác admin ghi vào bảng `AuditLog`, xem trên dashboard.
+
 ### Admin panel
 
 - `/admin` — guard server-side theo `user.role` trong DB (API routes guard riêng từng route).

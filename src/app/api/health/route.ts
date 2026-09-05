@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/server/prisma";
+import { logger } from "@/lib/server/logger";
 
 /**
  * GET /api/health — health check cho uptime monitor (UptimeRobot, K8s probe…).
@@ -18,7 +19,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error(JSON.stringify({ type: "health", db: "down", error: String(error) }));
+    logger.error("health.db_down", { error: String(error) });
     return NextResponse.json(
       { status: "degraded", db: "down", timestamp: new Date().toISOString() },
       { status: 503 },

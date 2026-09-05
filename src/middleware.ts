@@ -27,19 +27,25 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/") && request.method !== "GET") {
-    const result = mutationLimiter.check(clientIp(request));
-    if (!result.allowed) {
-      return NextResponse.json(
-        { error: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
-        { status: 429, headers: { "Retry-After": String(result.retryAfterSeconds) } },
-      );
+    // Telemetry (metrics) fire-and-forget với tần suất cao — không thuộc lớp cần bảo vệ
+    if (!pathname.startsWith("/api/metrics") && !pathname.startsWith("/api/health")) {
+      const result = mutationLimiter.check(clientIp(request));
+      if (!result.allowed) {
+        return NextResponse.json(
+          { error: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
+          { status: 429, headers: { "Retry-After": String(result.retryAfterSeconds) } },
+        );
+      }
+      const response = NextResponse.next();
+      response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+      response.headers.set("x-request-id", crypto.randomUUID());
+      return response;
     }
-    const response = NextResponse.next();
-    response.headers.set("X-RateLimit-Remaining", String(result.remaining));
-    return response;
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set("x-request-id", crypto.randomUUID());
+  return response;
 }
 
 export const config = {

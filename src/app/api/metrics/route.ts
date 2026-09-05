@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { logger } from "@/lib/server/logger";
 
 /**
  * POST /api/metrics — điểm nhận event analytics + web vitals + client error.
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Event không hợp lệ." }, { status: 422 });
     }
     counters.set(body.event, (counters.get(body.event) ?? 0) + 1);
-    console.info(JSON.stringify({ type: "analytics", event: body.event, props: body.props ?? {}, ts: new Date().toISOString() }));
+    logger.info("analytics_event", { event: body.event, props: body.props ?? {} });
     return NextResponse.json({ ok: true }, { status: 202 });
   } catch {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });

@@ -3,6 +3,7 @@ import { placeOrderServer, OrderValidationError } from "@/lib/server/place-order
 import { getUserOrders } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
 import { createRateLimiter } from "@/lib/utils/rate-limit";
+import { logger } from "@/lib/server/logger";
 
 /**
  * POST /api/orders — đặt hàng (server verify giá/stock, ghi DB).
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof OrderValidationError) {
       return NextResponse.json({ error: error.message }, { status: 422 });
     }
-    console.error("[orders] place failed:", error);
+    logger.error("order.place_failed", { error: String(error) });
     return NextResponse.json({ error: "Không thể tạo đơn hàng. Vui lòng thử lại." }, { status: 500 });
   }
 }

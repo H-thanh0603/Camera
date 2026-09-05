@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { captureException } from "@/lib/monitoring";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    // Log để monitoring thu thập; không hiển thị raw error cho người dùng
-    console.error("[LUMINA] Unhandled app error:", error);
+    // Gửi tới hệ thống monitoring; không hiển thị raw error cho người dùng
+    captureException(error, { digest: error.digest });
   }, [error]);
 
   return (
