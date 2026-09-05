@@ -8,7 +8,7 @@ import {
   FREE_SHIPPING_THRESHOLD,
   STANDARD_SHIPPING_FEE,
 } from "@/lib/services/cart-service";
-import type { CartLine, CartLineDetail, Product } from "@/lib/types";
+import type { CartLine, CartLineDetail } from "@/lib/types";
 import { getProductById } from "@/lib/repositories/product-repository";
 
 const x1 = getProductById("p-lumina-x1")!;

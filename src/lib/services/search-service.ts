@@ -13,16 +13,25 @@ export interface SearchResult {
   total: number;
 }
 
+/** Chuẩn hoá so sánh không dấu: "may anh" khớp "Máy Ảnh". */
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d");
+}
+
 function relevance(p: Product, q: string): number {
-  const name = p.name.toLowerCase();
-  const brand = p.brand.toLowerCase();
-  const query = q.toLowerCase();
+  const name = normalize(p.name);
+  const brand = normalize(p.brand);
+  const query = normalize(q);
   let score = 0;
   if (name.includes(query)) score += 5;
   if (name.startsWith(query)) score += 3;
   if (brand.includes(query)) score += 4;
-  if (p.subcategory.toLowerCase().includes(query)) score += 2;
-  if (p.tags.some((t) => t.includes(query))) score += 1;
+  if (normalize(p.subcategory).includes(query)) score += 2;
+  if (p.tags.some((t) => normalize(t).includes(query))) score += 1;
   return score;
 }
 

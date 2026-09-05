@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { applyQuery } from "@/lib/repositories/product-repository";
 import { dbAllProducts } from "@/lib/server/product-db";
 import type { Category, ProductQuery } from "@/lib/types";
 import { ProductCard } from "@/components/product/product-card";
 import { EmptyState, CardSkeletonGrid } from "@/components/ui/states";
 import { CatalogControls } from "@/components/catalog/catalog-controls";
+import { applyQuery, getFacets as buildFacets } from "@/lib/repositories/product-repository";
 import { parseCatalogParams } from "@/lib/utils/catalog-params";
-import { getFacets as buildFacets } from "@/lib/repositories/product-repository";
 
 export const metadata: Metadata = {
   title: "Kho Thiết Bị — Máy Ảnh, Ống Kính & Phụ Kiện",

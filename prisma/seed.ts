@@ -22,7 +22,9 @@ async function hashPassword(password: string): Promise<string> {
 
 async function main() {
   for (const p of products) {
-    const { variants, reviews, images, thumbnail, specifications, tags, badges, highlights, inTheBox, compatibleWith, ...rest } = p;
+    // reviews tĩnh không seed vào DB (DB chỉ lưu review người dùng gửi, có moderation)
+  const { variants, reviews, images, thumbnail, specifications, tags, badges, highlights, inTheBox, compatibleWith, ...rest } = p;
+  void reviews;
     await prisma.product.upsert({
       where: { id: p.id },
       update: {

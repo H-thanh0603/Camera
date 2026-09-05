@@ -1,0 +1,637 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: reviews.spec.ts >> Review submission >> validation chặn review không hợp lệ
+- Location: tests/e2e/reviews.spec.ts:20:7
+
+# Error details
+
+```
+Test timeout of 60000ms exceeded.
+```
+
+```
+Error: locator.click: Test timeout of 60000ms exceeded.
+Call log:
+  - waiting for getByRole('button', { name: 'Gửi đánh giá' })
+
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "LUMINA Optics Logo LUMINA OPTICS PRECISION CINEMA APPARATUS" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img "LUMINA Optics Logo" [ref=e6]
+          - generic [ref=e7]:
+            - generic [ref=e8]: LUMINA OPTICS
+            - generic [ref=e9]: PRECISION CINEMA APPARATUS
+        - generic [ref=e10]: SENSOR 61MP RAW ONLINE
+      - generic [ref=e13]:
+        - 'generic "Đơn vị tiền tệ: VND" [ref=e14]':
+          - button "VND" [pressed] [ref=e15] [cursor=pointer]
+          - generic [ref=e16]: /
+          - button "USD" [ref=e17] [cursor=pointer]
+        - button "Tìm kiếm sản phẩm" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: search
+          - generic [ref=e20]: ⌘K
+        - link "Wishlist" [ref=e21] [cursor=pointer]:
+          - /url: /wishlist
+          - generic [ref=e22]: favorite
+        - button "Giỏ hàng trống" [ref=e23] [cursor=pointer]:
+          - generic [ref=e24]: shopping_bag
+        - link "Tư vấn chuyên gia" [ref=e25] [cursor=pointer]:
+          - /url: /account
+          - generic [ref=e26]: support_agent
+        - link "Đăng nhập / Tài khoản" [ref=e28] [cursor=pointer]:
+          - /url: /account
+          - generic [ref=e29]: person_outline
+    - navigation "Điều hướng chính" [ref=e30]:
+      - generic [ref=e31]:
+        - link "Máy ảnh Flagship" [ref=e32] [cursor=pointer]:
+          - /url: /products?category=camera&tag=flagship
+        - link "Ống kính Cine & Prime" [ref=e33] [cursor=pointer]:
+          - /url: /products?category=lens
+        - link "Hệ thống Medium Format" [ref=e34] [cursor=pointer]:
+          - /url: /products?category=camera&tag=medium_format
+        - link "Phụ kiện Studio" [ref=e35] [cursor=pointer]:
+          - /url: /products?category=lighting
+        - link "Dịch vụ Đổi mới & Thu cũ" [ref=e36] [cursor=pointer]:
+          - /url: /#concierge
+        - link "Lumina Journal" [ref=e37] [cursor=pointer]:
+          - /url: /journal
+  - main [ref=e38]:
+    - generic [ref=e39]:
+      - navigation "Breadcrumb" [ref=e40]:
+        - link "Trang chủ" [ref=e41] [cursor=pointer]:
+          - /url: /
+        - text: /
+        - link "Kho thiết bị" [ref=e42] [cursor=pointer]:
+          - /url: /products
+        - text: /Lumina X-1 Monolith
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - button "Phóng to ảnh sản phẩm (NHẤP ĐỂ ZOOM)" [ref=e45]:
+            - img "Lumina X-1 Monolith — thân máy flagship nhìn trực diện" [ref=e46]
+            - generic [ref=e47]:
+              - generic [ref=e48]: zoom_in
+              - text: NHẤP ĐỂ ZOOM
+          - tablist "Ảnh sản phẩm" [ref=e49]:
+            - tab [selected] [ref=e50] [cursor=pointer]:
+              - img "Lumina X-1 Monolith — thân máy flagship nhìn trực diện" [ref=e51]
+            - tab [ref=e52] [cursor=pointer]:
+              - img "Lumina X-1 trên phiến đá đen với ánh sáng studio" [ref=e53]
+            - tab [ref=e54] [cursor=pointer]:
+              - img "Cấu trúc quang học và cảm biến của Lumina X-1" [ref=e55]
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - generic [ref=e58]: Lumina • Mirrorless Flagship
+            - heading "Lumina X-1 Monolith" [level=1] [ref=e59]
+            - generic [ref=e60]:
+              - img "Đánh giá 4.9 trên 5 sao" [ref=e61]:
+                - generic [ref=e62]: star
+                - generic [ref=e63]: star
+                - generic [ref=e64]: star
+                - generic [ref=e65]: star
+                - generic [ref=e66]: star
+              - generic [ref=e67]: 4.9 • 47 đánh giá
+              - generic [ref=e68]: ● Còn hàng
+          - paragraph [ref=e69]: Flagship 61.2MP BSI, IBIS 8.5 stops, quay 8K 60p ProRes HQ — đỉnh cao quang học thuần khiết.
+          - generic [ref=e70]:
+            - generic [ref=e71]: 185.000.000 ₫
+            - generic [ref=e73]: Trả góp 0% từ 7.700.000 ₫/tháng qua thẻ tín dụng VIP
+            - generic [ref=e74]: "SKU: LUM-X1-BODY"
+          - group "Phiên bản" [ref=e75]:
+            - generic [ref=e77]:
+              - button "Body only LUM-X1-BODY 185.000.000 ₫ Còn hàng" [pressed] [ref=e78] [cursor=pointer]:
+                - generic [ref=e79]:
+                  - generic [ref=e80]: Body only
+                  - generic [ref=e81]: LUM-X1-BODY
+                - generic [ref=e82]:
+                  - generic [ref=e83]: 185.000.000 ₫
+                  - generic [ref=e84]: Còn hàng
+              - button "Body + 50mm f/1.2 ASPH LUM-X1-K50 259.000.000 ₫ Còn hàng" [ref=e85] [cursor=pointer]:
+                - generic [ref=e86]:
+                  - generic [ref=e87]: Body + 50mm f/1.2 ASPH
+                  - generic [ref=e88]: LUM-X1-K50
+                - generic [ref=e89]:
+                  - generic [ref=e90]: 259.000.000 ₫
+                  - generic [ref=e91]: Còn hàng
+              - button "Cine Pro Kit (RAW 16-bit, PL mount) LUM-X1-CINE 428.000.000 ₫ Đặt trước" [ref=e92] [cursor=pointer]:
+                - generic [ref=e93]:
+                  - generic [ref=e94]: Cine Pro Kit (RAW 16-bit, PL mount)
+                  - generic [ref=e95]: LUM-X1-CINE
+                - generic [ref=e96]:
+                  - generic [ref=e97]: 428.000.000 ₫
+                  - generic [ref=e98]: Đặt trước
+          - generic [ref=e99]:
+            - generic [ref=e101]:
+              - button "Giảm số lượng" [disabled] [ref=e102]: −
+              - spinbutton "Số lượng" [ref=e103]: "1"
+              - button "Tăng số lượng" [ref=e104] [cursor=pointer]: +
+            - generic [ref=e105]:
+              - button "Thêm Vào Giỏ" [ref=e106] [cursor=pointer]:
+                - generic [ref=e107]: shopping_bag
+                - text: Thêm Vào Giỏ
+              - button "Mua Ngay" [ref=e108] [cursor=pointer]:
+                - generic [ref=e109]: bolt
+                - text: Mua Ngay
+            - generic [ref=e110]:
+              - button "Yêu thích" [ref=e111] [cursor=pointer]:
+                - generic [ref=e112]: favorite_border
+                - text: Yêu thích
+              - button "So sánh" [ref=e113] [cursor=pointer]:
+                - generic [ref=e114]: compare_arrows
+                - text: So sánh
+          - list [ref=e115]:
+            - listitem [ref=e116]:
+              - generic [ref=e117]: verified_user
+              - text: Bảo hành 5 năm tận nơi, vệ sinh sensor trọn đời
+            - listitem [ref=e118]:
+              - generic [ref=e119]: change_circle
+              - text: Đổi mới 30 ngày không cần lý do
+            - listitem [ref=e120]:
+              - generic [ref=e121]: apartment
+              - text: Đặt lịch test 1:1 tại Studio Quận 1 & Hoàn Kiếm
+      - generic [ref=e122]:
+        - region "Giới thiệu sản phẩm" [ref=e123]:
+          - generic [ref=e124]: PRODUCT STORYTELLING
+          - heading "Vì Sao Nó Sinh Ra" [level=2] [ref=e125]
+          - paragraph [ref=e126]: "Chiến hạm ghi hình của Lumina: cảm biến 61.2MP BSI CMOS full-frame, ngàm hợp kim Magie hàng không, dải tương phản động 15+ EV và hệ thống lấy nét AI 759 điểm. Chế tác thủ công tại Wetzlar & Kyoto cho nhiếp ảnh gia thương mại và điện ảnh hybrid."
+          - list [ref=e127]:
+            - listitem [ref=e128]:
+              - generic [ref=e129]: check_circle
+              - text: Độ phân giải 61.2MP cho in ấn cỡ lớn và crop linh hoạt
+            - listitem [ref=e130]:
+              - generic [ref=e131]: check_circle
+              - text: 8K 60p ProRes HQ — chuẩn điện ảnh trong một thân máy
+            - listitem [ref=e132]:
+              - generic [ref=e133]: check_circle
+              - text: IBIS 8.5 stops quay tay lúc hoàng hôn không cần gimbal
+        - region "Thông số kỹ thuật" [ref=e134]:
+          - generic [ref=e135]:
+            - heading "Thông Số Kỹ Thuật" [level=2] [ref=e136]
+            - generic [ref=e137]: Việt Nam / Wetzlar & Kyoto
+          - generic [ref=e138]:
+            - generic [ref=e139]:
+              - term [ref=e140]: Cảm biến
+              - definition [ref=e141]: Full-frame BSI CMOS 35.7 × 23.8mm
+            - generic [ref=e142]:
+              - term [ref=e143]: Độ phân giải
+              - definition [ref=e144]: 61.2 MP
+            - generic [ref=e145]:
+              - term [ref=e146]: Dải ISO
+              - definition [ref=e147]: Dual Native ISO 100–102,400 (800/3200)
+            - generic [ref=e148]:
+              - term [ref=e149]: Lấy nét tự động
+              - definition [ref=e150]: 759 điểm phase-detect AI, 0.02s lock
+            - generic [ref=e151]:
+              - term [ref=e152]: Chụp liên tiếp
+              - definition [ref=e153]: 10 fps (máy cơ) / 120 fps (crop APSC)
+            - generic [ref=e154]:
+              - term [ref=e155]: Quay video
+              - definition [ref=e156]: 8K 60p ProRes HQ 16-bit RAW, 2,200 Mbps
+            - generic [ref=e157]:
+              - term [ref=e158]: Chống rung IBIS
+              - definition [ref=e159]: 8.5 stops, 5 trục
+            - generic [ref=e160]:
+              - term [ref=e161]: Pin
+              - definition [ref=e162]: NP-FZ100h — 720 ảnh
+            - generic [ref=e163]:
+              - term [ref=e164]: Trọng lượng
+              - definition [ref=e165]: 712 g (thân máy)
+            - generic [ref=e166]:
+              - term [ref=e167]: Kích thước
+              - definition [ref=e168]: 136 × 97 × 82 mm
+            - generic [ref=e169]:
+              - term [ref=e170]: Ngàm mount
+              - definition [ref=e171]: Lumina LM (PL qua adapter)
+            - generic [ref=e172]:
+              - term [ref=e173]: Đường kính filter
+              - definition [ref=e174]: —
+          - generic [ref=e175]:
+            - heading "What's in the box" [level=3] [ref=e176]
+            - list [ref=e177]:
+              - listitem [ref=e178]:
+                - generic [ref=e179]: inventory_2
+                - text: Thân máy Lumina X-1
+              - listitem [ref=e180]:
+                - generic [ref=e181]: inventory_2
+                - text: Pin NP-FZ100h ×2
+              - listitem [ref=e182]:
+                - generic [ref=e183]: inventory_2
+                - text: Sạc nhanh BC-QZ1
+              - listitem [ref=e184]:
+                - generic [ref=e185]: inventory_2
+                - text: Dai cổ tay nhung
+              - listitem [ref=e186]:
+                - generic [ref=e187]: inventory_2
+                - text: Sách hướng dẫn kỷ niệm Wetzlar
+      - region "Đánh giá của khách hàng" [ref=e188]:
+        - generic [ref=e189]:
+          - heading "Đánh Giá Từ Chủ Nhân (47)" [level=2] [ref=e190]
+          - generic [ref=e191]:
+            - generic [ref=e192]:
+              - img "Đánh giá 4.9 trên 5 sao" [ref=e193]:
+                - generic [ref=e194]: star
+                - generic [ref=e195]: star
+                - generic [ref=e196]: star
+                - generic [ref=e197]: star
+                - generic [ref=e198]: star
+              - generic [ref=e199]: 4.9/5
+            - button "Viết đánh giá" [active] [ref=e200] [cursor=pointer]
+        - generic [ref=e201]:
+          - generic [ref=e202]: rate_review
+          - heading "Chưa có đánh giá chi tiết" [level=2] [ref=e204]
+          - paragraph [ref=e205]: Trở thành chủ nhân đầu tiên chia sẻ trải nghiệm về Lumina X-1 Monolith.
+      - region "Hoàn thiện bộ thiết bị" [ref=e206]:
+        - generic [ref=e207]: COMPLETE YOUR SETUP
+        - heading "Phụ Kiện Đồng Bộ Khuyến Nghị" [level=2] [ref=e208]
+        - generic [ref=e209]:
+          - article [ref=e210]:
+            - generic [ref=e211]:
+              - link "Xem chi tiết Lumina 50mm f/1.2 ASPH" [ref=e212] [cursor=pointer]:
+                - /url: /products/lumina-50mm-f12-asph
+                - img "Lumina 50mm f/1.2 ASPH" [ref=e213]
+              - generic [ref=e214]:
+                - generic [ref=e215]: MASTER PRIME
+                - generic [ref=e216]: Còn hàng
+              - generic [ref=e217]:
+                - button "Lưu Lumina 50mm f/1.2 ASPH vào yêu thích" [ref=e218] [cursor=pointer]:
+                  - generic [ref=e219]: favorite_border
+                - button "Thêm Lumina 50mm f/1.2 ASPH vào so sánh" [ref=e220] [cursor=pointer]:
+                  - generic [ref=e221]: compare_arrows
+            - generic [ref=e222]:
+              - generic [ref=e223]:
+                - generic [ref=e224]:
+                  - generic [ref=e225]: Lumina • Prime
+                  - generic [ref=e226]:
+                    - img "Đánh giá 4.9 trên 5 sao" [ref=e227]:
+                      - generic [ref=e228]: star
+                      - generic [ref=e229]: star
+                      - generic [ref=e230]: star
+                      - generic [ref=e231]: star
+                      - generic [ref=e232]: star
+                    - generic [ref=e233]: (38)
+                - heading [level=3] [ref=e234]:
+                  - link "Lumina 50mm f/1.2 ASPH" [ref=e235] [cursor=pointer]:
+                    - /url: /products/lumina-50mm-f12-asph
+                - paragraph [ref=e236]: Prime 50mm f/1.2, bokeh 11 lá tròn, phủ nano T* truyền sáng 99.8%.
+              - generic [ref=e237]:
+                - generic [ref=e238]:
+                  - generic [ref=e239]: 62.000.000 ₫
+                  - generic [ref=e240]: Từ 2.580.000 ₫/tháng
+                - generic [ref=e241]:
+                  - button "Thêm Vào Giỏ" [ref=e242] [cursor=pointer]:
+                    - generic [ref=e243]: shopping_bag
+                  - link "Chi Tiết" [ref=e245] [cursor=pointer]:
+                    - /url: /products/lumina-50mm-f12-asph
+          - article [ref=e246]:
+            - generic [ref=e247]:
+              - link "Xem chi tiết Lumina 24-70mm f/2.8 Zoom" [ref=e248] [cursor=pointer]:
+                - /url: /products/lumina-24-70mm-f28-zoom
+                - img "Lumina 24-70mm f/2.8 Zoom" [ref=e249]
+              - generic [ref=e250]:
+                - generic [ref=e251]: GIẢM 13%
+                - generic [ref=e252]: Còn hàng
+              - generic [ref=e253]:
+                - button "Lưu Lumina 24-70mm f/2.8 Zoom vào yêu thích" [ref=e254] [cursor=pointer]:
+                  - generic [ref=e255]: favorite_border
+                - button "Thêm Lumina 24-70mm f/2.8 Zoom vào so sánh" [ref=e256] [cursor=pointer]:
+                  - generic [ref=e257]: compare_arrows
+            - generic [ref=e258]:
+              - generic [ref=e259]:
+                - generic [ref=e260]:
+                  - generic [ref=e261]: Lumina • Zoom
+                  - generic [ref=e262]:
+                    - img "Đánh giá 4.6 trên 5 sao" [ref=e263]:
+                      - generic [ref=e264]: star
+                      - generic [ref=e265]: star
+                      - generic [ref=e266]: star
+                      - generic [ref=e267]: star
+                      - generic [ref=e268]: star_border
+                    - generic [ref=e269]: (41)
+                - heading [level=3] [ref=e270]:
+                  - link "Lumina 24-70mm f/2.8 Zoom" [ref=e271] [cursor=pointer]:
+                    - /url: /products/lumina-24-70mm-f28-zoom
+                - paragraph [ref=e272]: Zoom 24-70mm f/2.8, chống thời tiết IP54, lấy nét tuyến tính.
+              - generic [ref=e273]:
+                - generic [ref=e274]:
+                  - generic [ref=e275]: 45.500.000 ₫
+                  - generic [ref=e276]: Từ 1.890.000 ₫/tháng
+                - generic [ref=e277]:
+                  - button "Thêm Vào Giỏ" [ref=e278] [cursor=pointer]:
+                    - generic [ref=e279]: shopping_bag
+                  - link "Chi Tiết" [ref=e281] [cursor=pointer]:
+                    - /url: /products/lumina-24-70mm-f28-zoom
+          - article [ref=e282]:
+            - generic [ref=e283]:
+              - link "Xem chi tiết CFexpress Type B 512GB (Duo Pack)" [ref=e284] [cursor=pointer]:
+                - /url: /products/cfexpress-type-b-512gb-duo
+                - img "CFexpress Type B 512GB" [ref=e285]
+              - generic [ref=e286]: Còn hàng
+              - generic [ref=e288]:
+                - button "Lưu CFexpress Type B 512GB (Duo Pack) vào yêu thích" [ref=e289] [cursor=pointer]:
+                  - generic [ref=e290]: favorite_border
+                - button "Thêm CFexpress Type B 512GB (Duo Pack) vào so sánh" [ref=e291] [cursor=pointer]:
+                  - generic [ref=e292]: compare_arrows
+            - generic [ref=e293]:
+              - generic [ref=e294]:
+                - generic [ref=e295]:
+                  - generic [ref=e296]: Lumina • Thẻ nhớ
+                  - generic [ref=e297]:
+                    - img "Đánh giá 4.8 trên 5 sao" [ref=e298]:
+                      - generic [ref=e299]: star
+                      - generic [ref=e300]: star
+                      - generic [ref=e301]: star
+                      - generic [ref=e302]: star
+                      - generic [ref=e303]: star
+                    - generic [ref=e304]: (45)
+                - heading [level=3] [ref=e305]:
+                  - link "CFexpress Type B 512GB (Duo Pack)" [ref=e306] [cursor=pointer]:
+                    - /url: /products/cfexpress-type-b-512gb-duo
+                - paragraph [ref=e307]: Đọc 1,750MB/s, ghi 1,500MB/s — đủ cho 8K RAW.
+              - generic [ref=e308]:
+                - generic [ref=e309]:
+                  - generic [ref=e310]: 9.800.000 ₫
+                  - generic [ref=e311]: Từ 408.000 ₫/tháng
+                - generic [ref=e312]:
+                  - button "Thêm Vào Giỏ" [ref=e313] [cursor=pointer]:
+                    - generic [ref=e314]: shopping_bag
+                  - link "Chi Tiết" [ref=e316] [cursor=pointer]:
+                    - /url: /products/cfexpress-type-b-512gb-duo
+          - article [ref=e317]:
+            - generic [ref=e318]:
+              - link "Xem chi tiết Lumina X-1 Battery Grip" [ref=e319] [cursor=pointer]:
+                - /url: /products/lumina-x1-battery-grip
+                - img "Lumina X-1 Battery Grip" [ref=e320]
+              - generic [ref=e321]: Còn hàng
+              - generic [ref=e323]:
+                - button "Lưu Lumina X-1 Battery Grip vào yêu thích" [ref=e324] [cursor=pointer]:
+                  - generic [ref=e325]: favorite_border
+                - button "Thêm Lumina X-1 Battery Grip vào so sánh" [ref=e326] [cursor=pointer]:
+                  - generic [ref=e327]: compare_arrows
+            - generic [ref=e328]:
+              - generic [ref=e329]:
+                - generic [ref=e330]:
+                  - generic [ref=e331]: Lumina • Pin & Grip
+                  - generic [ref=e332]:
+                    - img "Đánh giá 4.7 trên 5 sao" [ref=e333]:
+                      - generic [ref=e334]: star
+                      - generic [ref=e335]: star
+                      - generic [ref=e336]: star
+                      - generic [ref=e337]: star
+                      - generic [ref=e338]: star_border
+                    - generic [ref=e339]: (19)
+                - heading [level=3] [ref=e340]:
+                  - link "Lumina X-1 Battery Grip" [ref=e341] [cursor=pointer]:
+                    - /url: /products/lumina-x1-battery-grip
+                - paragraph [ref=e342]: Grip 2 pin cho X-1, quay 8K gấp đôi thời lượng.
+              - generic [ref=e343]:
+                - generic [ref=e344]:
+                  - generic [ref=e345]: 7.200.000 ₫
+                  - generic [ref=e346]: Từ 300.000 ₫/tháng
+                - generic [ref=e347]:
+                  - button "Thêm Vào Giỏ" [ref=e348] [cursor=pointer]:
+                    - generic [ref=e349]: shopping_bag
+                  - link "Chi Tiết" [ref=e351] [cursor=pointer]:
+                    - /url: /products/lumina-x1-battery-grip
+      - region "Sản phẩm tương tự" [ref=e352]:
+        - generic [ref=e353]: YOU MAY ALSO LIKE
+        - heading "Tương Tự & Cùng Hệ Sinh Thái" [level=2] [ref=e354]
+        - generic [ref=e355]:
+          - article [ref=e356]:
+            - generic [ref=e357]:
+              - link "Xem chi tiết Lumina Cine 8K PL" [ref=e358] [cursor=pointer]:
+                - /url: /products/lumina-cine-8k-pl
+                - img "Lumina Cine 8K PL" [ref=e359]
+              - generic [ref=e360]:
+                - generic [ref=e361]: CINE MASTER
+                - generic [ref=e362]: Đặt trước
+              - generic [ref=e363]:
+                - button "Lưu Lumina Cine 8K PL vào yêu thích" [ref=e364] [cursor=pointer]:
+                  - generic [ref=e365]: favorite_border
+                - button "Thêm Lumina Cine 8K PL vào so sánh" [ref=e366] [cursor=pointer]:
+                  - generic [ref=e367]: compare_arrows
+            - generic [ref=e368]:
+              - generic [ref=e369]:
+                - generic [ref=e370]:
+                  - generic [ref=e371]: Lumina • Cine Camera
+                  - generic [ref=e372]:
+                    - img "Đánh giá 4.9 trên 5 sao" [ref=e373]:
+                      - generic [ref=e374]: star
+                      - generic [ref=e375]: star
+                      - generic [ref=e376]: star
+                      - generic [ref=e377]: star
+                      - generic [ref=e378]: star
+                    - generic [ref=e379]: (11)
+                - heading [level=3] [ref=e380]:
+                  - link "Lumina Cine 8K PL" [ref=e381] [cursor=pointer]:
+                    - /url: /products/lumina-cine-8k-pl
+                - paragraph [ref=e382]: 8K RAW 16-bit, PL mount, genlock timecode cho set phim chuyên nghiệp.
+              - generic [ref=e383]:
+                - generic [ref=e384]:
+                  - generic [ref=e385]: 360.000.000 ₫
+                  - generic [ref=e386]: Từ 15.000.000 ₫/tháng
+                - generic [ref=e387]:
+                  - button "Đặt Trước" [ref=e388] [cursor=pointer]:
+                    - generic [ref=e389]: schedule
+                  - link "Chi Tiết" [ref=e391] [cursor=pointer]:
+                    - /url: /products/lumina-cine-8k-pl
+          - article [ref=e392]:
+            - generic [ref=e393]:
+              - link "Xem chi tiết Sony Alpha 1 II" [ref=e394] [cursor=pointer]:
+                - /url: /products/sony-alpha-1-ii
+                - img "Sony Alpha 1 II" [ref=e395]
+              - generic [ref=e396]:
+                - generic [ref=e397]: MỚI 2025
+                - generic [ref=e398]: Còn hàng
+              - generic [ref=e399]:
+                - button "Lưu Sony Alpha 1 II vào yêu thích" [ref=e400] [cursor=pointer]:
+                  - generic [ref=e401]: favorite_border
+                - button "Thêm Sony Alpha 1 II vào so sánh" [ref=e402] [cursor=pointer]:
+                  - generic [ref=e403]: compare_arrows
+            - generic [ref=e404]:
+              - generic [ref=e405]:
+                - generic [ref=e406]:
+                  - generic [ref=e407]: Sony • Mirrorless Flagship
+                  - generic [ref=e408]:
+                    - img "Đánh giá 4.8 trên 5 sao" [ref=e409]:
+                      - generic [ref=e410]: star
+                      - generic [ref=e411]: star
+                      - generic [ref=e412]: star
+                      - generic [ref=e413]: star
+                      - generic [ref=e414]: star
+                    - generic [ref=e415]: (54)
+                - heading [level=3] [ref=e416]:
+                  - link "Sony Alpha 1 II" [ref=e417] [cursor=pointer]:
+                    - /url: /products/sony-alpha-1-ii
+                - paragraph [ref=e418]: 30fps blackout-free, AI subject recognition, 8K 60p.
+              - generic [ref=e419]:
+                - generic [ref=e420]:
+                  - generic [ref=e421]: 169.500.000 ₫
+                  - generic [ref=e422]: Từ 7.050.000 ₫/tháng
+                - generic [ref=e423]:
+                  - button "Thêm Vào Giỏ" [ref=e424] [cursor=pointer]:
+                    - generic [ref=e425]: shopping_bag
+                  - link "Chi Tiết" [ref=e427] [cursor=pointer]:
+                    - /url: /products/sony-alpha-1-ii
+          - article [ref=e428]:
+            - generic [ref=e429]:
+              - link "Xem chi tiết Hasselblad 907X & CFV 100C" [ref=e430] [cursor=pointer]:
+                - /url: /products/hasselblad-907x-cfv-100c
+                - img "Hasselblad 907X & CFV 100C" [ref=e431]
+              - generic [ref=e432]:
+                - generic [ref=e433]: SẴN HÀNG VAULT
+                - generic [ref=e434]: Còn hàng
+              - generic [ref=e435]:
+                - button "Lưu Hasselblad 907X & CFV 100C vào yêu thích" [ref=e436] [cursor=pointer]:
+                  - generic [ref=e437]: favorite_border
+                - button "Thêm Hasselblad 907X & CFV 100C vào so sánh" [ref=e438] [cursor=pointer]:
+                  - generic [ref=e439]: compare_arrows
+            - generic [ref=e440]:
+              - generic [ref=e441]:
+                - generic [ref=e442]:
+                  - generic [ref=e443]: Hasselblad • Medium Format
+                  - generic [ref=e444]:
+                    - img "Đánh giá 4.9 trên 5 sao" [ref=e445]:
+                      - generic [ref=e446]: star
+                      - generic [ref=e447]: star
+                      - generic [ref=e448]: star
+                      - generic [ref=e449]: star
+                      - generic [ref=e450]: star
+                    - generic [ref=e451]: (18)
+                - heading [level=3] [ref=e452]:
+                  - link "Hasselblad 907X & CFV 100C" [ref=e453] [cursor=pointer]:
+                    - /url: /products/hasselblad-907x-cfv-100c
+                - paragraph [ref=e454]: Back 100MP gắn trên thân cơ khí cổ điển, 1TB SSD tích hợp.
+              - generic [ref=e455]:
+                - generic [ref=e456]:
+                  - generic [ref=e457]: 215.000.000 ₫
+                  - generic [ref=e458]: Từ 8.950.000 ₫/tháng
+                - generic [ref=e459]:
+                  - button "Thêm Vào Giỏ" [ref=e460] [cursor=pointer]:
+                    - generic [ref=e461]: shopping_bag
+                  - link "Chi Tiết" [ref=e463] [cursor=pointer]:
+                    - /url: /products/hasselblad-907x-cfv-100c
+  - contentinfo [ref=e464]:
+    - generic [ref=e465]:
+      - generic [ref=e466]:
+        - generic [ref=e467]:
+          - generic [ref=e468]: LUMINA OPTICS
+          - paragraph [ref=e470]: Không gian trưng bày và phân phối thiết bị quang học cine, medium format cao cấp hàng đầu Việt Nam. Mỗi thành phẩm đều trải qua quy trình kiểm chuẩn quang sai nghiêm ngặt với hệ chuẩn collimator công nghiệp.
+          - generic [ref=e471]:
+            - generic [ref=e472]: "Bảo chứng đối tác ủy quyền:"
+            - generic [ref=e473]:
+              - generic [ref=e474]: LEICA
+              - generic [ref=e475]: "|"
+              - generic [ref=e476]: HASSELBLAD
+              - generic [ref=e477]: "|"
+              - generic [ref=e478]: SONY CINE
+        - generic [ref=e479]:
+          - generic [ref=e480]: Phân hệ Tuyệt tác
+          - list [ref=e481]:
+            - listitem [ref=e482]:
+              - link "Máy ảnh Medium Format 100MP" [ref=e483] [cursor=pointer]:
+                - /url: /products?category=camera&tag=medium_format
+            - listitem [ref=e484]:
+              - link "Ống kính Cine Anamorphic 2x" [ref=e485] [cursor=pointer]:
+                - /url: /products?category=lens&tag=cine
+            - listitem [ref=e486]:
+              - link "Hệ thống T* Coating Prime T1.3" [ref=e487] [cursor=pointer]:
+                - /url: /products?category=lens
+            - listitem [ref=e488]:
+              - link "Chân máy Carbon Hàng không" [ref=e489] [cursor=pointer]:
+                - /url: /products?category=tripod
+            - listitem [ref=e490]:
+              - link "Thiết bị lưu trữ 8K RAW" [ref=e491] [cursor=pointer]:
+                - /url: /products?category=storage
+        - generic [ref=e492]:
+          - generic [ref=e493]: Đặc quyền Concierge
+          - list [ref=e494]:
+            - listitem [ref=e495]:
+              - link "Lên lịch Trải nghiệm Studio 1:1" [ref=e496] [cursor=pointer]:
+                - /url: /camera-finder
+            - listitem [ref=e497]:
+              - link "Đo quang sai chuẩn MTF" [ref=e498] [cursor=pointer]:
+                - /url: /products?category=lens
+            - listitem [ref=e499]:
+              - link "So sánh hệ thống máy ảnh" [ref=e500] [cursor=pointer]:
+                - /url: /compare
+            - listitem [ref=e501]:
+              - link "Tìm máy ảnh phù hợp" [ref=e502] [cursor=pointer]:
+                - /url: /camera-finder
+            - listitem [ref=e503]:
+              - link "Bảo hành toàn cầu Lumina Care+" [ref=e504] [cursor=pointer]:
+                - /url: /#concierge
+        - generic [ref=e505]:
+          - generic [ref=e506]: Masterclass & Journal
+          - paragraph [ref=e507]: Nhận thư tin độc quyền về kỹ thuật điện ảnh và mời tham dự các buổi thẩm định quang học giới hạn.
+          - generic [ref=e508]:
+            - generic [ref=e509]: Email nhận thư Masterclass
+            - textbox "Email nhận thư Masterclass" [ref=e510]:
+              - /placeholder: nhập email của bạn...
+            - button "Gửi" [ref=e511] [cursor=pointer]
+          - generic [ref=e512]:
+            - generic [ref=e513]: verified
+            - generic [ref=e514]: 100% NHẬP KHẨU CHÍNH NGẠCH NGUYÊN SEAL
+      - generic [ref=e515]:
+        - generic [ref=e516]:
+          - generic [ref=e517]: PATENT NO. VN-OPTIC-8842-X
+          - generic [ref=e518]: ISO 9001:2015 CERTIFIED BENCH
+          - generic [ref=e519]: CALIBRATED TO ZERO RUNOUT
+        - generic [ref=e520]:
+          - link "Bảo mật" [ref=e521] [cursor=pointer]:
+            - /url: /legal/privacy
+          - link "Điều khoản" [ref=e522] [cursor=pointer]:
+            - /url: /legal/terms
+          - link "Đổi trả" [ref=e523] [cursor=pointer]:
+            - /url: /legal/returns
+          - generic [ref=e524]: © 2024–2026 LUMINA OPTICS. TOÀN BỘ QUYỀN ĐƯỢC BẢO LƯU. KIẾN TẠO CHO ĐIỆN ẢNH ĐỈNH CAO.
+```
+
+# Test source
+
+```ts
+  1  | import { expect, test } from "@playwright/test";
+  2  | 
+  3  | test.describe("Review submission", () => {
+  4  |   test("gửi review hợp lệ → hiện trạng thái chờ kiểm duyệt", async ({ page }) => {
+  5  |     await page.goto("/products/lumina-x1-monolith");
+  6  |     await page.waitForLoadState("networkidle");
+  7  | 
+  8  |     await page.getByRole("button", { name: "Viết đánh giá" }).click();
+  9  |     await page.getByRole("button", { name: "4 sao" }).click();
+  10 |     await page.getByLabel("Tiêu đề").fill("Trải nghiệm rất tốt");
+  11 |     await page.getByLabel(/Nội dung/).fill("Máy dùng ổn định, lấy nét nhanh, đáng đầu tư cho công việc chuyên nghiệp.");
+  12 |     await page.getByLabel(/Tên của bạn/).fill("E2E Reviewer");
+  13 | 
+  14 |     await page.getByRole("button", { name: "Gửi đánh giá" }).click();
+  15 | 
+  16 |     await expect(page.getByText("đang chờ kiểm duyệt")).toBeVisible({ timeout: 15_000 });
+  17 |     await expect(page.getByText("CHỜ KIỂM DUYỆT").first()).toBeVisible();
+  18 |   });
+  19 | 
+  20 |   test("validation chặn review không hợp lệ", async ({ page }) => {
+  21 |     await page.goto("/products/lumina-x1-monolith");
+  22 |     await page.waitForLoadState("networkidle");
+  23 | 
+  24 |     await page.getByRole("button", { name: "Viết đánh giá" }).click();
+> 25 |     await page.getByRole("button", { name: "Gửi đánh giá" }).click();
+     |                                                              ^ Error: locator.click: Test timeout of 60000ms exceeded.
+  26 | 
+  27 |     await expect(page.getByText("Vui lòng chọn số sao từ 1 đến 5.")).toBeVisible();
+  28 |     await expect(page.getByText("Tiêu đề cần tối thiểu 4 ký tự.")).toBeVisible();
+  29 |   });
+  30 | });
+  31 | 
+```

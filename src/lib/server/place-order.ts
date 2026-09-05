@@ -1,6 +1,5 @@
 import type { CartTotals, ContactInfo, Order, OrderLine, Product, ShippingInfo } from "@/lib/types";
 import { calculateTotals, maxQuantityOf, resolveVariant, unitPriceOf, unitCompareAtPriceOf } from "@/lib/services/cart-service";
-import { getProductsByIds } from "@/lib/repositories/product-repository";
 import { dbGetProductById } from "./product-db";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";

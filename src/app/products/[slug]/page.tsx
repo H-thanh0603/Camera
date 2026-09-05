@@ -95,7 +95,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <div className="container-page flex flex-col gap-space-xl pb-24 pt-space-lg lg:pb-space-xl">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {/* Escape < thành < — chặn breakout khỏi script tag nếu name/description chứa "</script>" */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\u003c") }}
+      />
 
       <nav aria-label="Breadcrumb" className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-outline">
         <Link href="/" className="transition-colors hover:text-primary">Trang chủ</Link>

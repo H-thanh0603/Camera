@@ -118,3 +118,14 @@ describe("catalog params (URL ↔ state)", () => {
     expect(qs).toContain("minPrice=1000000");
   });
 });
+
+describe("search không dấu tiếng Việt", () => {
+  it('gõ "may anh" vẫn khớp "Máy Ảnh"', () => {
+    const result = search("may anh");
+    expect(result.products.length).toBeGreaterThan(0);
+  });
+  it('gõ "ong kinh" khớp "Ống kính"', () => {
+    const result = search("ong kinh");
+    expect(result.brands.length).toBeGreaterThan(0);
+  });
+});
