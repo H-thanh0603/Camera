@@ -29,8 +29,20 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Setup database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: "file:./dev.db"
+
+      - name: Seed database
+        run: npx prisma db seed
+        env:
+          DATABASE_URL: "file:./dev.db"
+
       - name: Production build
         run: npm run build
+        env:
+          DATABASE_URL: "file:./dev.db"
 
   e2e:
     runs-on: ubuntu-latest
@@ -53,9 +65,15 @@ jobs:
         env:
           DATABASE_URL: "file:./dev.db"
 
+      - name: Seed database
+        run: npx prisma db seed
+        env:
+          DATABASE_URL: "file:./dev.db"
+
       - name: Production build
         run: npm run build
         env:
+          DATABASE_URL: "file:./dev.db"
           PAYMENT_DEMO_MODE: "true"
           NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true"
 

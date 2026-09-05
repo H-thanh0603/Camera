@@ -48,11 +48,20 @@ src/
 tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filter, order verification, luồng mua thật
 ```
 
+### Admin panel
+
+- `/admin` — guard server-side theo `user.role` trong DB (API routes guard riêng từng route).
+- Tài khoản seed: `admin@lumina.vn` / `ADMIN_PASSWORD` (mặc định `admin-lumina-2026`).
+- Dashboard (đơn, doanh thu, sản phẩm, review chờ duyệt), CRUD sản phẩm (viết DB +
+  `revalidatePath` — catalogue hiển thị lại gần như tức thì), đổi trạng thái đơn,
+  duyệt/xóa review (tự tính lại rating sản phẩm).
+- Catalogue sản phẩm nằm trong DB: client refresh qua `/api/products/snapshot`.
+
 ### Backend hiện trạng
 
-- **Database (Prisma + SQLite)**: `users`, `sessions`, `orders` + `order_lines`, `reviews`.
-  Catalogue sản phẩm vẫn là seed read-only (chưa có admin CRUD) — khi thêm admin,
-  chuyển sang bảng `products` và `DbProductRepository`.
+- **Database (Prisma + SQLite)**: `users`, `sessions`, `orders` + `order_lines`,
+  `reviews`, `products` + `product_variants`. Catalogue đọc từ DB (ISR + on-demand
+  revalidate khi admin ghi).
 - **Auth thật**: scrypt hash, session token (cookie httpOnly, DB chỉ lưu SHA-256),
   rate limit login/register. Không còn thông tin user trong localStorage.
 - **Đặt hàng**: client chỉ gửi productId/variantId/quantity — **server tự lấy giá,
@@ -78,5 +87,5 @@ tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filt
 
 1. Deploy: Vercel + Postgres (Supabase/Neon) — đổi `provider` + `DATABASE_URL`, chạy `prisma migrate deploy`.
 2. Payment thật: webhook VNPay/MoMo/Stripe thay `pay-demo`, xóa endpoint demo.
-3. Admin panel (role-based) + CRUD sản phẩm vào DB, chuyển catalogue sang DB reads (ISR).
-4. Email (xác nhận đơn, reset password), ảnh CDN + `next/image`, Sentry.
+3. Email (xác nhận đơn, reset password), ảnh CDN + `next/image`, Sentry.
+4. Snapshot API → phân trang server-side khi catalogue lên hàng nghìn SP.
