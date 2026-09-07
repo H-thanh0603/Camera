@@ -29,7 +29,8 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
-      DATABASE_URL: "file:./tests/e2e/.test.db",
+      // Prisma resolve file: tương đối theo thư mục prisma/ → ../ ra root
+      DATABASE_URL: "file:../tests/e2e/.test.db",
       PAYMENT_DEMO_MODE: "true",
       NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true",
       NEXT_PUBLIC_ORDER_FAILURE_RATE: "0",

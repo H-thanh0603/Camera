@@ -250,7 +250,7 @@ export async function dbSimilarProducts(
     orderBy: [{ rating: "desc" }, { reviewCount: "desc" }],
     take: 20,
   });
-  // Sort: brand match + category match + price proximity (giống getSimilarProducts client)
+  // Sort: brand match + category match + price proximity
   return rows
     .map((r) => dbProductToDomain(r))
     .sort(

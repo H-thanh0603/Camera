@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/product/product-card";
-import { applyQuery } from "@/lib/repositories/product-repository";
-import { dbAllProducts } from "@/lib/server/product-db";
+import { dbQueryProducts } from "@/lib/server/product-db";
 
 /** Section 5 — Curated Bestsellers & Precision Vault: dữ liệu từ DB. */
 export async function VaultBestsellers() {
-  const catalog = await dbAllProducts();
-  const bestsellers = applyQuery(catalog, { sort: "best_selling", pageSize: 3 }).items;
+  const { items: bestsellers } = await dbQueryProducts({ sort: "best_selling", pageSize: 3 });
 
   return (
     <section className="relative w-full bg-surface py-space-4xl">

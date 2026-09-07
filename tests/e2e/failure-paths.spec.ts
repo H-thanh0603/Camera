@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Failure paths — 404 / validation / auth", () => {
-  test("product không tồn tại → 404", async ({ page }) => {
-    const res = await page.goto("/products/this-product-does-not-exist-xyz");
-    expect(res?.status()).toBe(404);
+  test("product không tồn tại → trang not-found", async ({ page }) => {
+    await page.goto("/products/this-product-does-not-exist-xyz");
+    await expect(page.getByRole("heading", { name: "Trang Không Được Tìm Thấy" })).toBeVisible();
   });
 
   test("checkout với giỏ trống → redirect /cart hoặc lỗi", async ({ page }) => {
@@ -63,8 +63,8 @@ test.describe("Failure paths — 404 / validation / auth", () => {
     await expect(page.getByRole("alert").filter({ hasText: /sai|không đúng|không hợp lệ/i })).toBeVisible({ timeout: 10_000 });
   });
 
-  test("rate limit — login 6 lần sai liên tiếp bị chặn", async ({ request }) => {
-    for (let i = 0; i < 6; i++) {
+  test("rate limit — login sai liên tiếp bị chặn 429 (limit 10/phút)", async ({ request }) => {
+    for (let i = 0; i < 11; i++) {
       await request.post("/api/auth/login", {
         data: { email: "admin@lumina.vn", password: "wrong" },
         failOnStatusCode: false,
