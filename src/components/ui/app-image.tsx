@@ -15,17 +15,20 @@ type FixedProps = Omit<ImageProps, "src" | "alt"> & {
   alt: string;
 };
 
-export function AppImage({ loading = "lazy", decoding = "async", ...props }: FixedProps) {
+export function AppImage({ loading, decoding = "async", priority = false, ...props }: FixedProps) {
   // alt bắt buộc qua type FixedProps — eslint không suy được qua spread.
+  // priority=true thì không kèm loading="lazy" (next/image throw).
   // eslint-disable-next-line jsx-a11y/alt-text
-  return <Image loading={loading} decoding={decoding} {...props} />;
+  return <Image loading={priority ? undefined : (loading ?? "lazy")} decoding={decoding} priority={priority} {...props} />;
 }
 
 export function AppFillImage({
   sizes = "(max-width: 768px) 100vw, 50vw",
+  priority = false,
   ...props
 }: Omit<FixedProps, "width" | "height" | "fill">) {
   // alt bắt buộc qua type — xem AppImage.
+  // priority=true thì không được kèm loading="lazy" (next/image throw).
   // eslint-disable-next-line jsx-a11y/alt-text
-  return <Image fill sizes={sizes} loading="lazy" {...props} />;
+  return <Image fill sizes={sizes} priority={priority} loading={priority ? undefined : "lazy"} {...props} />;
 }
