@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { articles } from "@/lib/data/articles";
 import { formatDate } from "@/lib/utils/format";
+import { AppFillImage } from "@/components/ui/app-image";
 
 export const metadata: Metadata = {
   title: "Lumina Journal — Camera Guides, Reviews & Buying Guides",
@@ -25,8 +26,7 @@ export default function JournalPage() {
         href={`/journal/${featured.slug}`}
         className="group relative flex min-h-[420px] flex-col justify-end overflow-hidden rounded-xl shadow-xl"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={featured.heroImage} alt={featured.heroAlt} className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        <AppFillImage src={featured.heroImage} alt={featured.heroAlt} priority sizes="100vw" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/40 to-transparent" aria-hidden="true" />
         <div className="relative z-10 flex flex-col gap-space-xs p-space-xl">
           <span className="w-fit rounded-lg bg-primary/90 px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs font-bold uppercase text-on-primary">{featured.category}</span>
@@ -41,8 +41,7 @@ export default function JournalPage() {
         {rest.map((article) => (
           <Link key={article.slug} href={`/journal/${article.slug}`} className="group flex flex-col overflow-hidden rounded-xl bg-surface-container shadow-xl transition-shadow hover:shadow-[0_16px_48px_rgba(242,202,80,0.12)]">
             <div className="aspect-[16/9] w-full overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={article.heroImage} alt={article.heroAlt} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <AppFillImage src={article.heroImage} alt={article.heroAlt} sizes="(max-width: 768px) 100vw, 50vw" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
             </div>
             <div className="flex flex-col gap-space-xs p-space-lg">
               <span className="w-fit rounded bg-primary/20 px-space-xs py-0.5 font-telemetry-xs text-telemetry-xs font-bold uppercase text-primary">{article.category}</span>

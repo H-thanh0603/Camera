@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { search, POPULAR_SEARCHES } from "@/lib/services/search-service";
 import { formatVND } from "@/lib/utils/format";
 import { useDebounce } from "@/hooks/useDebounce";
+import { AppImage } from "@/components/ui/app-image";
 import { loadJSON, saveJSON } from "@/lib/repositories/storage-repository";
 import { useStore } from "@/state/store";
 import { track } from "@/lib/analytics";
@@ -119,8 +120,7 @@ export function SearchOverlay() {
                     onClick={() => setSearchOpen(false)}
                     className="flex items-center gap-space-sm rounded-lg p-space-xs transition-colors hover:bg-surface-container-high"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.thumbnail.url} alt="" loading="lazy" className="h-12 w-12 rounded bg-surface-container-low object-contain" />
+                    <AppImage src={p.thumbnail.url} alt="" width={48} height={48} className="h-12 w-12 rounded bg-surface-container-low object-contain" />
                     <span className="flex flex-1 flex-col">
                       <span className="font-headline-sm text-headline-sm text-on-surface">{p.name}</span>
                       <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">{p.brand} • {p.subcategory}</span>

@@ -7,6 +7,7 @@ import { findRecommendations } from "@/lib/services/finder-service";
 import type { FinderAnswers } from "@/lib/types";
 import { formatVND } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/format";
+import { AppFillImage } from "@/components/ui/app-image";
 
 /** Hero Section 4 — Sensor & Low-Light Simulator (port từ prototype, matchmaker gắn FinderService). */
 type SensorKey = "medium" | "fullframe" | "apsc";
@@ -80,13 +81,11 @@ export function SensorLab() {
         <div className="grid grid-cols-1 gap-space-xl rounded-xl bg-surface-container p-space-xl shadow-2xl lg:grid-cols-12">
           <div className="flex flex-col gap-space-md lg:col-span-8">
             <div className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-lg bg-surface-container-lowest">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <AppFillImage
                 className="h-full w-full object-cover transition-all duration-300"
                 style={{ filter: imgFilter }}
                 alt="Chân dung thiếu sáng với bokeh mịn và kiểm soát nhiễu vượt trội"
                 src={IMG.lowLightPortrait}
-                loading="lazy"
               />
               <div className="pointer-events-none absolute flex h-full w-full items-start justify-end border-2 border-primary p-space-xs transition-all duration-500" style={{ width: SENSORS[sensor].size, height: SENSORS[sensor].size }} aria-hidden="true">
                 <span className="rounded bg-primary px-1.5 py-0.5 font-telemetry-xs text-[10px] font-bold uppercase text-on-primary">{SENSORS[sensor].crop}</span>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { IMG } from "@/lib/data/images";
 import { cn } from "@/lib/utils/format";
+import { AppFillImage } from "@/components/ui/app-image";
 
 /** Hero Section 2 — Dissection & Interactive Optical Anatomy (port từ prototype). */
 const MODES = {
@@ -67,12 +68,10 @@ export function LensAnatomy() {
         <div className="grid grid-cols-1 items-center gap-space-xl lg:grid-cols-12">
           <div className="flex flex-col gap-space-md lg:col-span-7">
             <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl bg-surface-container-low p-space-lg shadow-xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <AppFillImage
                 className="h-full w-full object-contain drop-shadow-[0_20px_50px_rgba(242,202,80,0.15)] transition-all duration-700"
                 alt="Sơ đồ exploded view các thấu kính quang học và khối cảm biến của Lumina"
                 src={IMG.anatomy}
-                loading="lazy"
               />
               <div className="absolute left-8 top-8 rounded-lg bg-surface-container-high/90 p-space-xs shadow-sm backdrop-blur-md">
                 <span className="block font-telemetry-xs text-telemetry-xs font-bold text-primary">LỚP PHỦ NANO T* & FLUORINE</span>

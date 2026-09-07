@@ -12,6 +12,7 @@ import { contactSchema, shippingSchema, type ContactInput, type ShippingInput } 
 import { formatVND, cn } from "@/lib/utils/format";
 import { useStore } from "@/state/store";
 import { EmptyState, Spinner } from "@/components/ui/states";
+import { AppImage } from "@/components/ui/app-image";
 
 const STEPS = ["Liên hệ", "Vận chuyển", "Giao nhận", "Thanh toán", "Xác nhận"] as const;
 
@@ -379,8 +380,7 @@ export default function CheckoutPage() {
               <ul className="flex flex-col gap-space-sm border-t border-surface-container-high pt-space-sm">
                 {lines.map((line) => (
                   <li key={`${line.productId}::${line.variantId ?? ""}`} className="flex items-center gap-space-sm">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={line.product.thumbnail.url} alt="" loading="lazy" className="h-12 w-12 rounded bg-surface-container-low object-contain" />
+                    <AppImage src={line.product.thumbnail.url} alt="" width={48} height={48} className="h-12 w-12 rounded bg-surface-container-low object-contain" />
                     <span className="flex flex-1 flex-col">
                       <span className="font-body-sm text-body-sm text-on-surface">{line.product.name}{line.variant ? ` — ${line.variant.name}` : ""}</span>
                       <span className="font-telemetry-xs text-telemetry-xs text-outline">× {line.quantity}</span>

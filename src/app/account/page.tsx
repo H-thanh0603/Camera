@@ -6,6 +6,7 @@ import type { Order, OrderStep } from "@/lib/types";
 import { ORDER_STEP_ORDER } from "@/lib/types";
 import { listOrders, cancelOrder } from "@/lib/services/order-service";
 import { toAuthError } from "@/lib/api-client";
+import { AppImage } from "@/components/ui/app-image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from "@/lib/schemas";
@@ -276,8 +277,7 @@ export default function AccountPage() {
                   <ul className="flex flex-wrap gap-space-sm">
                     {order.lines.map((line) => (
                       <li key={`${line.productId}-${line.variantId ?? ""}`} className="flex items-center gap-space-2xs rounded-lg bg-surface-container-low p-space-2xs">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={line.image} alt="" loading="lazy" className="h-10 w-10 rounded object-contain" />
+                        <AppImage src={line.image} alt="" width={40} height={40} className="h-10 w-10 rounded object-contain" />
                         <span className="font-telemetry-xs text-telemetry-xs text-on-surface">{line.name} × {line.quantity}</span>
                       </li>
                     ))}

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { formatVND } from "@/lib/utils/format";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/services/cart-service";
 import { useStore } from "@/state/store";
+import { AppImage } from "@/components/ui/app-image";
 import { EmptyState } from "@/components/ui/states";
 
 export function CartDrawer() {
@@ -85,8 +86,7 @@ export function CartDrawer() {
             <ul className="flex flex-1 flex-col gap-space-sm overflow-y-auto">
               {lines.map((line) => (
                 <li key={lineKey(line)} className="flex gap-space-sm rounded-lg bg-surface-container-low p-space-sm">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={line.product.thumbnail.url} alt={line.product.thumbnail.alt} loading="lazy" className="h-20 w-20 shrink-0 rounded-lg object-contain" />
+                  <AppImage src={line.product.thumbnail.url} alt={line.product.thumbnail.alt} width={80} height={80} className="h-20 w-20 shrink-0 rounded-lg object-contain" />
                   <div className="flex flex-1 flex-col gap-space-2xs">
                     <div className="flex items-start justify-between gap-space-xs">
                       <div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { IMG } from "@/lib/data/images";
 import { getProductById } from "@/lib/repositories/product-repository";
 import { useStore } from "@/state/store";
+import { AppFillImage } from "@/components/ui/app-image";
 
 /** Hero Section 3 — Master Series Collection (port nguyên vẹn, heart gắn wishlist thật). */
 const COLLECTIONS = [
@@ -85,8 +86,7 @@ export function CollectionGrid() {
             return (
               <div key={c.title} className="group relative flex flex-col justify-between overflow-hidden rounded-xl bg-surface-container shadow-xl transition-all hover:shadow-[0_16px_48px_rgba(242,202,80,0.12)]">
                 <div className="relative aspect-[4/5] w-full overflow-hidden bg-surface-container-low">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src={c.image} alt={c.alt} loading="lazy" />
+                  <AppFillImage className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" src={c.image} alt={c.alt} />
                   <div className="absolute inset-0 bg-gradient-to-t from-surface-container via-transparent to-transparent" aria-hidden="true" />
                   <div className="absolute left-space-sm top-space-sm flex flex-col gap-1">
                     <span className="rounded-lg bg-surface-container-high/90 px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs font-bold uppercase text-primary">{c.number}</span>

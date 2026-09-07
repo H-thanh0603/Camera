@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 import { Spinner } from "@/components/ui/states";
+import { AppImage } from "@/components/ui/app-image";
 
 const STATUSES: OrderStatus[] = ["pending", "paid", "processing", "shipped", "delivered", "cancelled", "refunded"];
 
@@ -92,8 +93,7 @@ export function OrdersAdmin() {
               <ul className="flex flex-wrap gap-space-sm">
                 {o.lines.map((l) => (
                   <li key={`${l.productId}-${l.variantId ?? ""}`} className="flex items-center gap-space-2xs rounded-lg bg-surface-container-low p-space-2xs">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={l.image} alt="" loading="lazy" className="h-10 w-10 rounded object-contain" />
+                    <AppImage src={l.image} alt="" width={40} height={40} className="h-10 w-10 rounded object-contain" />
                     <span className="font-telemetry-xs text-telemetry-xs text-on-surface">
                       {l.name}{l.variantName ? ` — ${l.variantName}` : ""} × {l.quantity}
                     </span>

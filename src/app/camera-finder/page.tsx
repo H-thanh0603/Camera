@@ -6,6 +6,7 @@ import type { FinderAnswers, PhotographyStyle } from "@/lib/types";
 import { findRecommendations, BUDGET_RANGES } from "@/lib/services/finder-service";
 import { formatVND, cn } from "@/lib/utils/format";
 import { RatingStars } from "@/components/ui/rating-stars";
+import { AppImage } from "@/components/ui/app-image";
 
 const QUESTIONS = [
   { key: "budget", question: "Ngân sách của bạn nằm ở đâu?", options: Object.entries(BUDGET_RANGES).map(([value, r]) => ({ value, label: r.label })) },
@@ -163,8 +164,7 @@ export default function CameraFinderPage() {
                     <RatingStars rating={rec.product.rating} size={14} />
                   </div>
                   <div className="flex gap-space-sm">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={rec.product.thumbnail.url} alt={rec.product.thumbnail.alt} loading="lazy" className="h-24 w-24 shrink-0 rounded-lg bg-surface-container-low object-contain p-1" />
+                    <AppImage src={rec.product.thumbnail.url} alt={rec.product.thumbnail.alt} width={96} height={96} className="h-24 w-24 shrink-0 rounded-lg bg-surface-container-low object-contain p-1" />
                     <div className="flex flex-col gap-space-2xs">
                       <h2 className="font-headline-sm text-headline-sm text-on-surface">{rec.product.name}</h2>
                       <span className="font-telemetry-data text-telemetry-data font-bold text-primary">{formatVND(rec.product.price)}</span>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IMG } from "@/lib/data/images";
+import { AppFillImage } from "@/components/ui/app-image";
 
 /** Hero Section 1 — Cinematic Viewfinder HUD (port nguyên vẹn từ prototype). */
 export function HeroHud() {
@@ -11,12 +12,12 @@ export function HeroHud() {
     <section className="relative flex min-h-[92vh] w-full select-none items-center justify-center overflow-hidden bg-surface-container-lowest">
       {/* Cinematic Dark Backdrop Image with Optical Gradient Scrim */}
       <div className="absolute inset-0 z-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <AppFillImage
           alt="Lumina X-1 Monolith 61MP Flagship Mirrorless Camera"
           className="h-full w-full scale-105 object-cover object-center contrast-[1.12] brightness-[0.78]"
           src={IMG.heroBackdrop}
-          fetchPriority="high"
+          priority
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-surface-container-lowest/60 to-surface-container-lowest/80" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background" />
@@ -161,8 +162,7 @@ export function HeroHud() {
               </button>
             </div>
             <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-surface-container-lowest">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="h-full w-full object-cover" alt="Thước phim điện ảnh quay trên Lumina X-1: núi lửa Iceland với vệt sáng anamorphic xanh" src={IMG.videoReel} />
+              <AppFillImage className="h-full w-full object-cover" alt="Thước phim điện ảnh quay trên Lumina X-1: núi lửa Iceland với vệt sáng anamorphic xanh" src={IMG.videoReel} />
               <div className="absolute inset-0 flex items-center justify-center bg-surface-container-lowest/40">
                 <div className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-full bg-primary text-on-primary shadow-xl transition-transform hover:scale-105">
                   <span className="material-symbols-outlined text-[32px]" aria-hidden="true">play_arrow</span>

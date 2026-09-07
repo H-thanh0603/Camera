@@ -21,6 +21,10 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "lh3.googleusercontent.com" }],
+    formats: ["image/avif", "image/webp"],
+  },
   async headers() {
     return [
       {

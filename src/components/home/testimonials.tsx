@@ -1,4 +1,5 @@
 import { IMG } from "@/lib/data/images";
+import { AppImage } from "@/components/ui/app-image";
 
 const TESTIMONIALS = [
   {
@@ -46,8 +47,7 @@ export function Testimonials() {
               </div>
               <figcaption className="flex items-center gap-space-md border-t border-surface-container-high pt-space-md">
                 <div className="h-12 w-12 overflow-hidden rounded-full bg-surface-container-high">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="h-full w-full object-cover" src={t.avatar} alt={t.avatarAlt} loading="lazy" />
+                  <AppImage className="h-full w-full object-cover" width={48} height={48} src={t.avatar} alt={t.avatarAlt} />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-headline-sm text-headline-sm text-on-surface">{t.name}</span>

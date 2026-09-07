@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { IMG } from "@/lib/data/images";
+import { AppImage } from "@/components/ui/app-image";
 import { useStore } from "@/state/store";
 import { cn } from "@/lib/utils/format";
 
@@ -39,8 +40,7 @@ export function Header() {
       <div className="mx-auto flex h-20 w-full max-w-container-max items-center justify-between gap-space-md px-gutter-mobile lg:px-gutter-desktop">
         <div className="flex shrink-0 items-center gap-space-lg">
           <Link href="/" className="group flex items-center gap-space-xs">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="LUMINA Optics Logo" className="h-8 w-auto object-contain" src={IMG.logo} />
+            <AppImage alt="LUMINA Optics Logo" width={120} height={32} priority className="h-8 w-auto object-contain" src={IMG.logo} />
             <span className="flex flex-col">
               <span className="font-headline-sm text-headline-sm uppercase tracking-wider text-on-surface transition-colors group-hover:text-primary">LUMINA OPTICS</span>
               <span className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-outline">PRECISION CINEMA APPARATUS</span>

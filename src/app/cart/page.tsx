@@ -7,6 +7,7 @@ import { FREE_SHIPPING_THRESHOLD } from "@/lib/services/cart-service";
 import { EmptyState } from "@/components/ui/states";
 import { AVAILABILITY_CLASS, AVAILABILITY_LABEL } from "@/lib/utils/availability";
 import { cn } from "@/lib/utils/format";
+import { AppImage } from "@/components/ui/app-image";
 
 export default function CartPage() {
   const { cartSnapshot, setQuantity, removeFromCart, clearCart, hydrated } = useStore();
@@ -57,8 +58,7 @@ export default function CartPage() {
               {lines.map((line) => (
                 <li key={`${line.productId}::${line.variantId ?? ""}`} className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-md sm:flex-row">
                   <Link href={`/products/${line.product.slug}`} className="flex items-center justify-center rounded-lg bg-surface-container-low p-space-sm sm:w-40">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={line.product.thumbnail.url} alt={line.product.thumbnail.alt} loading="lazy" className="h-24 w-full object-contain" />
+                    <AppImage src={line.product.thumbnail.url} alt={line.product.thumbnail.alt} width={320} height={256} className="h-24 w-full object-contain" />
                   </Link>
                   <div className="flex flex-1 flex-col justify-between gap-space-sm">
                     <div className="flex items-start justify-between gap-space-sm">

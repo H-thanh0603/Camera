@@ -8,6 +8,7 @@ import { AVAILABILITY_CLASS, AVAILABILITY_LABEL } from "@/lib/utils/availability
 import { RatingStars } from "@/components/ui/rating-stars";
 import { useStore } from "@/state/store";
 import { cn } from "@/lib/utils/format";
+import { AppFillImage } from "@/components/ui/app-image";
 
 /**
  * ProductCard chuẩn hóa từ card "Vault" trong prototype — giữ nguyên style.
@@ -38,12 +39,11 @@ export function ProductCard({ product, priority = false }: { product: Product; p
           className="flex h-full w-full items-center justify-center"
           aria-label={`Xem chi tiết ${product.name}`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <AppFillImage
             src={hovered && secondaryImage ? secondaryImage.url : product.thumbnail.url}
             alt={hovered && secondaryImage ? secondaryImage.alt : product.thumbnail.alt}
-            loading={priority ? "eager" : "lazy"}
-            decoding="async"
+            sizes="(max-width: 768px) 50vw, 25vw"
+            priority={priority}
             className="h-full w-full object-contain transition-opacity duration-300"
           />
         </Link>

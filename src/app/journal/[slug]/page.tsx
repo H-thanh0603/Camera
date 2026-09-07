@@ -5,6 +5,7 @@ import { articles } from "@/lib/data/articles";
 import { getProductBySlug } from "@/lib/repositories/product-repository";
 import { ProductCard } from "@/components/product/product-card";
 import { formatDate } from "@/lib/utils/format";
+import { AppFillImage } from "@/components/ui/app-image";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -44,8 +45,7 @@ export default async function ArticlePage({ params }: PageProps) {
   return (
     <article className="flex flex-col">
       <div className="relative flex min-h-[440px] flex-col justify-end">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={article.heroImage} alt={article.heroAlt} className="absolute inset-0 h-full w-full object-cover" />
+        <AppFillImage src={article.heroImage} alt={article.heroAlt} priority sizes="100vw" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" aria-hidden="true" />
         <div className="container-page relative z-10 flex flex-col gap-space-xs pb-space-xl">
           <span className="w-fit rounded-lg bg-primary/90 px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs font-bold uppercase text-on-primary">{article.category}</span>

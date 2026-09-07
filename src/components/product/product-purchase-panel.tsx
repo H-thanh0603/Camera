@@ -9,6 +9,7 @@ import { AVAILABILITY_CLASS, AVAILABILITY_LABEL, canPurchase } from "@/lib/utils
 import { RatingStars } from "@/components/ui/rating-stars";
 import { useStore } from "@/state/store";
 import { track } from "@/lib/analytics";
+import { AppFillImage, AppImage } from "@/components/ui/app-image";
 
 /**
  * PurchasePanel — gallery, variant selector, quantity, CTA.
@@ -63,8 +64,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
             onKeyDown={(e) => e.key === "Enter" && setZoom(true)}
             aria-label="Phóng to ảnh sản phẩm (NHẤP ĐỂ ZOOM)"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={displayImage.url} alt={displayImage.alt} className="h-full w-full object-contain" />
+            <AppFillImage src={displayImage.url} alt={displayImage.alt} sizes="(max-width: 1024px) 100vw, 55vw" priority className="h-full w-full object-contain" />
             <span className="absolute bottom-space-sm right-space-sm rounded bg-surface-container-highest/80 px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs text-outline backdrop-blur">
               <span className="material-symbols-outlined align-middle text-[14px]" aria-hidden="true">zoom_in</span> NHẤP ĐỂ ZOOM
             </span>
@@ -88,8 +88,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
                     activeImage === i ? "border-primary" : "border-surface-container-highest hover:border-outline",
                   )}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={image.url} alt={image.alt} loading="lazy" className="h-full w-full object-contain" />
+                  <AppImage src={image.url} alt={image.alt} width={80} height={80} className="h-full w-full object-contain" />
                 </button>
               ))}
             </div>
@@ -258,8 +257,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
       {/* Zoom modal */}
       {zoom && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-surface-container-lowest/95 p-space-md" role="dialog" aria-modal="true" aria-label="Ảnh phóng to" onClick={() => setZoom(false)}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={displayImage.url} alt={displayImage.alt} className="max-h-[90vh] max-w-[90vw] object-contain" />
+          <AppImage src={displayImage.url} alt={displayImage.alt} width={1600} height={1200} className="max-h-[90vh] max-w-[90vw] object-contain" />
           <button type="button" onClick={() => setZoom(false)} className="absolute right-space-md top-space-md rounded-full bg-surface-container-high p-space-xs text-on-surface" aria-label="Đóng zoom">
             <span className="material-symbols-outlined" aria-hidden="true">close</span>
           </button>

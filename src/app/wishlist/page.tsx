@@ -7,6 +7,7 @@ import { formatVND, cn } from "@/lib/utils/format";
 import { AVAILABILITY_CLASS, AVAILABILITY_LABEL, canPurchase } from "@/lib/utils/availability";
 import { EmptyState } from "@/components/ui/states";
 import { RatingStars } from "@/components/ui/rating-stars";
+import { AppImage } from "@/components/ui/app-image";
 
 export default function WishlistPage() {
   const { wishlist, removeWishlist, addToCart, hydrated } = useStore();
@@ -45,8 +46,7 @@ export default function WishlistPage() {
             return (
               <li key={entry.productId} className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-md sm:flex-row sm:items-center">
                 <Link href={`/products/${product.slug}`} className="flex items-center justify-center rounded-lg bg-surface-container-low p-space-sm sm:w-36">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={product.thumbnail.url} alt={product.thumbnail.alt} loading="lazy" className="h-20 w-full object-contain" />
+                  <AppImage src={product.thumbnail.url} alt={product.thumbnail.alt} width={320} height={256} className="h-20 w-full object-contain" />
                 </Link>
                 <div className="flex flex-1 flex-col gap-space-2xs">
                   <Link href={`/products/${product.slug}`} className="font-headline-sm text-headline-sm text-on-surface transition-colors hover:text-primary">
