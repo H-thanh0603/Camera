@@ -16,8 +16,8 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  const { dbAllProducts } = await import("@/lib/server/product-db");
-  const products = await dbAllProducts();
+  const { dbProductRoutes } = await import("@/lib/server/product-db");
+  const products = await dbProductRoutes();
   return products.map((p) => ({ slug: p.slug }));
 }
 

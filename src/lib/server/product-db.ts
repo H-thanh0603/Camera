@@ -66,6 +66,14 @@ export function dbProductToDomain(row: ProductRow, approvedReviews: ApprovedRevi
   };
 }
 
+/**
+ * Chỉ slug + updatedAt cho sitemap/generateStaticParams — nhẹ hơn
+ * dbAllProducts (không tải JSON spec/images/reviews).
+ */
+export async function dbProductRoutes(): Promise<{ slug: string; updatedAt: Date }[]> {
+  return prisma.product.findMany({ select: { slug: true, updatedAt: true }, orderBy: { createdAt: "desc" } });
+}
+
 export async function dbAllProducts(): Promise<Product[]> {
   const [rows, reviews] = await Promise.all([
     prisma.product.findMany({ include: INCLUDE, orderBy: { createdAt: "desc" } }),
