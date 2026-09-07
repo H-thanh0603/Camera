@@ -6,12 +6,28 @@ import { isRedisConfigured } from "@/lib/server/rate-limit-redis";
 /**
  * GET /api/health — health check cho uptime monitor (UptimeRobot, K8s probe…).
  * 200 khi app + DB sống; 503 khi DB không phản hồi.
+ * Uptime monitor ping mỗi phút nên nhờ nó dọn session/reset-token hết hạn
+ * (1 lần/giờ — dùng flag in-memory, không cần cron riêng).
  */
+
+const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+let lastSweep = 0;
 
 export async function GET() {
   const startedAt = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
+
+    let swept = 0;
+    if (Date.now() - lastSweep >= SWEEP_INTERVAL_MS) {
+      lastSweep = Date.now();
+      const expired = { lt: new Date() };
+      const sessions = await prisma.session.deleteMany({ where: { expiresAt: expired } });
+      const tokens = await prisma.passwordResetToken.deleteMany({ where: { expiresAt: expired } });
+      swept = sessions.count + tokens.count;
+      if (swept > 0) logger.info("auth.sweep_expired", { sessions: sessions.count, tokens: tokens.count });
+    }
+
     const mem = process.memoryUsage();
     return NextResponse.json({
       status: "ok",
@@ -28,6 +44,7 @@ export async function GET() {
       email: Boolean(process.env.RESEND_API_KEY),
       sentry: Boolean(process.env.SENTRY_DSN),
       redis: isRedisConfigured() ? "upstash" : "memory",
+      swept,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

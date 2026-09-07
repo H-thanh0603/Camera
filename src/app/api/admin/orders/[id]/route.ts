@@ -8,6 +8,7 @@ import type { OrderStatus } from "@/lib/types";
 /**
  * PATCH /api/admin/orders/:id — đổi trạng thái đơn.
  * currentStep đồng bộ theo status (timeline 7 bước).
+ * Hủy/hoàn tiền từ trạng thái còn hàng → hoàn stock; chuyển ngược chiều bị chặn.
  */
 
 const VALID: OrderStatus[] = ["pending", "paid", "processing", "shipped", "delivered", "cancelled", "refunded"];
@@ -21,6 +22,18 @@ const STATUS_TO_STEP: Partial<Record<OrderStatus, string>> = {
   cancelled: "confirmed",
   refunded: "confirmed",
 };
+
+/** Trạng thái chỉ được đi tiến — hoặc rẽ sang cancelled/refunded một lần. */
+const FORWARD: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  pending: ["paid", "cancelled"],
+  paid: ["processing", "cancelled", "refunded"],
+  processing: ["shipped", "cancelled", "refunded"],
+  shipped: ["delivered", "refunded"],
+  delivered: ["refunded"],
+};
+
+/** Hủy/hoàn tiền chỉ hoàn stock một lần — từ trạng thái chưa hủy. */
+const RESTOCKABLE: OrderStatus[] = ["pending", "paid", "processing"];
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await adminGuardResponse();
@@ -42,8 +55,46 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const order = await prisma.order.findUnique({ where: { id }, include: { lines: true } });
   if (!order) return NextResponse.json({ error: "Không tìm thấy đơn." }, { status: 404 });
 
+  const from = order.status as OrderStatus;
+  if (from !== status && !(FORWARD[from] ?? []).includes(status)) {
+    return NextResponse.json(
+      { error: `Không thể chuyển từ "${from}" sang "${status}" — trạng thái chỉ được đi tiến hoặc hủy một lần.` },
+      { status: 422 },
+    );
+  }
+  if (from === status) {
+    return NextResponse.json({ ok: true, status, currentStep: order.currentStep });
+  }
+
+  const restock = (status === "cancelled" || status === "refunded") && RESTOCKABLE.includes(from);
   const currentStep = STATUS_TO_STEP[status] ?? order.currentStep;
-  await prisma.order.update({ where: { id }, data: { status, currentStep } });
-  await logAudit(await getSessionUser(), "order.status", "order", id, { from: order.status, to: status });
+
+  await prisma.$transaction(async (tx) => {
+    // Claim chuyển trạng thái: where giữ status cũ — 2 PATCH song song
+    // chỉ 1 bên thắng, bên thua không hoàn stock lần hai.
+    const claim = await tx.order.updateMany({
+      where: { id, status: from },
+      data: { status, currentStep },
+    });
+    if (claim.count === 0) {
+      throw new Error("ORDER_CONCURRENT_UPDATE");
+    }
+    if (restock) {
+      for (const l of order.lines) {
+        if (l.variantId) {
+          await tx.productVariant.update({ where: { id: l.variantId }, data: { stock: { increment: l.quantity } } });
+          await tx.product.update({ where: { id: l.productId }, data: { stock: { increment: l.quantity } } });
+        } else {
+          await tx.product.update({ where: { id: l.productId }, data: { stock: { increment: l.quantity } } });
+        }
+      }
+    }
+  });
+
+  await logAudit(await getSessionUser(), "order.status", "order", id, {
+    from,
+    to: status,
+    restocked: restock,
+  });
   return NextResponse.json({ ok: true, status, currentStep });
 }
