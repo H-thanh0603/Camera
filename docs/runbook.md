@@ -11,7 +11,12 @@
    - App **từ chối khởi động** nếu production mà demo payment còn bật
      (`src/lib/server/env.ts` throw) — kiểm tra bằng `GET /api/health`
      (`paymentDemoMode` phải `false`).
-3. `npx prisma migrate deploy && npx prisma db seed`
+3. Schema lần đầu trên Postgres: history migrations là SQLite-only nên
+   **không** `migrate deploy`. Đổi `provider = "postgresql"` trong
+   `prisma/schema.prisma`, chạy `npx prisma db push && npx prisma db seed`
+   (đã chứng minh trên Postgres 18 + seed 18 SP/3 coupon, EXPLAIN dùng
+   `Order_status_idx` + `Review_productId_approved_idx`; CI job
+   `postgres-check` khóa lại mỗi push).
 4. Gắn uptime monitor vào `GET /api/health` (200 = ok; 503 = DB down).
    Response còn báo `paymentWebhook/email/sentry/redis` đã cấu hình hay chưa.
 

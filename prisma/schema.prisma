@@ -2,7 +2,7 @@
 // Schema chỉ dùng kiểu portable (String/Int/Json/DateTime/Boolean/Float)
 // nên chuyển provider không đổi gì khác.
 // Deploy Postgres (Supabase/Neon):
-//   1. provider = "postgresql", DATABASE_URL="postgresql://...?sslmode=require"
+//   1. provider = "sqlite", DATABASE_URL="postgresql://...?sslmode=require"
 //   2. npx prisma migrate deploy && npx prisma db seed
 //   3. Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
 
@@ -66,6 +66,9 @@ model Product {
 
   @@index([category])
   @@index([brand])
+  @@index([price])
+  @@index([rating])
+  @@index([createdAt])
 }
 
 model ProductVariant {
@@ -79,6 +82,7 @@ model ProductVariant {
   stock          Int      @default(0)
   availability   String
   image          Json?
+  @@index([productId])
 }
 
 model Session {
@@ -127,6 +131,7 @@ model Order {
 
   @@index([userId])
   @@index([createdAt])
+  @@index([status])
 }
 
 model OrderLine {
@@ -177,6 +182,7 @@ model Review {
 
   @@index([productId])
   @@index([approved])
+  @@index([productId, approved])
 }
 
 model Coupon {
