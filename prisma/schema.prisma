@@ -21,6 +21,7 @@ model User {
   name         String
   passwordHash String
   role        String    @default("customer") // customer | admin
+  isBanned    Boolean   @default(false)
   createdAt    DateTime  @default(now())
   sessions     Session[]
   orders       Order[]

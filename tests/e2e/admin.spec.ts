@@ -68,9 +68,10 @@ test.describe("Admin panel", () => {
     const selects = page.getByRole("combobox");
     const count = await selects.count();
     if (count > 0) {
-      await selects.first().selectOption("processing");
+      // Máy trạng thái chỉ cho đi tiến: pending → paid (rồi paid → processing)
+      await selects.first().selectOption("paid");
       // select giữ giá trị mới
-      await expect(selects.first()).toHaveValue("processing");
+      await expect(selects.first()).toHaveValue("paid");
     }
   });
 });

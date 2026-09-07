@@ -21,14 +21,18 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function OrdersAdmin() {
   const queryClient = useQueryClient();
-  const { data: orders, isLoading, error } = useQuery<{ orders: Order[] }>({
-    queryKey: ["admin", "orders"],
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<"all" | OrderStatus>("all");
+  const { data, isLoading, error } = useQuery<{ orders: Order[]; total: number; totalPages: number }>({
+    queryKey: ["admin", "orders", page, filter],
     queryFn: async () => {
-      const res = await fetch("/api/admin/orders");
+      const res = await fetch(`/api/admin/orders?status=${filter}&page=${page}&pageSize=20`);
       if (!res.ok) throw new Error("Không tải được đơn hàng.");
       return res.json();
     },
   });
+  const orders = data?.orders ?? [];
+  const totalPages = data?.totalPages ?? 1;
 
   const changeStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: OrderStatus }) => {
@@ -44,8 +48,12 @@ export function OrdersAdmin() {
     },
     onSuccess: (_data, variables) => {
       // Optimistic update trong cache — không cần refetch
-      queryClient.setQueryData<{ orders: Order[] }>(["admin", "orders"], (prev) =>
-        prev ? { orders: prev.orders.map((o) => (o.id === variables.id ? { ...o, status: variables.status } : o)) } : prev,
+      queryClient.setQueryData<{ orders: Order[]; total: number; totalPages: number }>(
+        ["admin", "orders", page, filter],
+        (prev) =>
+          prev
+            ? { ...prev, orders: prev.orders.map((o) => (o.id === variables.id ? { ...o, status: variables.status } : o)) }
+            : prev,
       );
     },
   });
@@ -57,14 +65,36 @@ export function OrdersAdmin() {
         <h1 className="font-headline-md text-headline-md text-on-surface">Quản Trị Đơn Hàng</h1>
       </header>
 
+      <div className="flex flex-wrap gap-space-xs" role="tablist" aria-label="Lọc đơn theo trạng thái">
+        {(["all", ...STATUSES] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            role="tab"
+            aria-selected={filter === s}
+            onClick={() => {
+              setFilter(s);
+              setPage(1);
+            }}
+            className={cn(
+              "rounded-lg px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase transition-colors",
+              filter === s ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:text-on-surface",
+            )}
+          >
+            {s === "all" ? "Tất cả" : STATUS_LABEL[s]}
+          </button>
+        ))}
+      </div>
+
       {error && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{(error as Error).message}</p>}
       {isLoading ? (
         <div className="flex justify-center py-space-lg"><Spinner className="border-primary border-t-transparent" /></div>
-      ) : (orders?.orders ?? []).length === 0 ? (
-        <p className="rounded-xl bg-surface-container p-space-lg font-body-md text-body-md text-on-surface-variant">Chưa có đơn hàng nào.</p>
+      ) : orders.length === 0 ? (
+        <p className="rounded-xl bg-surface-container p-space-lg font-body-md text-body-md text-on-surface-variant">Không có đơn hàng nào trong mục này.</p>
       ) : (
+        <>
         <ul className="flex flex-col gap-space-md">
-          {(orders?.orders ?? []).map((o) => (
+          {orders.map((o) => (
             <li key={o.id} className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg shadow-xl">
               <div className="flex flex-wrap items-center justify-between gap-space-sm">
                 <div className="flex flex-col">
@@ -106,6 +136,18 @@ export function OrdersAdmin() {
             </li>
           ))}
         </ul>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-space-sm">
+            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface disabled:opacity-40">
+              ← Trước
+            </button>
+            <span className="font-telemetry-xs text-telemetry-xs text-outline">Trang {page}/{totalPages}</span>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface disabled:opacity-40">
+              Sau →
+            </button>
+          </div>
+        )}
+        </>
       )}
     </div>
   );

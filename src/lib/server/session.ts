@@ -53,5 +53,10 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
     return null;
   }
+  // Tài khoản bị khóa sau khi đã login → đá phiên ngay
+  if (session.user.isBanned) {
+    await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
+    return null;
+  }
   return { id: session.user.id, name: session.user.name, email: session.user.email };
 }

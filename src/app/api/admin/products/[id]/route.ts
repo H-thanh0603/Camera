@@ -5,7 +5,8 @@ import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
-import type { Prisma } from "@prisma/client";
+import { validateProductPayload, validateVariants } from "@/lib/server/product-validation";
+import { Prisma } from "@prisma/client";
 
 /** PUT /api/admin/products/:id — cập nhật; DELETE — xóa (cascade variants). */
 
@@ -21,34 +22,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });
   }
 
+  // Cùng luật validate với POST — slug/SKU/brand/giá sai đều 422 rõ lý do
+  const { error, data } = validateProductPayload(body);
+  if (error || !data) return NextResponse.json({ error }, { status: 422 });
+
   try {
-    const variantsInput = Array.isArray(body.variants) ? (body.variants as Record<string, unknown>[]) : [];
-    const variantData = variantsInput
-      .filter((v) => v.id && v.sku && v.name)
-      .map((v) => ({
-        id: String(v.id),
-        sku: String(v.sku),
-        name: String(v.name),
-        price: Number(v.price) || Number(body.price),
-        compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : null,
-        stock: Number.isInteger(Number(v.stock)) ? Number(v.stock) : 0,
-        availability: String(v.availability ?? "in_stock"),
-        image: (v.image ?? null) as Prisma.InputJsonValue,
-      }));
+    const variantData = validateVariants(body, Number(data.price));
 
     const row = await prisma.product.update({
       where: { id },
       data: {
-        name: String(body.name),
-        price: Number(body.price),
-        compareAtPrice: body.compareAtPrice ? Number(body.compareAtPrice) : null,
-        stock: Number.isInteger(Number(body.stock)) ? Number(body.stock) : 0,
-        availability: String(body.availability ?? "in_stock"),
-        description: String(body.description ?? ""),
-        shortDescription: String(body.shortDescription ?? ""),
-        subcategory: String(body.subcategory ?? "Khác"),
-        monthlyFrom: body.monthlyFrom ? Number(body.monthlyFrom) : null,
-        rating: Math.min(5, Math.max(0, Number(body.rating) || 0)),
+        ...data,
         images: (body.images ?? []) as Prisma.InputJsonValue,
         thumbnail: (body.thumbnail ?? { url: "", alt: "" }) as Prisma.InputJsonValue,
         specifications: (body.specifications ?? {}) as Prisma.InputJsonValue,
@@ -65,7 +49,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     revalidatePath("/", "layout");
     await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) });
-  } catch {
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return NextResponse.json({ error: "Không tìm thấy sản phẩm." }, { status: 404 });
+    }
     return NextResponse.json({ error: "Không cập nhật được sản phẩm." }, { status: 409 });
   }
 }

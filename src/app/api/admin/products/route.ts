@@ -5,6 +5,7 @@ import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
+import { validateProductPayload, validateVariants } from "@/lib/server/product-validation";
 import type { Prisma } from "@prisma/client";
 
 /**
@@ -18,44 +19,6 @@ export async function GET() {
 
   const rows = await prisma.product.findMany({ include: { variants: true }, orderBy: { createdAt: "desc" } });
   return NextResponse.json({ products: rows.map((r) => dbProductToDomain(r)) });
-}
-
-/** Nhận payload tự do từ admin form, validate tối thiểu trước khi ghi DB. */
-function validateProductPayload(body: Record<string, unknown>): { error?: string; data?: Record<string, unknown> } {
-  const name = String(body.name ?? "").trim();
-  const slug = String(body.slug ?? "").trim();
-  const brand = String(body.brand ?? "").trim();
-  const category = String(body.category ?? "").trim();
-  const price = Number(body.price);
-  const sku = String(body.sku ?? "").trim();
-
-  if (name.length < 2) return { error: "Tên sản phẩm bắt buộc." };
-  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) return { error: "Slug chỉ gồm chữ thường, số và dấu gạch." };
-  if (!brand) return { error: "Thương hiệu bắt buộc." };
-  if (!category) return { error: "Danh mục bắt buộc." };
-  if (!Number.isInteger(price) || price <= 0) return { error: "Giá phải là số nguyên dương." };
-  if (!sku) return { error: "SKU bắt buộc." };
-
-  const data: Record<string, unknown> = {
-    name,
-    slug,
-    brand,
-    category,
-    sku,
-    subcategory: String(body.subcategory ?? "").trim() || "Khác",
-    description: String(body.description ?? "").trim(),
-    shortDescription: String(body.shortDescription ?? "").trim() || String(body.description ?? "").slice(0, 140),
-    price,
-    compareAtPrice: body.compareAtPrice ? Number(body.compareAtPrice) : null,
-    stock: Number.isInteger(Number(body.stock)) ? Number(body.stock) : 0,
-    availability: ["in_stock", "low_stock", "pre_order", "out_of_stock", "contact"].includes(String(body.availability))
-      ? String(body.availability)
-      : "in_stock",
-    rating: Math.min(5, Math.max(0, Number(body.rating) || 0)),
-    reviewCount: Number.isInteger(Number(body.reviewCount)) ? Number(body.reviewCount) : 0,
-    monthlyFrom: body.monthlyFrom ? Number(body.monthlyFrom) : null,
-  };
-  return { data };
 }
 
 export async function POST(request: NextRequest) {
@@ -74,19 +37,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const id = body.id ? String(body.id) : `p-${String(body.slug)}`;
-    const variantsInput = Array.isArray(body.variants) ? (body.variants as Record<string, unknown>[]) : [];
-    const variantData = variantsInput
-      .filter((v) => v.id && v.sku && v.name)
-      .map((v) => ({
-        id: String(v.id),
-        sku: String(v.sku),
-        name: String(v.name),
-        price: Number(v.price) || Number(data.price),
-        compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : null,
-        stock: Number.isInteger(Number(v.stock)) ? Number(v.stock) : 0,
-        availability: String(v.availability ?? "in_stock"),
-        image: (v.image ?? null) as Prisma.InputJsonValue,
-      }));
+    const variantData = validateVariants(body, Number(data.price));
 
     const row = await prisma.product.upsert({
       where: { id },

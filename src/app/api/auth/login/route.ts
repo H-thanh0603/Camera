@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
   if (!user || !ok) {
     return NextResponse.json({ error: "Email hoặc mật khẩu không đúng." }, { status: 401 });
   }
+  if (user.isBanned) {
+    return NextResponse.json({ error: "Tài khoản đã bị khóa. Liên hệ concierge để được hỗ trợ." }, { status: 403 });
+  }
 
   await createSession(user.id);
   return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email } });
