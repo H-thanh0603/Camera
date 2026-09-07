@@ -15,6 +15,8 @@ import { useStore } from "@/state/store";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 import { EmptyState, Spinner } from "@/components/ui/states";
 
+const GOOGLE_ENABLED = process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "true";
+
 const STATUS_LABEL: Record<string, string> = {
   pending: "Chờ thanh toán",
   paid: "Đã thanh toán",
@@ -94,6 +96,7 @@ export default function AccountPage() {
           </div>
 
           {serverError && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{serverError}</p>}
+          <OAuthNotice pushToast={pushToast} />
           <div className="flex rounded-lg bg-surface-container-low p-space-2xs" role="tablist" aria-label="Chọn chế độ đăng nhập">
             {(["login", "register"] as const).map((m) => (
               <button
@@ -113,6 +116,7 @@ export default function AccountPage() {
           </div>
 
           {mode === "login" ? (
+            <>
             <form onSubmit={loginForm.handleSubmit(doLogin)} noValidate className="flex flex-col gap-space-sm">
               <div className="flex flex-col gap-space-2xs">
                 <label htmlFor="account-email" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Email</label>
@@ -132,6 +136,8 @@ export default function AccountPage() {
                 Quên mật khẩu?
               </Link>
             </form>
+            {GOOGLE_ENABLED && <GoogleButton />}
+            </>
           ) : (
             <form onSubmit={registerForm.handleSubmit(doRegister)} noValidate className="flex flex-col gap-space-sm">
               <div className="flex flex-col gap-space-2xs">
@@ -290,4 +296,35 @@ export default function AccountPage() {
       </section>
     </div>
   );
+}
+
+function GoogleButton() {
+  return (
+    <>
+      <div className="flex items-center gap-space-xs" aria-hidden="true">
+        <span className="h-[1px] flex-1 bg-surface-container-high" />
+        <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">hoặc</span>
+        <span className="h-[1px] flex-1 bg-surface-container-high" />
+      </div>
+      <a
+        href="/api/auth/google"
+        className="flex items-center justify-center gap-space-xs rounded-lg bg-surface-container-low py-space-sm font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-high"
+      >
+        <span className="font-bold normal-case">G</span> Tiếp tục với Google
+      </a>
+    </>
+  );
+}
+
+function OAuthNotice({ pushToast }: { pushToast: (message: string, type: "success" | "error" | "info") => void }) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("oauth");
+    if (!status) return;
+    if (status === "success") pushToast("Đăng nhập Google thành công!", "success");
+    else if (status === "denied") pushToast("Bạn đã từ chối quyền đăng nhập Google.", "info");
+    else pushToast("Đăng nhập Google thất bại. Vui lòng thử lại.", "error");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [pushToast]);
+  return null;
 }
