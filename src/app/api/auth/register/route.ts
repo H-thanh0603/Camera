@@ -40,9 +40,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const user = await prisma.user.create({
-    data: { name, email, passwordHash: await hashPassword(password) },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: { name, email, passwordHash: await hashPassword(password) },
+    });
+  } catch (error) {
+    // P2002 = unique constraint — 2 request cùng email chạm DB đồng thời
+    if ((error as { code?: string }).code === "P2002") {
+      return NextResponse.json(
+        { error: "Email đã được đăng ký.", fieldErrors: { email: "Email đã được đăng ký." } },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
 
   await createSession(user.id);
   return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email } }, { status: 201 });

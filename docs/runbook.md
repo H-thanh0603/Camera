@@ -47,6 +47,11 @@
 - Có `UPSTASH_*`: sliding-window Redis dùng chung mọi instance.
 - Chưa có: fallback in-memory fail-open + warn (1 instance ok, đa instance yếu).
 - Quên mật khẩu giới hạn 5 req/phút/IP; đặt hàng 10 req/phút/IP.
+- **X-Forwarded-For**: middleware + route lấy IP client từ header
+  `x-forwarded-for` (phần tử đầu). Chỉ tin header này khi app chạy **sau
+  reverse proxy tin cậy** (Vercel, Nginx được quản lý) — proxy ghi đè giá trị
+  client gửi lên. Chạy self-host trần (không proxy): client tự inject header
+  để xoay IP bypass rate limit — khi đó đổi các chỗ lấy IP sang socket.
 
 ## 6. Giám sát
 

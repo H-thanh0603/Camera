@@ -4,6 +4,7 @@ import { applyCouponToSubtotal, normalizeCouponCode } from "@/lib/services/coupo
 import { dbGetProductById } from "./product-db";
 import { getCouponByCode } from "./coupons";
 import { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
 import { prisma } from "./prisma";
 import { getSessionUser } from "./session";
 import { logger } from "./logger";
@@ -45,7 +46,8 @@ export interface PlaceOrderInput {
 
 function orderNumber(): string {
   const stamp = Date.now().toString(36).toUpperCase();
-  const rand = Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, "0");
+  // 3 random bytes (16M combo) — tránh va chạm unique khi nhiều đơn cùng ms
+  const rand = randomBytes(3).toString("hex").toUpperCase();
   return `LUM-${stamp}${rand}`;
 }
 
@@ -144,6 +146,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   // Coupon: server verify từ DB, tính discount trên subtotal (trước phí ship)
   let totals: CartTotals = baseTotals;
   let appliedCoupon: string | undefined;
+  let appliedCouponMaxUses: number | null = null;
   const rawCoupon = input.couponCode?.trim();
   if (rawCoupon) {
     const code = normalizeCouponCode(rawCoupon);
@@ -159,6 +162,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       if (row.maxUses != null && row.usedCount >= row.maxUses) {
         throw new OrderValidationError(`Mã "${code}" đã hết lượt sử dụng.`);
       }
+      appliedCouponMaxUses = row.maxUses;
     }
     totals = {
       ...baseTotals,
@@ -201,10 +205,17 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
     }
 
     if (appliedCoupon) {
-      await tx.coupon.updateMany({
-        where: { code: appliedCoupon },
+      // Điều kiện usedCount < maxUses ngay trong UPDATE — chống race vượt
+      // giới hạn lượt dùng khi 2 request cộng gộp đồng thời.
+      const res = await tx.coupon.updateMany({
+        where: appliedCouponMaxUses
+          ? { code: appliedCoupon, usedCount: { lt: appliedCouponMaxUses } }
+          : { code: appliedCoupon },
         data: { usedCount: { increment: 1 } },
       });
+      if (res.count === 0) {
+        throw new OrderValidationError(`Mã "${appliedCoupon}" vừa hết lượt sử dụng.`);
+      }
     }
 
     return tx.order.create({
