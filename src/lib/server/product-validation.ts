@@ -113,8 +113,7 @@ export interface SanitizedProductJson {
   compatibleWith: Prisma.InputJsonValue;
 }
 
-function stringList(input: unknown, maxItems: number, maxLen: number): string[] {
-  if (!Array.isArray(input)) return [];
+function stringList(input: unknown, maxItems: number, maxLen: number): string[] {  if (!Array.isArray(input)) return [];
   return input
     .filter((v): v is string => typeof v === "string")
     .map((s) => s.trim().slice(0, maxLen))
@@ -167,4 +166,13 @@ export function sanitizeProductJson(body: Record<string, unknown>): SanitizedPro
       ? stringList(body.compatibleWith, 20, 64)
       : null) as unknown as Prisma.InputJsonValue,
   };
+}
+
+/**
+ * Chuỗi tag phi chuẩn hóa "|t1|t2|" cho filter LIKE portable.
+ * Match chính xác nhờ pipe bao quanh — "|cine|" không khớp "|cinema|".
+ */
+export function buildTagString(tags: string[]): string {
+  const clean = tags.map((t) => t.trim().toLowerCase()).filter(Boolean);
+  return `|${clean.join("|")}|`;
 }

@@ -76,10 +76,15 @@ export const placeOrderSchema = z.object({
 export const productQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   brand: z.string().trim().max(60).optional(),
+  brands: z.string().trim().max(300).optional().transform((v) => v?.split(",").map((s) => s.trim()).filter(Boolean)),
   category: z.string().trim().max(30).optional(),
+  categories: z.string().trim().max(300).optional().transform((v) => v?.split(",").map((s) => s.trim()).filter(Boolean)),
+  tag: z.string().trim().max(60).optional(),
   minPrice: z.coerce.number().int().min(0).optional(),
   maxPrice: z.coerce.number().int().min(0).optional(),
-  sort: z.enum(["featured", "newest", "price_asc", "price_desc", "rating_desc"]).default("featured"),
+  minRating: z.coerce.number().min(0).max(5).optional(),
+  inStockOnly: z.string().optional().transform((v) => v === "1" || v === "true"),
+  sort: z.enum(["featured", "newest", "price_asc", "price_desc", "rating_desc", "best_selling"]).default("featured"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(60).default(12),
 });

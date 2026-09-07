@@ -55,6 +55,9 @@ model Product {
   seedCount        Int              @default(0)
   seedTotal        Float            @default(0)
   tags             Json
+  // Chuỗi tag phi chuẩn hóa "|flagship|cine|" để filter LIKE portable
+  // (SQLite + Postgres) — thay thế cho query JSON array
+  tagString        String   @default("|")
   badges           Json
   monthlyFrom      Int?
   createdAt        DateTime         @default(now())

@@ -4,9 +4,10 @@ import { productQuerySchema, zodFieldErrors } from "@/lib/schemas";
 
 /**
  * GET /api/products — catalogue phân trang + tìm kiếm server-side.
- * Query: ?q=&brand=&category=&minPrice=&maxPrice=&sort=&page=&pageSize=
- * Giữ /api/products/snapshot cho client cache cũ; endpoint này dùng khi
- * catalogue lớn hoặc cần search không tải toàn bộ về client.
+ * Query: ?q=&brand(s)=&category(ies)=&tag=&minPrice=&maxPrice=&minRating=
+ *   &inStockOnly=1&sort=&page=&pageSize=
+ * Giữ /api/products/snapshot cho client cache cũ (cart/wishlist resolve);
+ * listing/search dùng endpoint này để không tải toàn bộ về client.
  */
 export async function GET(request: NextRequest) {
   const query = Object.fromEntries(request.nextUrl.searchParams.entries());

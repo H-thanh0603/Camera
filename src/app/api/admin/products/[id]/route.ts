@@ -5,7 +5,7 @@ import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
-import { validateProductPayload, validateVariants, sanitizeProductJson } from "@/lib/server/product-validation";
+import { validateProductPayload, validateVariants, sanitizeProductJson, buildTagString } from "@/lib/server/product-validation";
 import { Prisma } from "@prisma/client";
 
 /** PUT /api/admin/products/:id — cập nhật; DELETE — xóa (cascade variants). */
@@ -35,11 +35,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data: {
         ...data,
         ...json,
+        tagString: buildTagString((json.tags ?? []) as string[]),
         variants: { deleteMany: {}, create: variantData },
       },
       include: { variants: true },
     });
-
     revalidatePath("/", "layout");
     await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) });

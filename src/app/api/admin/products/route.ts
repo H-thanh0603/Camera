@@ -5,7 +5,7 @@ import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
-import { validateProductPayload, validateVariants, sanitizeProductJson } from "@/lib/server/product-validation";
+import { validateProductPayload, validateVariants, sanitizeProductJson, buildTagString } from "@/lib/server/product-validation";
 import type { Prisma } from "@prisma/client";
 
 /**
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
         ...(data as Prisma.ProductUncheckedCreateInput),
         id,
         ...json,
+        tagString: buildTagString((json.tags ?? []) as string[]),
         variants: { create: variantData },
       },
       include: { variants: true },

@@ -27,11 +27,13 @@ async function main() {
   void reviews;
     // rating/reviewCount của seed là nền BẤT BIẾN cho aggregate (chống drift)
     const seedFields = { seedCount: p.reviewCount, seedTotal: p.rating * p.reviewCount };
+    const tagString = `|${p.tags.map((t) => t.trim().toLowerCase()).join("|")}|`;
     await prisma.product.upsert({
       where: { id: p.id },
       update: {
         ...rest,
         ...seedFields,
+        tagString,
         images: images as unknown as object,
         thumbnail: thumbnail as unknown as object,
         specifications: specifications as object,
@@ -44,6 +46,7 @@ async function main() {
       create: {
         ...rest,
         ...seedFields,
+        tagString,
         images: images as unknown as object,
         thumbnail: thumbnail as unknown as object,
         specifications: specifications as object,

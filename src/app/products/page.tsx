@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { dbAllProducts } from "@/lib/server/product-db";
-import type { Category, ProductQuery } from "@/lib/types";
+import { dbFacets, dbQueryProducts } from "@/lib/server/product-db";
+import type { Category } from "@/lib/types";
 import { ProductCard } from "@/components/product/product-card";
 import { EmptyState, CardSkeletonGrid } from "@/components/ui/states";
 import { CatalogControls } from "@/components/catalog/catalog-controls";
-import { applyQuery, getFacets as buildFacets } from "@/lib/repositories/product-repository";
 import { parseCatalogParams } from "@/lib/utils/catalog-params";
 
 export const metadata: Metadata = {
@@ -22,23 +21,32 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const parsed = parseCatalogParams(params);
 
-  const query: ProductQuery = {
+  const query = {
     brands: parsed.brands,
     categories: parsed.categories as Category[] | undefined,
     minPrice: parsed.minPrice,
     maxPrice: parsed.maxPrice,
     minRating: parsed.minRating,
-    inStockOnly: parsed.inStockOnly,
-    search: parsed.search,
-    tags: parsed.tag ? [parsed.tag] : undefined,
+    inStockOnly: parsed.inStockOnly || undefined,
+    q: parsed.search,
+    tag: parsed.tag,
     sort: parsed.sort,
     page: parsed.page,
     pageSize: 9,
   };
 
-  const catalog = await dbAllProducts();
-  const result = applyQuery(catalog, query);
-  const facets = buildFacets({ ...query, page: undefined, brands: undefined, categories: undefined }, catalog);
+  // Server-side: chỉ tải 1 trang + facets aggregate (chịu catalogue lớn)
+  const [result, facets] = await Promise.all([
+    dbQueryProducts(query),
+    dbFacets({
+      q: parsed.search,
+      minPrice: parsed.minPrice,
+      maxPrice: parsed.maxPrice,
+      minRating: parsed.minRating,
+      inStockOnly: parsed.inStockOnly || undefined,
+      tag: parsed.tag,
+    }),
+  ]);
 
   return (
     <div className="container-page flex flex-col gap-space-xl py-space-xl">

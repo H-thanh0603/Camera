@@ -101,18 +101,66 @@ export async function dbGetProductById(id: string): Promise<Product | null> {
 export interface ProductSearchParams {
   q?: string;
   brand?: string;
+  brands?: string[];
   category?: string;
+  categories?: string[];
   minPrice?: number;
   maxPrice?: number;
-  sort?: "featured" | "newest" | "price_asc" | "price_desc" | "rating_desc";
+  minRating?: number;
+  inStockOnly?: boolean;
+  tag?: string;
+  sort?: "featured" | "newest" | "price_asc" | "price_desc" | "rating_desc" | "best_selling";
   page?: number;
   pageSize?: number;
 }
 
 /**
+ * Điều kiện WHERE dùng chung cho listing + facets (semantics khớp
+ * applyQuery client: brands/categories OR, tag ANY, search multi-term AND,
+ * inStock = stock>0 hoặc availability in_stock/low_stock).
+ */
+function buildProductWhere(params: Pick<ProductSearchParams, "q" | "brand" | "brands" | "category" | "categories" | "minPrice" | "maxPrice" | "minRating" | "inStockOnly" | "tag">): Prisma.ProductWhereInput {
+  const where: Prisma.ProductWhereInput = {};
+  const brands = params.brands?.length ? params.brands : params.brand ? [params.brand] : [];
+  if (brands.length) where.brand = { in: brands };
+  const categories = params.categories?.length ? params.categories : params.category ? [params.category] : [];
+  if (categories.length) where.category = { in: categories };
+  if (params.minPrice != null || params.maxPrice != null) {
+    where.price = {
+      ...(params.minPrice != null ? { gte: params.minPrice } : {}),
+      ...(params.maxPrice != null ? { lte: params.maxPrice } : {}),
+    };
+  }
+  if (params.minRating != null) where.rating = { gte: params.minRating };
+  if (params.inStockOnly) {
+    where.OR = [{ stock: { gt: 0 } }, { availability: { in: ["in_stock", "low_stock"] } }];
+  }
+  const and: Prisma.ProductWhereInput[] = [];
+  if (params.tag) {
+    and.push({ tagString: { contains: `|${params.tag.trim().toLowerCase()}|` } });
+  }
+  if (params.q) {
+    for (const term of params.q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
+      and.push({
+        OR: [
+          { name: { contains: term } },
+          { brand: { contains: term } },
+          { subcategory: { contains: term } },
+          { tagString: { contains: term } },
+        ],
+      });
+    }
+  }
+  if (and.length) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), ...and];
+  }
+  return where;
+}
+
+/**
  * Tìm kiếm + phân trang server-side cho catalogue lớn.
- * `q` match name/brand/sku (contains, case-insensitive trên Postgres;
- * SQLite dùng contains thường). Sort featured = mới nhất.
+ * Sort featured ≈ rating rồi reviewCount (xấp xỉ rating×reviewCount của
+ * bản client — không có expression index nên dùng 2 cột có index).
  */
 export async function dbQueryProducts(params: ProductSearchParams): Promise<{
   items: Product[];
@@ -123,33 +171,19 @@ export async function dbQueryProducts(params: ProductSearchParams): Promise<{
 }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(60, Math.max(1, params.pageSize ?? 12));
-  const where: Prisma.ProductWhereInput = {};
-  if (params.brand) where.brand = params.brand;
-  if (params.category) where.category = params.category;
-  if (params.minPrice != null || params.maxPrice != null) {
-    where.price = {
-      ...(params.minPrice != null ? { gte: params.minPrice } : {}),
-      ...(params.maxPrice != null ? { lte: params.maxPrice } : {}),
-    };
-  }
-  if (params.q) {
-    const q = params.q.trim();
-    if (q) {
-      where.OR = [
-        { name: { contains: q } },
-        { brand: { contains: q } },
-        { sku: { contains: q } },
-      ];
-    }
-  }
-  const orderBy: Prisma.ProductOrderByWithRelationInput =
+  const where = buildProductWhere(params);
+  const orderBy: Prisma.ProductOrderByWithRelationInput[] =
     params.sort === "price_asc"
-      ? { price: "asc" }
+      ? [{ price: "asc" }]
       : params.sort === "price_desc"
-        ? { price: "desc" }
+        ? [{ price: "desc" }]
         : params.sort === "rating_desc"
-          ? { rating: "desc" }
-          : { createdAt: "desc" };
+          ? [{ rating: "desc" }]
+          : params.sort === "best_selling"
+            ? [{ reviewCount: "desc" }]
+            : params.sort === "newest"
+              ? [{ createdAt: "desc" }]
+              : [{ rating: "desc" }, { reviewCount: "desc" }];
 
   const [total, rows] = await Promise.all([
     prisma.product.count({ where }),
@@ -167,5 +201,31 @@ export async function dbQueryProducts(params: ProductSearchParams): Promise<{
     page,
     pageSize,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+/**
+ * Facets server-side (bounded: groupBy + min/max, không tải rows).
+ * Đếm theo brands/categories TRÊN tập đã lọc các điều kiện khác
+ * (khớp semantics getFacets client).
+ */
+export async function dbFacets(params: Pick<ProductSearchParams, "q" | "minPrice" | "maxPrice" | "minRating" | "inStockOnly" | "tag">): Promise<{
+  brands: { value: string; count: number }[];
+  categories: { value: import("@/lib/types").Category; count: number }[];
+  priceRange: { min: number; max: number };
+}> {
+  const where = buildProductWhere(params);
+  const [brandGroups, categoryGroups, agg] = await Promise.all([
+    prisma.product.groupBy({ by: ["brand"], where, _count: { brand: true }, orderBy: { _count: { brand: "desc" } } }),
+    prisma.product.groupBy({ by: ["category"], where, _count: { category: true } }),
+    prisma.product.aggregate({ where, _min: { price: true }, _max: { price: true } }),
+  ]);
+  return {
+    brands: brandGroups.map((g) => ({ value: g.brand, count: g._count.brand })),
+    categories: categoryGroups.map((g) => ({
+      value: g.category as import("@/lib/types").Category,
+      count: g._count.category,
+    })),
+    priceRange: { min: agg._min.price ?? 0, max: agg._max.price ?? 0 },
   };
 }
