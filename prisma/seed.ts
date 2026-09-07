@@ -25,10 +25,13 @@ async function main() {
     // reviews tĩnh không seed vào DB (DB chỉ lưu review người dùng gửi, có moderation)
   const { variants, reviews, images, thumbnail, specifications, tags, badges, highlights, inTheBox, compatibleWith, ...rest } = p;
   void reviews;
+    // rating/reviewCount của seed là nền BẤT BIẾN cho aggregate (chống drift)
+    const seedFields = { seedCount: p.reviewCount, seedTotal: p.rating * p.reviewCount };
     await prisma.product.upsert({
       where: { id: p.id },
       update: {
         ...rest,
+        ...seedFields,
         images: images as unknown as object,
         thumbnail: thumbnail as unknown as object,
         specifications: specifications as object,
@@ -40,6 +43,7 @@ async function main() {
       },
       create: {
         ...rest,
+        ...seedFields,
         images: images as unknown as object,
         thumbnail: thumbnail as unknown as object,
         specifications: specifications as object,

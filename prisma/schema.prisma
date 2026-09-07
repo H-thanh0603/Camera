@@ -50,6 +50,10 @@ model Product {
   specifications   Json
   rating           Float            @default(0)
   reviewCount      Int              @default(0)
+  // Đánh giá nền từ seed — BẤT BIẾN sau seed, dùng để tính rating chuẩn:
+  // rating = (seedTotal + sum(approved)) / (seedCount + count(approved))
+  seedCount        Int              @default(0)
+  seedTotal        Float            @default(0)
   tags             Json
   badges           Json
   monthlyFrom      Int?

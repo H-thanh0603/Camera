@@ -4,6 +4,7 @@ import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
+import { recalcProductRating } from "@/lib/server/ratings";
 
 /**
  * PATCH  /api/admin/reviews/:id — { approved: true | false } duyệt/hủy duyệt.
@@ -49,21 +50,4 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   revalidatePath("/", "layout");
   await logAudit(await getSessionUser(), "review.delete", "review", id, { productId: review.productId });
   return NextResponse.json({ ok: true });
-}
-
-/** Tính lại rating trung bình + số review đã duyệt của sản phẩm. */
-async function recalcProductRating(productId: string): Promise<void> {
-  const product = await prisma.product.findUnique({ where: { id: productId } });
-  if (!product) return;
-  const approved = await prisma.review.findMany({ where: { productId, approved: true } });
-  // Seed rating gốc đóng vai trò "đánh giá nền"; review duyệt thêm điều chỉnh dần
-  const seedCount = product.reviewCount;
-  const seedTotal = product.rating * seedCount;
-  const totalCount = seedCount + approved.length;
-  const totalScore = seedTotal + approved.reduce((sum, r) => sum + r.rating, 0);
-  const rating = totalCount > 0 ? totalScore / totalCount : 0;
-  await prisma.product.update({
-    where: { id: productId },
-    data: { rating: Math.round(rating * 10) / 10, reviewCount: totalCount },
-  });
 }
