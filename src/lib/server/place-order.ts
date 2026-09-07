@@ -178,7 +178,10 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
 
   // Transaction: trừ kho nguyên tử + tạo đơn. Chống oversell khi 2 người
   // mua cùng lúc: updateMany có điều kiện stock >= qty, affected==0 → hết hàng.
-  const dbOrder = await prisma.$transaction(async (tx) => {
+  // Trùng idempotencyKey đồng thời (P2002): trả về đơn đã tạo thay vì 500.
+  let dbOrder;
+  try {
+    dbOrder = await prisma.$transaction(async (tx) => {
     for (const l of finalLines) {
       if (l.variantId) {
         const res = await tx.productVariant.updateMany({
@@ -246,6 +249,25 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       include: { lines: true },
     });
   });
+  } catch (error) {
+    // Trùng key đồng thời: tx thua đã ROLLBACK toàn bộ (kể cả trừ kho) khi
+    // P2002 — chỉ cần trả về đơn của bên thắng.
+    if (
+      input.idempotencyKey &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const existing = await prisma.order.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+        include: { lines: true },
+      });
+      if (existing) {
+        const { dbOrderToDomain } = await import("./order-mapper");
+        return dbOrderToDomain(existing);
+      }
+    }
+    throw error;
+  }
 
   logger.info("order.placed", {
     orderId: dbOrder.id,

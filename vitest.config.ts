@@ -5,6 +5,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Test chạm dev.db chung (SQLite single-writer) — chạy file tuần tự
+    // để tx dài (concurrency/cancel) không làm đói socket file khác.
+    fileParallelism: false,
   },
   resolve: {
     alias: {

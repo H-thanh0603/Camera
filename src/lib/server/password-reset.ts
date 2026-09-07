@@ -57,9 +57,17 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
   if (!row || row.usedAt || row.expiresAt < new Date()) {
     throw new PasswordResetError("Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.", 400);
   }
+  // Claim token có điều kiện trong tx: 2 request cùng token song song
+  // thì chỉ 1 thắng (count==0 → lỗi), token không dùng được 2 lần.
+  const claimed = await prisma.passwordResetToken.updateMany({
+    where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } },
+    data: { usedAt: new Date() },
+  });
+  if (claimed.count === 0) {
+    throw new PasswordResetError("Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.", 400);
+  }
   await prisma.$transaction([
     prisma.user.update({ where: { id: row.userId }, data: { passwordHash: await hashPassword(newPassword) } }),
-    prisma.passwordResetToken.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
     // Đăng xuất mọi phiên cũ sau khi đổi mật khẩu
     prisma.session.deleteMany({ where: { userId: row.userId } }),
   ]);
