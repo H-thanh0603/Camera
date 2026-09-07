@@ -47,7 +47,3 @@ prisma/dev.db-journal
 # env example được commit
 !.env.example
 .husky/_
-
-# e2e artefacts
-/test-results/
-/playwright-report/

@@ -55,11 +55,10 @@ export function SensorLab() {
     <section className="relative w-full bg-surface-container-lowest py-space-4xl">
       <div className="mx-auto flex w-full max-w-container-max flex-col gap-space-2xl px-gutter-mobile lg:px-gutter-desktop">
         <div className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
-          <div className="flex max-w-2xl flex-col gap-space-2xs">
-            <p className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-on-surface-variant/70">
-              Công cụ thực nghiệm — kéo thanh trượt, đổi cảm biến
-            </p>
+          <div>
+            <span className="section-telemetry block">CÔNG CỤ THỰC NGHIỆM TƯƠNG TÁC</span>
             <h2 className="font-headline-lg text-headline-lg text-on-surface">Mô Phỏng Cảm Biến & Thiếu Sáng</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant">Kéo thanh trượt để so sánh hạt nhiễu (Noise Floor) và độ sâu trường ảnh (DoF) giữa các định dạng.</p>
           </div>
           <div className="flex flex-wrap items-center gap-space-2xs rounded-lg bg-surface-container p-space-2xs" role="group" aria-label="Chọn kích thước cảm biến">
             {(Object.keys(SENSORS) as SensorKey[]).map((key) => (
@@ -83,12 +82,12 @@ export function SensorLab() {
           <div className="flex flex-col gap-space-md lg:col-span-8">
             <div className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-lg bg-surface-container-lowest">
               <AppFillImage
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover transition-all duration-300"
                 style={{ filter: imgFilter }}
                 alt="Chân dung thiếu sáng với bokeh mịn và kiểm soát nhiễu vượt trội"
                 src={IMG.lowLightPortrait}
               />
-              <div className="pointer-events-none absolute flex h-full w-full items-start justify-end border-2 border-primary p-space-xs" style={{ width: SENSORS[sensor].size, height: SENSORS[sensor].size }} aria-hidden="true">
+              <div className="pointer-events-none absolute flex h-full w-full items-start justify-end border-2 border-primary p-space-xs transition-all duration-500" style={{ width: SENSORS[sensor].size, height: SENSORS[sensor].size }} aria-hidden="true">
                 <span className="rounded bg-primary px-1.5 py-0.5 font-telemetry-xs text-[10px] font-bold uppercase text-on-primary">{SENSORS[sensor].crop}</span>
               </div>
               <div className="absolute bottom-4 left-4 flex items-center gap-space-md rounded-lg bg-surface-container-lowest/85 px-space-sm py-space-xs backdrop-blur-md">

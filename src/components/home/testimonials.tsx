@@ -32,10 +32,8 @@ export function Testimonials() {
   return (
     <section id="concierge" className="relative w-full scroll-mt-24 overflow-hidden bg-surface-container-lowest py-space-4xl lg:scroll-mt-[132px]">
       <div className="mx-auto flex w-full max-w-container-max flex-col gap-space-3xl px-gutter-mobile lg:px-gutter-desktop">
-        <div className="mx-auto flex max-w-2xl flex-col gap-space-xs">
-          <p className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-on-surface-variant/70">
-            Bảo chứng từ những bậc thầy hình ảnh
-          </p>
+        <div className="mx-auto flex max-w-2xl flex-col gap-space-xs text-center">
+          <span className="section-telemetry font-bold">BẢO CHỨNG TỪ NHỮNG BẬC THẦY HÌNH ẢNH</span>
           <h2 className="font-headline-lg text-headline-lg text-on-surface">Được Tin Dùng Tại Những Vùng Đất Khắc Nghiệt Nhất</h2>
           <p className="font-body-md text-body-md text-on-surface-variant">Từ băng giá Bắc Cực tới miệng núi lửa Nam Thái Bình Dương, Lumina Optics đồng hành trong từng khung hình lịch sử.</p>
         </div>
@@ -61,21 +59,21 @@ export function Testimonials() {
         </div>
 
         <div className="rounded-xl bg-surface-container-low p-space-xl shadow-2xl">
-          <div className="flex flex-wrap items-end justify-between gap-space-sm pb-space-md">
-            <h3 className="font-headline-md text-headline-md text-on-surface">Đặc Quyền Vượt Xa Chuẩn Mực Bán Lẻ</h3>
-            <span className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-primary">Lumina Privilege Concierge</span>
+          <div className="pb-space-lg text-center">
+            <span className="section-telemetry font-bold">LUMINA PRIVILEGE CONCIERGE</span>
+            <h3 className="pt-space-2xs font-headline-md text-headline-md text-on-surface">Đặc Quyền Vượt Xa Chuẩn Mực Bán Lẻ</h3>
           </div>
-          <ul className="flex flex-col">
+          <div className="grid grid-cols-1 gap-space-lg sm:grid-cols-2 lg:grid-cols-4">
             {PRIVILEGES.map((p) => (
-              <li key={p.title} className="flex items-baseline gap-space-md border-t border-surface-container-high py-space-md last:border-b">
-                <span className="material-symbols-outlined shrink-0 text-[22px] text-primary" aria-hidden="true">{p.icon}</span>
-                <div className="flex flex-col gap-space-3xs sm:flex-row sm:items-baseline sm:gap-space-md">
-                  <span className="shrink-0 font-headline-sm text-headline-sm text-on-surface sm:w-64">{p.title}</span>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">{p.desc}</p>
+              <div key={p.title} className="flex flex-col gap-space-xs">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-high text-primary shadow-sm">
+                  <span className="material-symbols-outlined text-[24px]" aria-hidden="true">{p.icon}</span>
                 </div>
-              </li>
+                <span className="font-headline-sm text-headline-sm text-on-surface">{p.title}</span>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">{p.desc}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     </section>
