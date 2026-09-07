@@ -81,3 +81,11 @@
 - [ ] Email xác nhận đơn đến tay, reset password end-to-end
 - [ ] Sentry nhận event thử, uptime monitor xanh
 - [ ] `npm run check:bundle` xanh, E2E xanh
+
+## 8. Migration roadmap (khi cần scale)
+
+| Phase | Trigger | Doc | Effort |
+|-------|---------|-----|--------|
+| 2.2 pg_trgm | Catalogue >1K products, cần fuzzy search | `docs/migration-pg-trgm.md` | 2-3 ngày |
+| 2.3 S3/R2 | Upload ảnh thật, CDN, optimization | `docs/migration-s3-r2-images.md` | 3-5 ngày |
+| 2.4 BullMQ | Async email, retry, background jobs | `docs/migration-bullmq-queue.md` | 3-4 ngày |
