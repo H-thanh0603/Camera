@@ -11,6 +11,7 @@
     "postinstall": "prisma generate",
     "db:reset": "prisma migrate reset --force",
     "db:backup": "node scripts/db-backup.mjs",
+    "test:load": "k6 run scripts/load-test.js",
     "prepare": "husky",
     "check:bundle": "node scripts/check-bundle.mjs"
   },

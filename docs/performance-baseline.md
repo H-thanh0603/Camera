@@ -38,3 +38,15 @@ LCP ~6s (mobile throttled) bị chi phối bởi ảnh hero ~hàng trăm KB từ
 không có srcset/AVIF. Fix cấu trúc duy nhất là chuyển sang **`next/image` +
 CDN/own bucket** (đã có trong lộ trình giai đoạn 2 — khi đó FCP/LCP dự kiến giảm
 mạnh, và icon font có thể tự host cùng fonts.gstatic).
+
+## Baseline kiểm thử tải k6 (2026-09-07)
+
+`k6 run scripts/load-test.js` (xem `npm run test:load`) vào production build
+trên máy dev, SQLite local — số tuyệt đối chỉ để so sánh tương đối:
+
+- 50 VUs đọc hỗn hợp (catalogue, search, health, home SSR): **0% lỗi**,
+  p95 **13ms**, p99 **17ms**.
+- Scenario coupon riêng (30 req/phút, dưới mutation limit): 100% 200.
+- Phát hiện khi đo: POST `/api/coupons/validate` ở 50 VUs trả 429 hàng loạt —
+  **đúng thiết kế** (middleware giới hạn 60 req GHI/phút/IP), không phải lỗi.
+  Đo lại trên staging đa instance + Upstash trước khi mở bán.
