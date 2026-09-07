@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { search, POPULAR_SEARCHES } from "@/lib/services/search-service";
+import { POPULAR_SEARCHES } from "@/lib/services/search-service";
+import type { Product } from "@/lib/types";
 import { formatVND } from "@/lib/utils/format";
 import { useDebounce } from "@/hooks/useDebounce";
 import { AppImage } from "@/components/ui/app-image";
@@ -20,7 +21,27 @@ export function SearchOverlay() {
   const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 250);
-  const result = search(debouncedQuery);
+  const [results, setResults] = useState<Product[]>([]);
+  const [resultTotal, setResultTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  // Server-side search on debounced query
+  useEffect(() => {
+    const q = debouncedQuery.trim();
+    if (!q) { setResults([]); setResultTotal(0); return; }
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/products?q=${encodeURIComponent(q)}&pageSize=6`)
+      .then((r) => r.json())
+      .then((data: { items?: Product[]; total?: number }) => {
+        if (cancelled) return;
+        setResults(data.items ?? []);
+        setResultTotal(data.total ?? 0);
+      })
+      .catch(() => { if (!cancelled) { setResults([]); setResultTotal(0); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [debouncedQuery]);
 
   useEffect(() => {
     if (searchOpen) {
@@ -47,7 +68,7 @@ export function SearchOverlay() {
     const updated = [trimmed, ...loadJSON<string[]>(RECENT_KEY, []).filter((t) => t !== trimmed)].slice(0, 5);
     saveJSON(RECENT_KEY, updated);
     setSearchOpen(false);
-    track("search", { query: trimmed, results: result.total });
+    track("search", { query: trimmed, results: resultTotal });
     router.push(`/products?search=${encodeURIComponent(trimmed)}`);
   };
 
@@ -107,13 +128,17 @@ export function SearchOverlay() {
                 </div>
               </section>
             </div>
-          ) : result.total === 0 ? (
+          ) : loading ? (
+            <p className="py-space-lg text-center font-body-md text-body-md text-on-surface-variant" role="status">
+              Đang tìm kiếm...
+            </p>
+          ) : results.length === 0 ? (
             <p className="py-space-lg text-center font-body-md text-body-md text-on-surface-variant" role="status">
               {`Không tìm thấy kết quả cho "${query}". Thử "Leica", "anamorphic" hoặc "medium format".`}
             </p>
           ) : (
             <ul className="flex flex-col gap-space-xs" aria-label="Gợi ý sản phẩm">
-              {result.products.map((p) => (
+              {results.map((p) => (
                 <li key={p.id}>
                   <Link
                     href={`/products/${p.slug}`}
@@ -135,7 +160,7 @@ export function SearchOverlay() {
                   onClick={() => commitSearch(query)}
                   className="w-full rounded-lg bg-surface-container-high py-space-xs font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest"
                 >
-                  Xem tất cả {result.total} kết quả
+                  Xem tất cả {resultTotal} kết quả
                 </button>
               </li>
             </ul>

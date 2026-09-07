@@ -70,6 +70,7 @@ function reducer(state: AppState, action: Action): AppState {
       if (exists) {
         return { ...state, wishlist: state.wishlist.filter((w) => w.productId !== action.product.id) };
       }
+      if (state.wishlist.length >= 20) return state;
       return {
         ...state,
         wishlist: [
@@ -240,6 +241,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       isWishlisted: (productId) => state.wishlist.some((w) => w.productId === productId),
       toggleWishlist: (product) => {
         const wasWishlisted = state.wishlist.some((w) => w.productId === product.id);
+        if (!wasWishlisted && state.wishlist.length >= 20) {
+          pushToast("Wishlist đã đầy (tối đa 20 sản phẩm).", "error");
+          return;
+        }
         dispatch({ type: "wishlist/toggle", product });
         pushToast(wasWishlisted ? `Đã bỏ "${product.name}" khỏi yêu thích.` : `Đã lưu "${product.name}" vào yêu thích.`, "info", { label: "Xem wishlist", href: "/wishlist" });
       },

@@ -229,3 +229,37 @@ export async function dbFacets(params: Pick<ProductSearchParams, "q" | "minPrice
     priceRange: { min: agg._min.price ?? 0, max: agg._max.price ?? 0 },
   };
 }
+
+/**
+ * Sản phẩm tương tự server-side (category match + brand bonus + giá gần),
+ * bỏ dbAllProducts trên PDP.
+ */
+export async function dbSimilarProducts(
+  product: { id: string; category: string; brand: string; price: number; tags: string[] },
+  limit = 4,
+): Promise<Product[]> {
+  const rows = await prisma.product.findMany({
+    where: {
+      id: { not: product.id },
+      OR: [
+        { category: product.category },
+        { tagString: { contains: `|${product.tags[0]}|` } },
+      ],
+    },
+    include: INCLUDE,
+    orderBy: [{ rating: "desc" }, { reviewCount: "desc" }],
+    take: 20,
+  });
+  // Sort: brand match + category match + price proximity (giống getSimilarProducts client)
+  return rows
+    .map((r) => dbProductToDomain(r))
+    .sort(
+      (a, b) =>
+        (b.brand === product.brand ? 1 : 0) +
+        (b.category === product.category ? 1 : 0) -
+        (a.brand === product.brand ? 1 : 0) -
+        (a.category === product.category ? 1 : 0) ||
+        Math.abs(a.price - product.price) - Math.abs(b.price - product.price),
+    )
+    .slice(0, limit);
+}

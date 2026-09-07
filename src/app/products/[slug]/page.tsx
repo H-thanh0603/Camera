@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { dbAllProducts, dbGetProductBySlug } from "@/lib/server/product-db";
-import { getCompleteSetup, getSimilarProducts } from "@/lib/services/recommendation-service";
+import { dbGetProductBySlug, dbSimilarProducts } from "@/lib/server/product-db";
 import { brandOrigin } from "@/lib/data/products";
 import { ProductPurchasePanel } from "@/components/product/product-purchase-panel";
 import { ProductCard } from "@/components/product/product-card";
@@ -17,6 +16,7 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
+  const { dbAllProducts } = await import("@/lib/server/product-db");
   const products = await dbAllProducts();
   return products.map((p) => ({ slug: p.slug }));
 }
@@ -62,9 +62,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const product = await dbGetProductBySlug(slug);
   if (!product) notFound();
 
-  const catalog = await dbAllProducts();
-  const completeSetup = getCompleteSetup(product);
-  const similar = getSimilarProducts(product, 3, catalog);
+  const [completeSetup, similar] = await Promise.all([
+    // completeSetup cần resolve compatibleWith IDs — vẫn cần getProductById client
+    // nhưng trên server có thể query trực tiếp
+    (async () => {
+      const { getCompleteSetup } = await import("@/lib/services/recommendation-service");
+      return getCompleteSetup(product);
+    })(),
+    dbSimilarProducts(product, 3),
+  ]);
 
   // Product structured data (SEO)
   const jsonLd = {
@@ -182,8 +188,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
           <span className="section-telemetry">YOU MAY ALSO LIKE</span>
           <h2 className="font-headline-md text-headline-md text-on-surface">Tương Tự & Cùng Hệ Sinh Thái</h2>
           <div className="grid grid-cols-1 gap-space-xl md:grid-cols-3">
-            {similar.map((r) => (
-              <ProductCard key={r.product.id} product={r.product} />
+            {similar.map((p) => (
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         </section>
