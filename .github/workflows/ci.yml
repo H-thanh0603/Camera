@@ -27,7 +27,11 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        run: npx vitest run
+        run: npm run test:unit
+
+      - name: Secret scan (patterns phổ biến)
+        run: |
+          ! grep -rEn --exclude-dir=node_modules --exclude-dir=.next --exclude='*.log' '(sk_live_[A-Za-z0-9]+|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[bap]-)' . || (echo "Phát hiện secret?" && exit 1)
 
       - name: Setup database
         run: npx prisma migrate deploy
@@ -43,6 +47,9 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: "file:./dev.db"
+
+      - name: Bundle budget
+        run: npm run check:bundle
 
   e2e:
     runs-on: ubuntu-latest

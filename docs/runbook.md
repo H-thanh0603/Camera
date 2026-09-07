@@ -51,18 +51,25 @@
 
 - Có `UPSTASH_*`: sliding-window Redis dùng chung mọi instance.
 - Chưa có: fallback in-memory fail-open + warn (1 instance ok, đa instance yếu).
-- Quên mật khẩu giới hạn 5 req/phút/IP; đặt hàng 10 req/phút/IP.
-- **X-Forwarded-For**: middleware + route lấy IP client từ header
-  `x-forwarded-for` (phần tử đầu). Chỉ tin header này khi app chạy **sau
-  reverse proxy tin cậy** (Vercel, Nginx được quản lý) — proxy ghi đè giá trị
-  client gửi lên. Chạy self-host trần (không proxy): client tự inject header
-  để xoay IP bypass rate limit — khi đó đổi các chỗ lấy IP sang socket.
+- Phủ limiter: login 10, register/forgot/reset 5, order/cancel/paydemo 10,
+  review 5, coupon-validate 30, webhook 60 req/phút/IP.
+- **Client IP** (`lib/server/client-ip.ts`): ưu tiên `cf-connecting-ip` /
+  `x-real-ip` (edge đảm bảo); XFF chỉ tin entry phải-nhất khi
+  `TRUST_PROXY_COUNT>0` (set `=1` ở prod sau 1 proxy). Self-host trần:
+  chặn direct-origin ở firewall.
 
-## 6. Giám sát
+## 6. Giám sát & Alerting
 
 - Sentry server: set `SENTRY_DSN` (+ `SENTRY_AUTH_TOKEN/ORG/PROJECT` để upload
   sourcemap). Lỗi client chảy về `POST /api/metrics` → `logger.error` →
   Sentry, không tốn bundle (1.30/1.43 MB).
+- UptimeRobot (mỗi 5 phút): monitor `GET /api/health` với keyword `"db":"up"`;
+  alert (Pager/Telegram/Slack) khi 503 hoặc mất keyword. Không monitor
+  `/api/payments/webhook` từ ngoài (cần chữ ký — chỉ gây 401 noise).
+- Sau mỗi deploy: `BASE_URL=... npm run smoke:prod` (health, demo-flag,
+  catalogue, admin-403, webhook) — fail thì rollback trước khi mở traffic.
+- Dọn session/token hết hạn: cron `npm run db:sweep` mỗi giờ (đã tách khỏi
+  health để health read-only).
 - Audit log: `order.placed/cancelled/paid_via_webhook`, `coupon.*`,
   `auth.password_reset_*` — xem ở admin dashboard.
 

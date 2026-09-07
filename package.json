@@ -12,6 +12,9 @@
     "db:reset": "prisma migrate reset --force",
     "db:backup": "node scripts/db-backup.mjs",
     "db:restore": "node scripts/db-restore.mjs",
+    "db:sweep": "node scripts/db-sweep.mjs",
+    "test:unit": "vitest run",
+    "smoke:prod": "node scripts/smoke-prod.mjs",
     "test:load": "k6 run scripts/load-test.js",
     "prepare": "husky",
     "check:bundle": "node scripts/check-bundle.mjs"
