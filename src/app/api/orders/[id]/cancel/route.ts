@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma } from "@/lib/server/prisma";
 import { getOwnOrder } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
+import { CancelConflict, completeCancel } from "@/lib/server/cancel-order";
 import { CANCELLABLE_STATUSES } from "@/lib/server/order-status";
 import { logAudit } from "@/lib/server/audit";
 import { logger } from "@/lib/server/logger";
@@ -16,23 +16,14 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Đơn hàng đang giao không thể hủy." }, { status: 409 });
   }
 
-  // Hoàn kho trong transaction cùng với đổi trạng thái
-  await prisma.$transaction(async (tx) => {
-    const lines = await tx.orderLine.findMany({ where: { orderId: id } });
-    for (const l of lines) {
-      if (l.variantId) {
-        await tx.productVariant.updateMany({
-          where: { id: l.variantId },
-          data: { stock: { increment: l.quantity } },
-        });
-      }
-      await tx.product.updateMany({
-        where: { id: l.productId },
-        data: { stock: { increment: l.quantity } },
-      });
+  try {
+    await completeCancel(id);
+  } catch (error) {
+    if (error instanceof CancelConflict) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    await tx.order.update({ where: { id }, data: { status: "cancelled" } });
-  });
+    throw error;
+  }
 
   const user = await getSessionUser();
   logger.info("order.cancelled", { orderId: id, userId: user?.id ?? "guest" });
