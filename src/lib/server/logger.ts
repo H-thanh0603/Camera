@@ -5,21 +5,24 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
+import { scrubMeta } from "./scrub";
 
 type Level = "debug" | "info" | "warn" | "error";
 
 function write(level: Level, message: string, meta?: Record<string, unknown>): void {
+  // Scrub PII trước khi ghi log / forward Sentry (P0-5)
+  const clean = (scrubMeta(meta ?? {}) ?? {}) as Record<string, unknown>;
   const line = JSON.stringify({
     level,
     message,
     timestamp: new Date().toISOString(),
-    ...meta,
+    ...clean,
   });
   if (level === "error") {
     console.error(line);
     if (process.env.SENTRY_DSN) {
       try {
-        Sentry.captureMessage(`${message}`, { level: "error", extra: meta });
+        Sentry.captureMessage(`${message}`, { level: "error", extra: clean });
       } catch {
         // Sentry fail không được phá vỡ request
       }

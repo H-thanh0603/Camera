@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { hashId } from "./scrub";
 
 /**
  * Email giao dịch — Resend khi có RESEND_API_KEY, ngược lại chế độ log
@@ -16,7 +17,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM ?? "Lumina Optics <orders@lumina.vn>";
   if (!apiKey) {
-    logger.info("email.log_mode", { to: input.to, subject: input.subject });
+    logger.info("email.log_mode", { toHash: hashId(input.to), subject: input.subject });
     return { sent: false, mode: "log" };
   }
   try {
@@ -26,12 +27,12 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
       body: JSON.stringify({ from, to: input.to, subject: input.subject, html: input.html }),
     });
     if (!res.ok) {
-      logger.error("email.resend_failed", { status: res.status, to: input.to });
+      logger.error("email.resend_failed", { status: res.status, toHash: hashId(input.to) });
       return { sent: false, mode: "resend" };
     }
     return { sent: true, mode: "resend" };
   } catch (error) {
-    logger.error("email.send_error", { error: String(error), to: input.to });
+    logger.error("email.send_error", { error: String(error), toHash: hashId(input.to) });
     return { sent: false, mode: "resend" };
   }
 }
