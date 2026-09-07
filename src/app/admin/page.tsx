@@ -17,23 +17,32 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 export default async function AdminDashboardPage() {
-  const [orderCount, productCount, pendingReviewCount, paidOrders, recentOrders, auditLogs] = await Promise.all([
-    prisma.order.count(),
-    prisma.product.count(),
-    prisma.review.count({ where: { approved: false } }),
-    prisma.order.findMany({
-      where: { status: { in: ["paid", "processing", "shipped", "delivered"] } },
-      select: { totals: true },
-    }),
-    prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 5, include: { lines: true } }),
-    recentAuditLogs(8),
-  ]);
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const paidStatuses = ["paid", "processing", "shipped", "delivered"];
 
-  // SQLite Json: tổng tiền tính ở application level từ totals.total
-  const revenue = paidOrders.reduce((sum, o) => sum + ((o.totals as { total?: number })?.total ?? 0), 0);
+  const [orderCount, productCount, pendingReviewCount, revenueAgg, recentOrders, auditLogs, chartOrders] =
+    await Promise.all([
+      prisma.order.count(),
+      prisma.product.count(),
+      prisma.review.count({ where: { approved: false } }),
+      // Doanh thu aggregate TRONG DB (thay vì tải hết totals về reduce JS)
+      prisma.order.aggregate({
+        where: { status: { in: paidStatuses } },
+        _sum: { totalAmount: true },
+      }),
+      prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 5, include: { lines: true } }),
+      recentAuditLogs(8),
+      // Chart 14 ngày: query giới hạn theo thời gian + cột nhẹ (không lines/totals)
+      prisma.order.findMany({
+        where: { createdAt: { gte: fourteenDaysAgo } },
+        select: { createdAt: true },
+      }),
+    ]);
 
-  // Đơn hàng 14 ngày gần nhất cho biểu đồ
-  const allOrders = await prisma.order.findMany({ select: { createdAt: true }, orderBy: { createdAt: "desc" }, take: 500 });
+  const revenue = revenueAgg._sum.totalAmount ?? 0;
+
+  // Đơn hàng 14 ngày gần nhất cho biểu đồ (đã lọc từ DB)
   const chartData: { day: string; orders: number; revenue: number }[] = [];
   for (let i = 13; i >= 0; i--) {
     const dayStart = new Date();
@@ -41,7 +50,7 @@ export default async function AdminDashboardPage() {
     dayStart.setDate(dayStart.getDate() - i);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
-    const dayOrders = allOrders.filter((o) => o.createdAt >= dayStart && o.createdAt < dayEnd).length;
+    const dayOrders = chartOrders.filter((o) => o.createdAt >= dayStart && o.createdAt < dayEnd).length;
     chartData.push({
       day: dayStart.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
       orders: dayOrders,

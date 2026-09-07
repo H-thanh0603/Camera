@@ -232,6 +232,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         delivery,
         payment,
         totals: totals as unknown as Prisma.InputJsonValue,
+        totalAmount: totals.total,
         idempotencyKey: input.idempotencyKey ?? null,
         lines: {
           create: finalLines.map((l) => ({

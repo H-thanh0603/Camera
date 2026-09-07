@@ -56,7 +56,28 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (denied) return denied;
 
   const { id } = await params;
-  await prisma.product.delete({ where: { id } });
+  // Chính sách orphan: SP đã có đơn/review thì CẤM xóa (giữ lịch sử toàn vẹn).
+  // Muốn ngừng bán: availability="contact" hoặc "out_of_stock".
+  const [lineCount, reviewCount] = await Promise.all([
+    prisma.orderLine.count({ where: { productId: id } }),
+    prisma.review.count({ where: { productId: id } }),
+  ]);
+  if (lineCount > 0 || reviewCount > 0) {
+    return NextResponse.json(
+      {
+        error: `Không thể xóa: sản phẩm đã có ${lineCount} dòng đơn và ${reviewCount} đánh giá. Hãy chuyển availability sang "contact" để ngừng bán mà vẫn giữ lịch sử.`,
+      },
+      { status: 409 },
+    );
+  }
+  try {
+    await prisma.product.delete({ where: { id } });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
+      return NextResponse.json({ error: "Không tìm thấy sản phẩm." }, { status: 404 });
+    }
+    throw e;
+  }
   revalidatePath("/", "layout");
   await logAudit(await getSessionUser(), "product.delete", "product", id);
   return NextResponse.json({ ok: true });

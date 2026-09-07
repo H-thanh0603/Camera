@@ -114,7 +114,7 @@ model Order {
   // null = khách vãng lai (guest checkout)
   userId     String?
   user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  status     String      @default("pending") // pending|paid|processing|shipped|delivered|cancelled|refunded
+  status     String      @default("pending") // pending|paid|processing|shipped|delivered|cancelled|refunded — enum ở APP (FORWARD/CANCELLABLE); SQLite không CHECK được
   // bước timeline hiện tại: order_placed..delivered (xem ORDER_STEP_ORDER)
   currentStep String     @default("confirmed")
   contact    Json
@@ -123,6 +123,8 @@ model Order {
   payment    String
   // snapshot tổng tiền do SERVER tính — client không được tin giá tự tính
   totals     Json
+  // Cột vô hướng cho báo cáo (aggregate SUM/GROUP trong DB thay vì reduce JS)
+  totalAmount Int @default(0)
   // chống double-submit: client gửi key ngẫu nhiên 1 lần per intent
   idempotencyKey String? @unique
   lines      OrderLine[]
