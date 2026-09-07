@@ -67,8 +67,7 @@ async function main() {
   console.log(`Seeded ${products.length} products.`);
 
   const adminEmail = "admin@lumina.vn";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "admin-lumina-2026";
-  await prisma.user.upsert({
+  const adminPassword = process.env.ADMIN_PASSWORD ?? "admin-lumina-2026";  await prisma.user.upsert({
     where: { email: adminEmail },
     update: { role: "admin" },
     create: {
@@ -79,6 +78,20 @@ async function main() {
     },
   });
   console.log(`Admin ready: ${adminEmail} (password từ ADMIN_PASSWORD hoặc mặc định)`);
+
+  const coupons = [
+    { code: "LUMINA10", kind: "percent", value: 10, minSubtotal: 5_000_000, maxUses: 500 },
+    { code: "FREESHIP", kind: "fixed", value: 350_000, minSubtotal: 2_000_000, maxUses: 1000 },
+    { code: "VIP500K", kind: "fixed", value: 500_000, minSubtotal: 20_000_000, maxUses: 200 },
+  ];
+  for (const c of coupons) {
+    await prisma.coupon.upsert({
+      where: { code: c.code },
+      update: { kind: c.kind, value: c.value, minSubtotal: c.minSubtotal, maxUses: c.maxUses, active: true },
+      create: { ...c, active: true },
+    });
+  }
+  console.log(`Seeded ${coupons.length} coupons.`);
 }
 
 main()

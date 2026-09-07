@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { placeOrderServer, OrderValidationError } from "@/lib/server/place-order";
 import { getUserOrders } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
-import { createRateLimiter } from "@/lib/utils/rate-limit";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { logger } from "@/lib/server/logger";
 import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
 
@@ -11,12 +11,18 @@ import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
  * GET  /api/orders — danh sách đơn của phiên hiện tại.
  */
 
-const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!limiter.check(`order:${ip}`).allowed) {
-    return NextResponse.json({ error: "Quá nhiều yêu cầu. Thử lại sau một phút." }, { status: 429 });
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const limit = await limiter.check(`order:${ip}`);
+  if (!limit.allowed) {
+    logger.warn("order.rate_limited", { ip, requestId });
+    return NextResponse.json(
+      { error: "Quá nhiều yêu cầu. Thử lại sau một phút." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
   }
 
   let body: Parameters<typeof placeOrderServer>[0];
@@ -42,7 +48,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof OrderValidationError) {
       return NextResponse.json({ error: error.message }, { status: 422 });
     }
-    logger.error("order.place_failed", { error: String(error) });
+    logger.error("order.place_failed", { error: String(error), requestId });
     return NextResponse.json({ error: "Không thể tạo đơn hàng. Vui lòng thử lại." }, { status: 500 });
   }
 }

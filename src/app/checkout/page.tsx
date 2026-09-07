@@ -44,6 +44,19 @@ export default function CheckoutPage() {
   const [delivery, setDelivery] = useState<"standard" | "express" | "pickup">("standard");
   const [payment, setPayment] = useState<"bank_transfer" | "cod" | "card_on_delivery">("bank_transfer");
 
+  // Coupon: server là nguồn chuẩn (POST /api/coupons/validate để preview,
+  // placeOrder gửi kèm mã để server tính lại + trừ lượt dùng).
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+
+  // Giỏ đổi → preview cũ hết hiệu lực, bắt áp lại để số tiền luôn đúng.
+  useEffect(() => {
+    setCoupon(null);
+    setCouponError(null);
+  }, [totals.subtotal]);
+
   const contactForm = useForm<ContactInput>({
     resolver: zodResolver(contactSchema),
     defaultValues: { fullName: user?.name ?? "", email: user?.email ?? "", phone: "" },
@@ -79,6 +92,11 @@ export default function CheckoutPage() {
             <div className="rounded-lg bg-surface-container-low p-space-sm text-left">
               <p className="text-outline">Tổng giá trị (server xác minh)</p>
               <p className="font-telemetry-data text-telemetry-data text-on-surface">{formatVND(placedOrder.totals.total)}</p>
+              {(placedOrder.totals.discount ?? 0) > 0 && (
+                <p className="font-telemetry-xs text-telemetry-xs text-primary">
+                  Đã giảm {formatVND(placedOrder.totals.discount ?? 0)}{placedOrder.totals.couponCode ? ` (${placedOrder.totals.couponCode})` : ""}
+                </p>
+              )}
             </div>
           </div>
 
@@ -155,14 +173,43 @@ export default function CheckoutPage() {
   }
 
   const expressFee = DELIVERY_OPTIONS.find((d) => d.value === delivery)?.price ?? 0;
-  const grandTotal = totals.total + expressFee;
+  const couponDiscount = coupon?.discount ?? 0;
+  const grandTotal = totals.total + expressFee - couponDiscount;
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code || couponBusy) return;
+    setCouponBusy(true);
+    setCouponError(null);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal: totals.subtotal }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCoupon(null);
+        setCouponError((data as { error?: string }).error ?? "Mã giảm giá không áp dụng được.");
+        return;
+      }
+      setCoupon({ code: (data as { code: string }).code, discount: (data as { discount: number }).discount });
+    } catch {
+      setCouponError("Không kiểm tra được mã. Vui lòng thử lại.");
+    } finally {
+      setCouponBusy(false);
+    }
+  };
 
   const submitOrder = async () => {
     if (!contact || !shipping) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const order = await placeOrder({ contact, shipping, delivery, payment, snapshot: cartSnapshot }, idempotencyKey ?? undefined);
+      const order = await placeOrder(
+        { contact, shipping, delivery, payment, snapshot: cartSnapshot, ...(coupon ? { couponCode: coupon.code } : {}) },
+        idempotencyKey ?? undefined,
+      );
       clearCart();
       setPlacedOrder(order);
       track("purchase", { orderId: order.id, total: order.totals.total, itemCount: order.totals.itemCount, payment: order.payment });
@@ -368,6 +415,52 @@ export default function CheckoutPage() {
           <div className="flex flex-col gap-space-xs font-body-sm text-body-sm">
             <Row label={`Tạm tính (${totals.itemCount} sp)`} value={formatVND(totals.subtotal)} />
             {totals.savings > 0 && <Row label="Tiết kiệm" value={`−${formatVND(totals.savings)}`} accent />}
+            {/* Mã giảm giá */}
+            {coupon ? (
+              <div className="flex items-center justify-between rounded-lg bg-primary/10 px-space-xs py-space-2xs">
+                <span className="font-telemetry-xs text-telemetry-xs uppercase text-primary">{coupon.code} (−{formatVND(coupon.discount)})</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCoupon(null);
+                    setCouponInput("");
+                  }}
+                  className="font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-error"
+                  aria-label={`Gỡ mã ${coupon.code}`}
+                >
+                  Gỡ
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-space-2xs">
+                <div className="flex gap-space-2xs">
+                  <label htmlFor="coupon-input" className="sr-only">Mã giảm giá</label>
+                  <input
+                    id="coupon-input"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void applyCoupon();
+                      }
+                    }}
+                    placeholder="Mã giảm giá (VD: LUMINA10)"
+                    className="min-w-0 flex-1 rounded-lg bg-surface-container-low px-space-sm py-space-2xs font-telemetry-data text-telemetry-data uppercase text-on-surface outline-none placeholder:text-outline focus:ring-1 focus:ring-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void applyCoupon()}
+                    disabled={couponBusy || !couponInput.trim()}
+                    className="shrink-0 rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-surface-container-highest disabled:opacity-50"
+                  >
+                    {couponBusy ? "Đang kiểm tra..." : "Áp dụng"}
+                  </button>
+                </div>
+                {couponError && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{couponError}</p>}
+              </div>
+            )}
+            {couponDiscount > 0 && <Row label={`Giảm giá (${coupon?.code})`} value={`−${formatVND(couponDiscount)}`} accent />}
             <Row label="Vận chuyển" value={totals.shipping === 0 && delivery !== "express" ? "Miễn phí" : formatVND(totals.shipping + expressFee)} />
             <div className="flex justify-between border-t border-surface-container-high pt-space-sm">
               <span className="font-headline-sm text-headline-sm text-on-surface">Tổng cộng</span>

@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getOwnOrder } from "@/lib/server/order-mapper";
+import { getSessionUser } from "@/lib/server/session";
+import { logAudit } from "@/lib/server/audit";
+import { logger } from "@/lib/server/logger";
 
 /**
  * POST /api/orders/:id/pay-demo — XÁC NHẬN THANH TOÁN DEMO.
@@ -26,5 +29,14 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   }
 
   await prisma.order.update({ where: { id }, data: { status: "paid" } });
+  const user = await getSessionUser();
+  logger.info("order.paid_demo", { orderId: id, userId: user?.id ?? "guest" });
+  await logAudit(
+    user ? { id: user.id, name: user.name, email: user.email } : null,
+    "order.paid_demo",
+    "Order",
+    id,
+    { number: order.number },
+  );
   return NextResponse.json({ order: { ...order, status: "paid" as const } });
 }

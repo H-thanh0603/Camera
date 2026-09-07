@@ -77,6 +77,7 @@ export async function apiPlaceOrder(
     delivery: string;
     payment: string;
     lines: { productId: string; variantId?: string; quantity: number }[];
+    couponCode?: string;
   },
   idempotencyKey?: string,
 ): Promise<Order> {

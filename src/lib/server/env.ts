@@ -1,0 +1,58 @@
+import { z } from "zod";
+
+/**
+ * Env validation tập trung cho backend.
+ * Import ở server entry (route handler / server lib) để fail-fast khi
+ * thiếu biến môi trường — thay vì lỗi ngầm lúc chạy (DB down, demo payment
+ * bật nhầm ở production…).
+ */
+
+const envSchema = z.object({
+  DATABASE_URL: z.string().min(1, "DATABASE_URL là bắt buộc."),
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  PAYMENT_DEMO_MODE: z.enum(["true", "false"]).default("true"),
+  ADMIN_PASSWORD: z.string().min(12, "ADMIN_PASSWORD production tối thiểu 12 ký tự.").optional(),
+  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  // Phase 1 production:
+  PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM: z.string().email().optional(),
+  SENTRY_DSN: z.string().url().optional(),
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+});
+
+export type AppEnv = z.infer<typeof envSchema>;
+
+let cached: AppEnv | null = null;
+
+export function getEnv(): AppEnv {
+  if (cached) return cached;
+  const parsed = envSchema.safeParse(process.env);
+  if (!parsed.success) {
+    const details = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new Error(`Biến môi trường không hợp lệ: ${details}`);
+  }
+  const env = parsed.data;
+  // Production không bao giờ được bật demo payment (nhận tiền giả).
+  if (env.NODE_ENV === "production" && env.PAYMENT_DEMO_MODE === "true") {
+    throw new Error(
+      "PAYMENT_DEMO_MODE=true bị cấm ở production — tắt demo và cấu hình PAYMENT_WEBHOOK_SECRET.",
+    );
+  }
+  if (env.NODE_ENV === "production" && !env.ADMIN_PASSWORD) {
+    throw new Error("ADMIN_PASSWORD là bắt buộc ở production.");
+  }
+  cached = env;
+  return cached;
+}
+
+/** true khi chạy production thật — dùng để chặn endpoint demo. */
+export function isProduction(): boolean {
+  return getEnv().NODE_ENV === "production";
+}
+
+/** Chỉ dùng trong test để reset cache. */
+export function __resetEnvCache(): void {
+  cached = null;
+}

@@ -76,7 +76,10 @@ export function buildCartSnapshot(lines: CartLine[], resolveProduct: (id: string
   return { lines: details, totals: calculateTotals(details) };
 }
 
-export function calculateTotals(lines: CartLineDetail[]): CartTotals {
+export function calculateTotals(
+  lines: CartLineDetail[],
+  opts?: { discount?: number; couponCode?: string },
+): CartTotals {
   const itemCount = lines.reduce((sum, l) => sum + l.quantity, 0);
   const subtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
   const savings = lines.reduce(
@@ -84,13 +87,15 @@ export function calculateTotals(lines: CartLineDetail[]): CartTotals {
     0,
   );
   const shipping = subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
+  const discount = Math.max(0, Math.min(opts?.discount ?? 0, subtotal));
   return {
     itemCount,
     subtotal,
     savings,
     shipping,
-    total: subtotal + shipping,
+    total: subtotal - discount + shipping,
     amountToFreeShipping: Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal),
+    ...(discount > 0 ? { discount, couponCode: opts?.couponCode } : {}),
   };
 }
 

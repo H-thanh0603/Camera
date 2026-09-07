@@ -19,7 +19,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Event không hợp lệ." }, { status: 422 });
     }
     counters.set(body.event, (counters.get(body.event) ?? 0) + 1);
-    logger.info("analytics_event", { event: body.event, props: body.props ?? {} });
+    // Lỗi client đi qua logger.error để forward sang Sentry (server-side,
+    // không tốn bundle client) — event thường chỉ info.
+    if (body.event === "client_error") {
+      logger.error("client_error", { props: body.props ?? {} });
+    } else {
+      logger.info("analytics_event", { event: body.event, props: body.props ?? {} });
+    }
     return NextResponse.json({ ok: true }, { status: 202 });
   } catch {
     return NextResponse.json({ error: "Dữ liệu không hợp lệ." }, { status: 400 });

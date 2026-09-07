@@ -1,11 +1,9 @@
 import { track } from "@/lib/analytics";
 
 /**
- * Error reporting (client): bắt exception ở error boundary + window.onerror,
- * gửi về /api/metrics để server log có cấu trúc.
- *
- * SẢN XUẤT: Sentry-ready — thay captureException bằng Sentry.captureException
- * (hoặc GlitchTip tự host), các điểm gọi đã xong.
+ * Error reporting (client): gửi về /api/metrics (sendBeacon) — server log
+ * qua logger.error("client_error") và forward sang Sentry ở phía server.
+ * Zero-cost bundle: không nhúng SDK vào client.
  */
 
 export function captureException(error: unknown, context?: Record<string, unknown>): void {

@@ -64,6 +64,24 @@ export const placeOrderSchema = z.object({
   payment: z.enum(["bank_transfer", "cod", "card_on_delivery"]),
   lines: z.array(orderLineSchema).min(1, "Đơn hàng trống."),
   idempotencyKey: z.string().min(8).max(64).optional(),
+  couponCode: z
+    .string()
+    .trim()
+    .min(3)
+    .max(32)
+    .regex(/^[A-Za-z0-9_-]+$/, "Mã giảm giá không hợp lệ.")
+    .optional(),
+});
+
+export const productQuerySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+  brand: z.string().trim().max(60).optional(),
+  category: z.string().trim().max(30).optional(),
+  minPrice: z.coerce.number().int().min(0).optional(),
+  maxPrice: z.coerce.number().int().min(0).optional(),
+  sort: z.enum(["featured", "newest", "price_asc", "price_desc", "rating_desc"]).default("featured"),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(60).default(12),
 });
 
 export type ContactInput = z.infer<typeof contactSchema>;
@@ -72,6 +90,63 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ReviewInput = z.infer<typeof reviewSchema>;
 export type PlaceOrderInputDto = z.infer<typeof placeOrderSchema>;
+
+/** Mã coupon chuẩn hoá: chữ hoa, số, gạch nối/gạch dưới. */
+export const couponCodeSchema = z
+  .string()
+  .trim()
+  .min(3, "Mã giảm giá tối thiểu 3 ký tự.")
+  .max(32)
+  .regex(/^[A-Za-z0-9_-]+$/, "Mã giảm giá không hợp lệ.")
+  .transform((v) => v.toUpperCase());
+
+export const couponValidateSchema = z.object({
+  code: couponCodeSchema,
+  subtotal: z.number().int().min(0),
+});
+
+export const couponCreateSchema = z
+  .object({
+    code: couponCodeSchema,
+    kind: z.enum(["percent", "fixed"]),
+    value: z.number().int().min(1, "Giá trị phải lớn hơn 0."),
+    minSubtotal: z.number().int().min(0).default(0),
+    maxUses: z.number().int().min(1).nullable().optional(),
+    active: z.boolean().default(true),
+    expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
+  })
+  .refine((v) => (v.kind === "percent" ? v.value <= 90 : true), {
+    message: "Phần trăm giảm tối đa 90%.",
+    path: ["value"],
+  });
+
+export const couponUpdateSchema = z.object({
+  kind: z.enum(["percent", "fixed"]).optional(),
+  value: z.number().int().min(1).optional(),
+  minSubtotal: z.number().int().min(0).optional(),
+  maxUses: z.number().int().min(1).nullable().optional(),
+  active: z.boolean().optional(),
+  expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+export type CouponCreateInput = z.infer<typeof couponCreateSchema>;
+export type CouponUpdateInput = z.infer<typeof couponUpdateSchema>;
+
+/**
+ * Webhook cổng thanh toán (VNPay/MoMo/Stripe mapping về shape này ở tầng
+ * adapter). Chữ ký HMAC-SHA256 hex của RAW body, gửi qua header
+ * `x-payment-signature`. `timestamp` chống replay (lệch tối đa 5 phút).
+ */
+export const paymentWebhookSchema = z.object({
+  provider: z.string().min(1).max(30),
+  eventId: z.string().min(1).max(128),
+  orderNumber: z.string().min(1).max(64),
+  amount: z.number().int().min(0),
+  status: z.enum(["paid", "failed"]),
+  timestamp: z.number().int(),
+});
+
+export type PaymentWebhookInput = z.infer<typeof paymentWebhookSchema>;
 
 /** Chuyển ZodError → { field: message } cho UI. */
 export function zodFieldErrors(error: z.ZodError): Record<string, string> {

@@ -13,6 +13,7 @@ export interface PlaceOrderDraft {
   delivery: "standard" | "express" | "pickup";
   payment: "bank_transfer" | "cod" | "card_on_delivery";
   snapshot: CartSnapshot;
+  couponCode?: string;
 }
 
 export async function placeOrder(draft: PlaceOrderDraft, idempotencyKey?: string): Promise<Order> {
@@ -26,6 +27,7 @@ export async function placeOrder(draft: PlaceOrderDraft, idempotencyKey?: string
       variantId: l.variantId,
       quantity: l.quantity,
     })),
+    ...(draft.couponCode ? { couponCode: draft.couponCode } : {}),
   }, idempotencyKey);
 }
 

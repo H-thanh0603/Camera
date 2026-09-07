@@ -97,3 +97,75 @@ export async function dbGetProductById(id: string): Promise<Product | null> {
   const row = await prisma.product.findUnique({ where: { id }, include: INCLUDE });
   return row ? dbProductToDomain(row) : null;
 }
+
+export interface ProductSearchParams {
+  q?: string;
+  brand?: string;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: "featured" | "newest" | "price_asc" | "price_desc" | "rating_desc";
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * Tìm kiếm + phân trang server-side cho catalogue lớn.
+ * `q` match name/brand/sku (contains, case-insensitive trên Postgres;
+ * SQLite dùng contains thường). Sort featured = mới nhất.
+ */
+export async function dbQueryProducts(params: ProductSearchParams): Promise<{
+  items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}> {
+  const page = Math.max(1, params.page ?? 1);
+  const pageSize = Math.min(60, Math.max(1, params.pageSize ?? 12));
+  const where: Prisma.ProductWhereInput = {};
+  if (params.brand) where.brand = params.brand;
+  if (params.category) where.category = params.category;
+  if (params.minPrice != null || params.maxPrice != null) {
+    where.price = {
+      ...(params.minPrice != null ? { gte: params.minPrice } : {}),
+      ...(params.maxPrice != null ? { lte: params.maxPrice } : {}),
+    };
+  }
+  if (params.q) {
+    const q = params.q.trim();
+    if (q) {
+      where.OR = [
+        { name: { contains: q } },
+        { brand: { contains: q } },
+        { sku: { contains: q } },
+      ];
+    }
+  }
+  const orderBy: Prisma.ProductOrderByWithRelationInput =
+    params.sort === "price_asc"
+      ? { price: "asc" }
+      : params.sort === "price_desc"
+        ? { price: "desc" }
+        : params.sort === "rating_desc"
+          ? { rating: "desc" }
+          : { createdAt: "desc" };
+
+  const [total, rows] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      include: INCLUDE,
+      orderBy,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  return {
+    items: rows.map((row) => dbProductToDomain(row)),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}

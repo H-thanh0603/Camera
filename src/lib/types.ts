@@ -160,6 +160,18 @@ export interface CartTotals {
   total: number;
   /** Còn bao nhiêu để được miễn phí vận chuyển (0 nếu đã đạt). */
   amountToFreeShipping: number;
+  /** Giảm giá từ coupon (VND) — optional để tương thích snapshot cũ. */
+  discount?: number;
+  couponCode?: string;
+}
+
+export interface Coupon {
+  code: string;
+  kind: "percent" | "fixed";
+  value: number;
+  minSubtotal: number;
+  active: boolean;
+  expiresAt?: string;
 }
 
 export interface CartSnapshot {

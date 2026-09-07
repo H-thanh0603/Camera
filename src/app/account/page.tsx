@@ -127,6 +127,9 @@ export default function AccountPage() {
                 {busy && <Spinner className="border-on-primary border-t-transparent" />}
                 Đăng nhập
               </button>
+              <Link href="/forgot-password" className="self-end font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-primary">
+                Quên mật khẩu?
+              </Link>
             </form>
           ) : (
             <form onSubmit={registerForm.handleSubmit(doRegister)} noValidate className="flex flex-col gap-space-sm">

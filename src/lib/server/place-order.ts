@@ -1,9 +1,13 @@
 import type { CartTotals, ContactInfo, Order, OrderLine, Product, ShippingInfo } from "@/lib/types";
 import { calculateTotals, maxQuantityOf, resolveVariant, unitPriceOf, unitCompareAtPriceOf } from "@/lib/services/cart-service";
+import { applyCouponToSubtotal, normalizeCouponCode } from "@/lib/services/coupon-service";
 import { dbGetProductById } from "./product-db";
+import { getCouponByCode } from "./coupons";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { getSessionUser } from "./session";
+import { logger } from "./logger";
+import { logAudit } from "./audit";
 
 /**
  * Đặt hàng phía SERVER — điểm verify cuối cùng:
@@ -36,6 +40,7 @@ export interface PlaceOrderInput {
   lines: IncomingLine[];
   /** Chống double-submit: key trùng → trả về đơn đã tạo thay vì tạo mới. */
   idempotencyKey?: string;
+  couponCode?: string;
 }
 
 function orderNumber(): string {
@@ -130,41 +135,128 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   }
 
   const finalProducts: Product[] = [];
-  const { finalLines, totals } = await verifyAndPriceLines(input.lines, delivery, async (id) => {
+  const { finalLines, totals: baseTotals } = await verifyAndPriceLines(input.lines, delivery, async (id) => {
     const p = await dbGetProductById(id);
     if (p) finalProducts.push(p);
     return p;
   });
 
+  // Coupon: server verify từ DB, tính discount trên subtotal (trước phí ship)
+  let totals: CartTotals = baseTotals;
+  let appliedCoupon: string | undefined;
+  const rawCoupon = input.couponCode?.trim();
+  if (rawCoupon) {
+    const code = normalizeCouponCode(rawCoupon);
+    const coupon = await getCouponByCode(code);
+    if (!coupon) throw new OrderValidationError(`Mã "${code}" không tồn tại.`);
+    const { discount, reason } = applyCouponToSubtotal(baseTotals.subtotal, coupon);
+    if (reason) throw new OrderValidationError(reason);
+    if (discount <= 0) throw new OrderValidationError(`Mã "${code}" không áp dụng được cho đơn này.`);
+    if (coupon.kind === "fixed" || coupon.kind === "percent") {
+      // kiểm tra giới hạn lượt dùng
+      const row = await prisma.coupon.findUnique({ where: { code } });
+      if (!row?.active) throw new OrderValidationError(`Mã "${code}" đã bị vô hiệu.`);
+      if (row.maxUses != null && row.usedCount >= row.maxUses) {
+        throw new OrderValidationError(`Mã "${code}" đã hết lượt sử dụng.`);
+      }
+    }
+    totals = {
+      ...baseTotals,
+      discount,
+      couponCode: code,
+      total: baseTotals.total - discount,
+    };
+    appliedCoupon = code;
+  }
+
   const productById = (id: string) => finalProducts.find((p) => p.id === id)!;
   const user = await getSessionUser();
-  const dbOrder = await prisma.order.create({
-    data: {
-      number: orderNumber(),
-      userId: user?.id ?? null,
-      status: "pending",
-      currentStep: "confirmed",
-      contact: contact as unknown as Prisma.InputJsonValue,
-      shipping: shipping as unknown as Prisma.InputJsonValue,
-      delivery,
-      payment,
-      totals: totals as unknown as Prisma.InputJsonValue,
-      idempotencyKey: input.idempotencyKey ?? null,
-      lines: {
-        create: finalLines.map((l) => ({
-          productId: l.productId,
-          variantId: l.variantId ?? null,
-          name: l.name,
-          variantName: l.variantName ?? null,
-          unitPrice: l.unitPrice,
-          quantity: l.quantity,
-          image: l.image,
-          sku: resolveVariant(productById(l.productId), l.variantId)?.sku ?? productById(l.productId)!.sku,
-        })),
+
+  // Transaction: trừ kho nguyên tử + tạo đơn. Chống oversell khi 2 người
+  // mua cùng lúc: updateMany có điều kiện stock >= qty, affected==0 → hết hàng.
+  const dbOrder = await prisma.$transaction(async (tx) => {
+    for (const l of finalLines) {
+      if (l.variantId) {
+        const res = await tx.productVariant.updateMany({
+          where: { id: l.variantId, stock: { gte: l.quantity } },
+          data: { stock: { decrement: l.quantity } },
+        });
+        if (res.count === 0) {
+          throw new OrderValidationError(`"${l.name}" vừa hết hàng. Vui lòng giảm số lượng.`);
+        }
+        // trừ kho tổng của product để số hiển thị khớp
+        await tx.product.updateMany({
+          where: { id: l.productId, stock: { gte: l.quantity } },
+          data: { stock: { decrement: l.quantity } },
+        });
+      } else {
+        const res = await tx.product.updateMany({
+          where: { id: l.productId, stock: { gte: l.quantity } },
+          data: { stock: { decrement: l.quantity } },
+        });
+        if (res.count === 0) {
+          throw new OrderValidationError(`"${l.name}" vừa hết hàng. Vui lòng giảm số lượng.`);
+        }
+      }
+    }
+
+    if (appliedCoupon) {
+      await tx.coupon.updateMany({
+        where: { code: appliedCoupon },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
+    return tx.order.create({
+      data: {
+        number: orderNumber(),
+        userId: user?.id ?? null,
+        status: "pending",
+        currentStep: "confirmed",
+        contact: contact as unknown as Prisma.InputJsonValue,
+        shipping: shipping as unknown as Prisma.InputJsonValue,
+        delivery,
+        payment,
+        totals: totals as unknown as Prisma.InputJsonValue,
+        idempotencyKey: input.idempotencyKey ?? null,
+        lines: {
+          create: finalLines.map((l) => ({
+            productId: l.productId,
+            variantId: l.variantId ?? null,
+            name: l.name,
+            variantName: l.variantName ?? null,
+            unitPrice: l.unitPrice,
+            quantity: l.quantity,
+            image: l.image,
+            sku: resolveVariant(productById(l.productId), l.variantId)?.sku ?? productById(l.productId)!.sku,
+          })),
+        },
       },
-    },
-    include: { lines: true },
+      include: { lines: true },
+    });
   });
+
+  logger.info("order.placed", {
+    orderId: dbOrder.id,
+    number: dbOrder.number,
+    total: totals.total,
+    coupon: appliedCoupon ?? null,
+    userId: user?.id ?? "guest",
+  });
+  await logAudit(user ? { id: user.id, name: user.name, email: user.email } : null, "order.placed", "Order", dbOrder.id, {
+    number: dbOrder.number,
+    total: totals.total,
+    coupon: appliedCoupon ?? null,
+  });
+
+  // Email xác nhận — fire-and-forget, không chặn response đặt hàng.
+  void import("./email").then(({ orderConfirmationHtml, sendEmail }) =>
+    sendEmail({
+      to: contact.email,
+      subject: `Xác nhận đơn hàng ${dbOrder.number} — Lumina Optics`,
+      html: orderConfirmationHtml(dbOrder.number, totals.total, contact.fullName),
+    }),
+  ).catch(() => undefined);
 
   return {
     id: dbOrder.id,

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createRateLimiter } from "@/lib/utils/rate-limit";
+import { getEdgeRateLimiter } from "@/lib/edge-rate-limit";
 
 /**
  * Middleware bảo mật biên.
@@ -9,11 +9,14 @@ import { createRateLimiter } from "@/lib/utils/rate-limit";
  * tính. Endpoint nhạy cảm (login, register, orders, reviews) còn có limiter
  * riêng chặt hơn trong route handler.
  *
- * LƯU Ý SẢN XUẤT: limiter in-memory chỉ đúng cho 1 instance. Khi deploy
- * đa instance, thay bằng Redis/Upstash trong rate-limit.ts (interface giữ nguyên).
+ * Backend: Upstash Redis sliding-window khi có UPSTASH_* env (đa instance),
+ * fallback in-memory fail-open khi chưa cấu hình.
  */
 
-const mutationLimiter = createRateLimiter({ windowMs: 60_000, max: 60 });
+const mutationLimiter = getEdgeRateLimiter(
+  { windowMs: 60_000, max: 60 },
+  (reason) => console.warn(JSON.stringify({ level: "warn", message: reason })),
+);
 
 function clientIp(request: NextRequest): string {
   return (
@@ -23,13 +26,21 @@ function clientIp(request: NextRequest): string {
   );
 }
 
-export function middleware(request: NextRequest) {
+function applySecurityHeaders(response: NextResponse): NextResponse {
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  return response;
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/") && request.method !== "GET") {
     // Telemetry (metrics) fire-and-forget với tần suất cao — không thuộc lớp cần bảo vệ
     if (!pathname.startsWith("/api/metrics") && !pathname.startsWith("/api/health")) {
-      const result = mutationLimiter.check(clientIp(request));
+      const result = await mutationLimiter.check(clientIp(request));
       if (!result.allowed) {
         return NextResponse.json(
           { error: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
@@ -39,13 +50,13 @@ export function middleware(request: NextRequest) {
       const response = NextResponse.next();
       response.headers.set("X-RateLimit-Remaining", String(result.remaining));
       response.headers.set("x-request-id", crypto.randomUUID());
-      return response;
+      return applySecurityHeaders(response);
     }
   }
 
   const response = NextResponse.next();
   response.headers.set("x-request-id", crypto.randomUUID());
-  return response;
+  return applySecurityHeaders(response);
 }
 
 export const config = {

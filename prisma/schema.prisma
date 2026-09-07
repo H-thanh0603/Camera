@@ -1,6 +1,10 @@
-// Prisma schema — SQLite cho môi trường dev/demo.
-// Deploy production: đổi provider sang "postgresql" + DATABASE_URL (Supabase/Neon),
-// schema không đổi gì khác.
+// Prisma schema — SQLite cho dev/demo, Postgres cho production.
+// Schema chỉ dùng kiểu portable (String/Int/Json/DateTime/Boolean/Float)
+// nên chuyển provider không đổi gì khác.
+// Deploy Postgres (Supabase/Neon):
+//   1. provider = "postgresql", DATABASE_URL="postgresql://...?sslmode=require"
+//   2. npx prisma migrate deploy && npx prisma db seed
+//   3. Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
 
 generator client {
   provider = "prisma-client-js"
@@ -22,6 +26,7 @@ model User {
   orders       Order[]
   reviews      Review[]
   auditLogs    AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Product {
@@ -78,6 +83,18 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -155,4 +172,19 @@ model Review {
 
   @@index([productId])
   @@index([approved])
+}
+
+model Coupon {
+  code        String    @id
+  kind        String    // percent | fixed
+  value       Int       // percent 1..90 hoặc số tiền VND
+  minSubtotal Int       @default(0)
+  maxUses     Int?
+  usedCount   Int       @default(0)
+  active      Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([active])
 }
