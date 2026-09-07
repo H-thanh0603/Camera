@@ -5,7 +5,7 @@ import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
-import { validateProductPayload, validateVariants } from "@/lib/server/product-validation";
+import { validateProductPayload, validateVariants, sanitizeProductJson } from "@/lib/server/product-validation";
 import type { Prisma } from "@prisma/client";
 
 /**
@@ -40,15 +40,12 @@ export async function POST(request: NextRequest) {
     const variantData = validateVariants(body, Number(data.price));
 
     // Create-only: trùng id/slug/SKU → 409, không bao giờ ghi đè qua POST
+    const json = sanitizeProductJson(body);
     const row = await prisma.product.create({
       data: {
         ...(data as Prisma.ProductUncheckedCreateInput),
         id,
-        images: (body.images ?? []) as Prisma.InputJsonValue,
-        thumbnail: (body.thumbnail ?? { url: "", alt: "" }) as Prisma.InputJsonValue,
-        specifications: (body.specifications ?? {}) as Prisma.InputJsonValue,
-        tags: (body.tags ?? []) as Prisma.InputJsonValue,
-        badges: (body.badges ?? []) as Prisma.InputJsonValue,
+        ...json,
         variants: { create: variantData },
       },
       include: { variants: true },

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 /**
  * Validate payload sản phẩm dùng chung cho POST (tạo) và PUT (sửa) admin.
@@ -62,16 +62,109 @@ export interface ValidatedVariant {
 /** Lọc variant thiếu trường bắt buộc + chuẩn hoá kiểu (dùng chung POST/PUT). */
 export function validateVariants(body: Record<string, unknown>, fallbackPrice: number): ValidatedVariant[] {
   const input = Array.isArray(body.variants) ? (body.variants as Record<string, unknown>[]) : [];
-  return input
-    .filter((v) => v.id && v.sku && v.name)
-    .map((v) => ({
+  const out: ValidatedVariant[] = [];
+  for (const v of input) {
+    if (!v.id || !v.sku || !v.name) continue;
+    // Giá khai báo mà <= 0/không nguyên → loại (không fallback âm thầm);
+    // thiếu giá mới dùng giá SP. Giá 0 = hàng tặng miễn phí = abuse vector.
+    const rawPrice = v.price === undefined || v.price === null || v.price === "" ? fallbackPrice : Number(v.price);
+    const price = rawPrice;
+    // Giá âm/0 và stock âm là data-poisoning (tổng đơn có thể âm) → loại variant
+    if (!Number.isInteger(price) || price <= 0) continue;
+    const stock = Number(v.stock);
+    if (!Number.isInteger(stock) || stock < 0) continue;
+    out.push({
       id: String(v.id),
       sku: String(v.sku),
-      name: String(v.name),
-      price: Number(v.price) || fallbackPrice,
-      compareAtPrice: v.compareAtPrice ? Number(v.compareAtPrice) : null,
-      stock: Number.isInteger(Number(v.stock)) ? Number(v.stock) : 0,
+      name: String(v.name).slice(0, 120),
+      price,
+      compareAtPrice: v.compareAtPrice && Number(v.compareAtPrice) > 0 ? Number(v.compareAtPrice) : null,
+      stock,
       availability: AVAILABILITY.includes(String(v.availability)) ? String(v.availability) : "in_stock",
-      image: (v.image ?? null) as Prisma.InputJsonValue,
-    }));
+      image: sanitizeImage(v.image),
+    });
+  }
+  return out;
+}
+
+function isSafeUrl(url: unknown): url is string {
+  return typeof url === "string" && (url.startsWith("https://") || url.startsWith("/")) && url.length <= 500;
+}
+
+function sanitizeImage(input: unknown): Prisma.InputJsonValue {
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    const rec = input as Record<string, unknown>;
+    if (isSafeUrl(rec.url)) {
+      return { url: rec.url, alt: String(rec.alt ?? "").slice(0, 200) } as Prisma.InputJsonValue;
+    }
+  }
+  return Prisma.JsonNull as unknown as Prisma.InputJsonValue;
+}
+
+/** Whitelist JSON tự do của admin — chặn Stored-XSS/data-poisoning qua ảnh/spec/tags. */
+export interface SanitizedProductJson {
+  images: Prisma.InputJsonValue;
+  thumbnail: Prisma.InputJsonValue;
+  specifications: Prisma.InputJsonValue;
+  tags: Prisma.InputJsonValue;
+  badges: Prisma.InputJsonValue;
+  highlights: Prisma.InputJsonValue;
+  inTheBox: Prisma.InputJsonValue;
+  compatibleWith: Prisma.InputJsonValue;
+}
+
+function stringList(input: unknown, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((v): v is string => typeof v === "string")
+    .map((s) => s.trim().slice(0, maxLen))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+export function sanitizeProductJson(body: Record<string, unknown>): SanitizedProductJson {
+  const images = Array.isArray(body.images)
+    ? body.images
+        .map((img) => {
+          if (img && typeof img === "object" && !Array.isArray(img)) {
+            const rec = img as Record<string, unknown>;
+            return isSafeUrl(rec.url)
+              ? { url: rec.url, alt: String(rec.alt ?? "").slice(0, 200) }
+              : null;
+          }
+          return null;
+        })
+        .filter((v): v is { url: string; alt: string } => v !== null)
+        .slice(0, 20)
+    : [];
+  const specs: Record<string, string> =
+    body.specifications && typeof body.specifications === "object" && !Array.isArray(body.specifications)
+      ? Object.fromEntries(
+          Object.entries(body.specifications as Record<string, unknown>)
+            .filter(([k, v]) => typeof k === "string" && typeof v === "string")
+            .map(([k, v]) => [k.slice(0, 40), (v as string).slice(0, 300)] as [string, string])
+            .slice(0, 30),
+        )
+      : {};
+  const thumb =
+    body.thumbnail && typeof body.thumbnail === "object" && !Array.isArray(body.thumbnail)
+      ? (() => {
+          const rec = body.thumbnail as Record<string, unknown>;
+          return isSafeUrl(rec.url)
+            ? { url: rec.url, alt: String(rec.alt ?? "").slice(0, 200) }
+            : { url: "", alt: "" };
+        })()
+      : { url: "", alt: "" };
+  return {
+    images: images as unknown as Prisma.InputJsonValue,
+    thumbnail: thumb as unknown as Prisma.InputJsonValue,
+    specifications: specs as unknown as Prisma.InputJsonValue,
+    tags: stringList(body.tags, 20, 40) as unknown as Prisma.InputJsonValue,
+    badges: stringList(body.badges, 10, 40) as unknown as Prisma.InputJsonValue,
+    highlights: (body.highlights ? stringList(body.highlights, 20, 200) : null) as unknown as Prisma.InputJsonValue,
+    inTheBox: (body.inTheBox ? stringList(body.inTheBox, 20, 200) : null) as unknown as Prisma.InputJsonValue,
+    compatibleWith: (body.compatibleWith
+      ? stringList(body.compatibleWith, 20, 64)
+      : null) as unknown as Prisma.InputJsonValue,
+  };
 }

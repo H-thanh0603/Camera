@@ -5,7 +5,7 @@ import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
-import { validateProductPayload, validateVariants } from "@/lib/server/product-validation";
+import { validateProductPayload, validateVariants, sanitizeProductJson } from "@/lib/server/product-validation";
 import { Prisma } from "@prisma/client";
 
 /** PUT /api/admin/products/:id — cập nhật; DELETE — xóa (cascade variants). */
@@ -28,19 +28,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const variantData = validateVariants(body, Number(data.price));
+    const json = sanitizeProductJson(body);
 
     const row = await prisma.product.update({
       where: { id },
       data: {
         ...data,
-        images: (body.images ?? []) as Prisma.InputJsonValue,
-        thumbnail: (body.thumbnail ?? { url: "", alt: "" }) as Prisma.InputJsonValue,
-        specifications: (body.specifications ?? {}) as Prisma.InputJsonValue,
-        tags: (body.tags ?? []) as Prisma.InputJsonValue,
-        badges: (body.badges ?? []) as Prisma.InputJsonValue,
-        highlights: (body.highlights ?? null) as Prisma.InputJsonValue,
-        inTheBox: (body.inTheBox ?? null) as Prisma.InputJsonValue,
-        compatibleWith: (body.compatibleWith ?? null) as Prisma.InputJsonValue,
+        ...json,
         variants: { deleteMany: {}, create: variantData },
       },
       include: { variants: true },
