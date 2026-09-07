@@ -59,8 +59,40 @@ export function ProductsAdmin({ initialProducts }: { initialProducts: Product[] 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const setField = (key: keyof Draft, value: string) => setDraft((d) => ({ ...d, [key]: value }));
+
+  /** Upload file thumbnail lên R2 rồi điền URL vào draft (giữ alt cũ). */
+  const uploadThumbnail = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("scope", draft.id || draft.slug || "tmp");
+      const res = await fetch("/api/admin/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error ?? "Upload thất bại.");
+        return;
+      }
+      let alt = file.name;
+      try {
+        const current = JSON.parse(draft.thumbnail || "{}");
+        if (typeof current.alt === "string" && current.alt) alt = current.alt;
+      } catch { /* giữ alt mặc định */ }
+      setField("thumbnail", JSON.stringify({ url: data.url, alt }, null, 2));
+    } catch {
+      setUploadError("Upload thất bại. Thử lại sau.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const filtered = products.filter((p) =>
     `${p.name} ${p.brand} ${p.sku}`.toLowerCase().includes(search.toLowerCase()),
@@ -249,9 +281,16 @@ export function ProductsAdmin({ initialProducts }: { initialProducts: Product[] 
             {field("Tags (phẩy)", "tags")}
             {field("Badges (phẩy)", "badges")}
             <div className="flex flex-col gap-space-2xs sm:col-span-2 lg:col-span-3">
-              <label htmlFor="f-thumbnail" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Thumbnail (JSON)</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="f-thumbnail" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Thumbnail (JSON)</label>
+                <label className="cursor-pointer rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-primary transition-colors hover:bg-surface-container-highest">
+                  {uploading ? "Đang tải lên…" : "Tải ảnh lên R2"}
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif,image/gif" className="sr-only" disabled={uploading} onChange={uploadThumbnail} />
+                </label>
+              </div>
               <textarea id="f-thumbnail" rows={3} value={draft.thumbnail} onChange={(e) => setField("thumbnail", e.target.value)}
                 className={cn("rounded-lg bg-surface-container-low px-space-sm py-space-xs font-telemetry-data text-telemetry-data text-on-surface outline-none font-mono", errors.thumbnail ? "ring-1 ring-error" : "focus:ring-1 focus:ring-primary")} />
+              {uploadError && <p className="font-body-sm text-body-sm text-error" role="alert">{uploadError}</p>}
             </div>
             <div className="flex flex-col gap-space-2xs sm:col-span-2 lg:col-span-3">
               <label htmlFor="f-images" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Images (JSON array)</label>

@@ -20,6 +20,12 @@ const envSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+  // Phase 2.3: R2 object storage (optional — thiếu thì upload 503)
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET: z.string().min(1).optional(),
+  R2_PUBLIC_URL: z.string().url().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

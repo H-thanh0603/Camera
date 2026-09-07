@@ -20,9 +20,25 @@ const csp = [
   "object-src 'none'",
 ].join("; ");
 
+function r2Hostname(): string | null {
+  try {
+    const raw = process.env.R2_PUBLIC_URL;
+    if (!raw) return null;
+    const host = new URL(raw).hostname;
+    return host || null;
+  } catch {
+    return null;
+  }
+}
+
+const r2Host = r2Hostname();
+
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "lh3.googleusercontent.com" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      ...(r2Host ? [{ protocol: "https" as const, hostname: r2Host }] : []),
+    ],
     formats: ["image/avif", "image/webp"],
   },
   async headers() {

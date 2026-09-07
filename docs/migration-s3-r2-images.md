@@ -1,5 +1,11 @@
 # Phase 2.3 — S3/R2 Image Storage Migration
 
+> ✅ IMPLEMENTED (cơ bản, không sharp): `src/lib/server/storage.ts`,
+> `POST /api/admin/upload`, nút "Tải ảnh lên R2" ở form admin thumbnail,
+> `tests/storage.test.ts`, `tests/e2e/upload.spec.ts`.
+> Chưa làm: convert WebP/sharp ở server (next/image đã optimize remote),
+> migrate seed URLs sang R2, xóa ảnh mồ côi (orphan cleanup).
+
 ## Trigger
 Khi cần upload ảnh sản phẩm thật (thay placeholder URLs), CDN caching,
 image optimization (WebP/AVIF), hoặc catalogue >500 products với nhiều images.

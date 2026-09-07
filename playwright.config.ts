@@ -3,7 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * E2E tests chạy trên production build.
  * Cách chạy: npm run build && npx playwright test
- * Server tự khởi động qua webServer (port 3000, reuse nếu đã chạy).
+ * Server tự khởi động qua webServer (reuse nếu đã chạy).
+ *
+ * E2E_PORT: đổi port khi 3000 bị chiếm (vd project khác).
+ *   E2E_PORT=3100 npx playwright test
  *
  * DB isolation: global-setup.ts copy dev.db → .test.db,
  * webServer dùng .test.db, global-teardown xóa sau khi xong.
@@ -11,6 +14,8 @@ import { defineConfig, devices } from "@playwright/test";
  * NEXT_PUBLIC_*_FAILURE_RATE = 0: tắt injection lỗi mạng giả lập
  * trong placeOrder/submitReview để test ổn định.
  */
+const E2E_PORT = Number(process.env.E2E_PORT ?? 3000);
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60_000,
@@ -20,16 +25,16 @@ export default defineConfig({
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: `http://localhost:${E2E_PORT}`,
     trace: "retain-on-failure",
   },
   webServer: {
     command: "npm run start",
-    port: 3000,
+    port: E2E_PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
-      // Prisma resolve file: tương đối theo thư mục prisma/ → ../ ra root
+      PORT: String(E2E_PORT),
       DATABASE_URL: "file:../tests/e2e/.test.db",
       PAYMENT_DEMO_MODE: "true",
       NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true",
