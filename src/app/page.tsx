@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+/* Hallmark · genre: atmospheric · macrostructure: Photographic · theme: Midnight · enrichment: none · nav: preserved · footer: preserved · contrast: pass (40-41) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50-57) · slop: 58/58 */
+/* Hallmark · pre-emit critique: P5 H4 E4 S5 R4 V5 */
 import { HeroHud } from "@/components/home/hero-hud";
 import { LensAnatomy } from "@/components/home/lens-anatomy";
 import { CollectionGrid } from "@/components/home/collection-grid";

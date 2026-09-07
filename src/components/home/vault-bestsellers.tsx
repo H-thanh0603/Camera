@@ -12,15 +12,15 @@ export async function VaultBestsellers() {
     <section className="relative w-full bg-surface py-space-4xl">
       <div className="mx-auto flex w-full max-w-container-max flex-col gap-space-3xl px-gutter-mobile lg:px-gutter-desktop">
         <div className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
-          <div>
-            <span className="section-telemetry block">KHO THIẾT BỊ NGUYÊN BẢN</span>
+          <div className="flex max-w-2xl flex-col gap-space-2xs">
+            <p className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-on-surface-variant/70">
+              Kho thiết bị nguyên bản — cân chỉnh collimator trước bàn giao
+            </p>
             <h2 className="font-headline-lg text-headline-lg text-on-surface">Tuyệt Tác Sẵn Hàng Tại Vault</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant">Mỗi thiết bị đều được cân chỉnh collimator và bảo lưu chứng nhận quang học độc bản trước khi bàn giao.</p>
           </div>
-          <div className="flex items-center gap-space-xs font-telemetry-xs text-telemetry-xs text-outline">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden="true" />
-            <span>HỖ TRỢ TRẢ GÓP 0% QUA THẺ TÍN DỤNG VIP</span>
-          </div>
+          <p className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-outline">
+            Hỗ trợ trả góp 0% qua thẻ tín dụng VIP
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-space-xl md:grid-cols-3">

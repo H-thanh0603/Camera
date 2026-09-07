@@ -54,8 +54,10 @@ export function LensAnatomy() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#d4af37_1px,transparent_1px)] opacity-10 [background-size:24px_24px]" aria-hidden="true" />
       <div className="relative z-10 mx-auto flex w-full max-w-container-max flex-col gap-space-3xl px-gutter-mobile lg:px-gutter-desktop">
         <div className="flex flex-col justify-between gap-space-md md:flex-row md:items-end">
-          <div className="flex flex-col gap-space-2xs">
-            <span className="section-telemetry">PHÂN HỆ CẤU TẠO LÕI • OPTICAL CORE LAB</span>
+          <div className="flex max-w-2xl flex-col gap-space-2xs">
+            <p className="font-telemetry-xs text-telemetry-xs uppercase tracking-widest text-on-surface-variant/70">
+              Phòng lab quang học — ba chế độ, một thân lens
+            </p>
             <h2 className="font-headline-lg text-headline-lg leading-tight text-on-surface">
               Giải Phẫu Lăng Kính & <span className="text-primary">Trái Tim Cảm Biến</span>
             </h2>
@@ -69,7 +71,7 @@ export function LensAnatomy() {
           <div className="flex flex-col gap-space-md lg:col-span-7">
             <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl bg-surface-container-low p-space-lg shadow-xl">
               <AppFillImage
-                className="h-full w-full object-contain drop-shadow-[0_20px_50px_rgba(242,202,80,0.15)] transition-all duration-700"
+                className="h-full w-full object-contain drop-shadow-[0_20px_50px_rgba(242,202,80,0.15)]"
                 alt="Sơ đồ exploded view các thấu kính quang học và khối cảm biến của Lumina"
                 src={IMG.anatomy}
               />
@@ -80,9 +82,6 @@ export function LensAnatomy() {
               <div className="absolute bottom-8 right-8 rounded-lg bg-surface-container-high/90 p-space-xs shadow-sm backdrop-blur-md">
                 <span className="block font-telemetry-xs text-telemetry-xs font-bold text-secondary">ĐỒNG NGUYÊN KHỐI TẢN NHIỆT</span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant">Quay 8K liên tục không quá nhiệt</span>
-              </div>
-              <div className="absolute flex h-8 w-8 items-center justify-center rounded-full border border-primary/40" aria-hidden="true">
-                <div className="h-1.5 w-1.5 animate-ping rounded-full bg-primary" />
               </div>
             </div>
 
@@ -95,7 +94,7 @@ export function LensAnatomy() {
                   aria-selected={mode === key}
                   onClick={() => setMode(key)}
                   className={cn(
-                    "rounded-lg p-space-sm text-left shadow-sm transition-all hover:bg-surface-container-highest",
+                    "rounded-lg p-space-sm text-left shadow-sm transition-colors hover:bg-surface-container-highest",
                     mode === key ? "bg-surface-container-high shadow-md" : "bg-surface-container-low",
                   )}
                 >
@@ -130,7 +129,7 @@ export function LensAnatomy() {
                   <line stroke="#31353c" strokeDasharray="2 2" strokeWidth="1" x1="0" x2="300" y1="10" y2="10" />
                   <line stroke="#31353c" strokeDasharray="2 2" strokeWidth="1" x1="0" x2="300" y1="35" y2="35" />
                   <line stroke="#31353c" strokeDasharray="2 2" strokeWidth="1" x1="0" x2="300" y1="60" y2="60" />
-                  <path d={data.curve} fill="none" stroke="#f2ca50" strokeWidth="2.5" className="transition-all duration-500" />
+                  <path d={data.curve} fill="none" stroke="#f2ca50" strokeWidth="2.5" />
                   <path d="M 0,22 Q 100,28 200,36 T 300,45" fill="none" stroke="#99907c" strokeDasharray="3 3" strokeWidth="1.5" />
                 </svg>
               </div>
