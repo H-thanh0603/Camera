@@ -58,7 +58,10 @@ interface GoogleUserInfo {
 }
 
 export class OAuthError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public code: "BANNED" | "FAILED" = "FAILED",
+  ) {
     super(message);
     this.name = "OAuthError";
   }
@@ -104,10 +107,22 @@ export async function finishGoogleLogin(code: string, state: string): Promise<{ 
   let user = await prisma.user.findUnique({ where: { email } });
   let isNewUser = false;
   if (!user) {
-    user = await prisma.user.create({
-      data: { email, name, passwordHash: "oauth:google", role: "customer" },
-    });
-    isNewUser = true;
+    try {
+      user = await prisma.user.create({
+        data: { email, name, passwordHash: "oauth:google", role: "customer" },
+      });
+      isNewUser = true;
+    } catch (e) {
+      // Đua tạo cùng email (P2002) → đọc lại thay vì 500
+      const { Prisma } = await import("@prisma/client");
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") throw e;
+      user = await prisma.user.findUnique({ where: { email } });
+      if (!user) throw new OAuthError("Không tạo được tài khoản. Vui lòng thử lại.");
+    }
+  }
+  if (user.isBanned) {
+    logger.warn("oauth.banned_blocked", { userId: user.id });
+    throw new OAuthError("Tài khoản đã bị khóa. Liên hệ concierge để được hỗ trợ.", "BANNED");
   }
   await createSession(user.id);
   logger.info("oauth.google_login", { userId: user.id, isNewUser });

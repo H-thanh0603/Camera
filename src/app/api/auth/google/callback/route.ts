@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof OAuthError) {
       logger.warn("oauth.callback_failed", { error: error.message });
-      return NextResponse.redirect(`${site}/account?oauth=error`);
+      return NextResponse.redirect(
+        `${site}/account?oauth=${error.code === "BANNED" ? "banned" : "error"}`,
+      );
     }
     logger.error("oauth.callback_error", { error: String(error) });
     return NextResponse.redirect(`${site}/account?oauth=error`);

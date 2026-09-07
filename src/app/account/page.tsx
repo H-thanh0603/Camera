@@ -323,6 +323,7 @@ function OAuthNotice({ pushToast }: { pushToast: (message: string, type: "succes
     if (!status) return;
     if (status === "success") pushToast("Đăng nhập Google thành công!", "success");
     else if (status === "denied") pushToast("Bạn đã từ chối quyền đăng nhập Google.", "info");
+    else if (status === "banned") pushToast("Tài khoản đã bị khóa. Liên hệ concierge để được hỗ trợ.", "error");
     else pushToast("Đăng nhập Google thất bại. Vui lòng thử lại.", "error");
     window.history.replaceState(null, "", window.location.pathname);
   }, [pushToast]);

@@ -28,7 +28,8 @@ export class PasswordResetError extends Error {
 export async function requestPasswordReset(email: string): Promise<{ ok: true }> {
   const normalized = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalized } });
-  if (user) {
+  // Banned: không gửi link (chống spam/toxic) nhưng vẫn trả ok chống enumerate
+  if (user && !user.isBanned) {
     const token = randomBytes(32).toString("hex");
     await prisma.passwordResetToken.create({
       data: {
