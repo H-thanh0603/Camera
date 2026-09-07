@@ -71,13 +71,18 @@ async function main() {
   console.log(`Seeded ${products.length} products.`);
 
   const adminEmail = "admin@lumina.vn";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "admin-lumina-2026";  await prisma.user.upsert({
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  // Production: cấm seed mật khẩu mặc định (backdoor nếu quên env)
+  if (process.env.NODE_ENV === "production" && !adminPassword) {
+    throw new Error("ADMIN_PASSWORD là bắt buộc khi seed ở production.");
+  }
+  await prisma.user.upsert({
     where: { email: adminEmail },
     update: { role: "admin" },
     create: {
       email: adminEmail,
       name: "Lumina Admin",
-      passwordHash: await hashPassword(adminPassword),
+      passwordHash: await hashPassword(adminPassword ?? "admin-lumina-2026"),
       role: "admin",
     },
   });

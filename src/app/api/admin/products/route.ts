@@ -39,10 +39,9 @@ export async function POST(request: NextRequest) {
     const id = body.id ? String(body.id) : `p-${String(body.slug)}`;
     const variantData = validateVariants(body, Number(data.price));
 
-    const row = await prisma.product.upsert({
-      where: { id },
-      update: { ...data, variants: { deleteMany: {}, create: variantData } } as Prisma.ProductUncheckedUpdateInput,
-      create: {
+    // Create-only: trùng id/slug/SKU → 409, không bao giờ ghi đè qua POST
+    const row = await prisma.product.create({
+      data: {
         ...(data as Prisma.ProductUncheckedCreateInput),
         id,
         images: (body.images ?? []) as Prisma.InputJsonValue,
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
     });
 
     revalidatePath("/", "layout");
-    await logAudit(await getSessionUser(), "product.upsert", "product", row.id, { name: row.name, price: row.price });
+    await logAudit(await getSessionUser(), "product.created", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) }, { status: 201 });
   } catch (e) {
     const message = e instanceof Error && e.message.includes("Unique") ? "SKU hoặc slug đã tồn tại." : "Không lưu được sản phẩm.";
