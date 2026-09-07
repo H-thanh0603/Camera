@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getOwnOrder } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
+import { isProduction } from "@/lib/server/env";
 import { logAudit } from "@/lib/server/audit";
 import { logger } from "@/lib/server/logger";
 
@@ -16,8 +19,23 @@ import { logger } from "@/lib/server/logger";
  * webhook verify chữ ký HMAC rồi mới chuyển trạng thái. Endpoint này bị xóa.
  */
 
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (process.env.PAYMENT_DEMO_MODE !== "true") {
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const limit = await limiter.check(`paydemo:${getClientIp(request.headers)}`);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Quá nhiều yêu cầu. Thử lại sau." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+  // Guard kép: env tập trung (throw ở prod nếu demo bật) + check trực tiếp.
+  // Fail-closed: cấu hình sai → 403 chứ không bao giờ nhận tiền giả.
+  try {
+    if (isProduction() || process.env.PAYMENT_DEMO_MODE !== "true") {
+      return NextResponse.json({ error: "Demo payment đang tắt." }, { status: 403 });
+    }
+  } catch {
     return NextResponse.json({ error: "Demo payment đang tắt." }, { status: 403 });
   }
 

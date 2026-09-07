@@ -2,14 +2,26 @@ import { NextResponse, type NextRequest } from "next/server";
 import { handlePaymentWebhook, PaymentWebhookError, verifyWebhookSignature } from "@/lib/server/payments";
 import { getEnv } from "@/lib/server/env";
 import { paymentWebhookSchema, zodFieldErrors } from "@/lib/schemas";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
 
 /**
  * POST /api/payments/webhook — nhận sự kiện từ cổng thanh toán.
  * Verify HMAC-SHA256(raw body) qua header `x-payment-signature` với
  * PAYMENT_WEBHOOK_SECRET. Không có secret cấu hình → 503 (chưa sẵn sàng).
+ * Limiter 60/phút/IP chống flood chữ ký rác (verify HMAC rẻ nhưng log phình).
  */
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 60 });
+
 export async function POST(request: NextRequest) {
+  const limit = await limiter.check(`webhook:${getClientIp(request.headers)}`);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Quá nhiều yêu cầu. Thử lại sau." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   let env: ReturnType<typeof getEnv>;
   try {
     env = getEnv();

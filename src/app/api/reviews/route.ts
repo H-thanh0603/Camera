@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getSessionUser } from "@/lib/server/session";
-import { createRateLimiter } from "@/lib/utils/rate-limit";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 import { dbGetProductById } from "@/lib/server/product-db";
 import { reviewSchema, zodFieldErrors } from "@/lib/schemas";
 
@@ -12,11 +13,11 @@ import { reviewSchema, zodFieldErrors } from "@/lib/schemas";
  * hàng mới đánh dấu "đã mua".
  */
 
-const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!limiter.check(`review:${ip}`).allowed) {
+  const ip = getClientIp(request.headers);
+  if (!(await limiter.check(`review:${ip}`)).allowed) {
     return NextResponse.json({ error: "Quá nhiều đánh giá. Thử lại sau một phút." }, { status: 429 });
   }
 

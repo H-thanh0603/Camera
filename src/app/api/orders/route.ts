@@ -3,6 +3,7 @@ import { placeOrderServer, OrderValidationError } from "@/lib/server/place-order
 import { getUserOrders } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
 import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
 
@@ -14,7 +15,7 @@ import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = getClientIp(request.headers);
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const limit = await limiter.check(`order:${ip}`);
   if (!limit.allowed) {

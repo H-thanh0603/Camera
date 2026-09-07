@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEdgeRateLimiter } from "@/lib/edge-rate-limit";
+import { getClientIp } from "@/lib/server/client-ip";
 
 /**
  * Middleware bảo mật biên.
@@ -19,11 +20,7 @@ const mutationLimiter = getEdgeRateLimiter(
 );
 
 function clientIp(request: NextRequest): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    request.headers.get("x-real-ip") ??
-    "unknown"
-  );
+  return getClientIp(request.headers);
 }
 
 function applySecurityHeaders(response: NextResponse): NextResponse {

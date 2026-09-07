@@ -3,16 +3,17 @@ import { prisma } from "@/lib/server/prisma";
 import { hashPassword } from "@/lib/server/password";
 import { createSession } from "@/lib/server/session";
 import { registerSchema, zodFieldErrors } from "@/lib/schemas";
-import { createRateLimiter } from "@/lib/utils/rate-limit";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 
 /** POST /api/auth/register — tạo user + phiên đăng nhập. */
 
-// 5 lần/phút/IP — chống spam đăng ký
-const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
+// 5 lần/phút/IP — chống spam đăng ký (Redis đa instance, fallback memory)
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!limiter.check(`register:${ip}`).allowed) {
+  const ip = getClientIp(request.headers);
+  if (!(await limiter.check(`register:${ip}`)).allowed) {
     return NextResponse.json({ error: "Quá nhiều yêu cầu. Thử lại sau một phút." }, { status: 429 });
   }
 

@@ -2,13 +2,24 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCouponByCode } from "@/lib/server/coupons";
 import { applyCouponToSubtotal } from "@/lib/services/coupon-service";
 import { couponValidateSchema, zodFieldErrors } from "@/lib/schemas";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 
 /**
  * POST /api/coupons/validate — preview giảm giá trước khi đặt hàng.
  * Body: { code, subtotal }. Không trừ lượt dùng — chỉ đặt hàng
- * thành công mới tăng usedCount.
+ * thành công mới tăng usedCount. Giới hạn 30/phút/IP để chống enumerate mã.
  */
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 30 });
+
 export async function POST(request: NextRequest) {
+  const limit = await limiter.check(`coupon:${getClientIp(request.headers)}`);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Quá nhiều yêu cầu. Thử lại sau." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   let body: unknown;
   try {
     body = await request.json();

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { PasswordResetError, resetPasswordWithToken } from "@/lib/server/password-reset";
+import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 import { zodFieldErrors } from "@/lib/schemas";
 
 const schema = z.object({
@@ -8,8 +10,18 @@ const schema = z.object({
   password: z.string().min(8, "Mật khẩu cần tối thiểu 8 ký tự."),
 });
 
+// 5 lần/phút/IP — token 256-bit nhưng vẫn cần chống spam/probe
+const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
+
 /** POST /api/auth/reset-password — đặt mật khẩu mới bằng token 1 lần. */
 export async function POST(request: NextRequest) {
+  const limit = await limiter.check(`reset:${getClientIp(request.headers)}`);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Quá nhiều yêu cầu. Thử lại sau." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   let body: unknown;
   try {
     body = await request.json();
