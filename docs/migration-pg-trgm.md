@@ -1,5 +1,9 @@
 # Phase 2.2 — pg_trgm Full-Text Search Migration
 
+> ✅ IMPLEMENTED (xem `src/lib/server/product-search-pg.ts`,
+> `prisma/postgres-extensions.sql`, `scripts/smoke-trigram.ts`).
+> Doc dưới giữ nguyên làm tài liệu thiết kế.
+
 ## Trigger
 Khi cần search chính xác hơn contains (fuzzy, typo-tolerant, relevance scoring)
 trên catalogue >1000 products.

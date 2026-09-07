@@ -6,6 +6,8 @@ import { productQuerySchema, zodFieldErrors } from "@/lib/schemas";
  * GET /api/products — catalogue phân trang + tìm kiếm server-side.
  * Query: ?q=&brand(s)=&category(ies)=&tag=&minPrice=&maxPrice=&minRating=
  *   &inStockOnly=1&sort=&page=&pageSize=
+ * Trên Postgres + có q: pg_trgm (ILIKE + similarity>0.2, sort relevance
+ * khi sort=featured). SQLite: contains cũ.
  * Giữ /api/products/snapshot cho client cache cũ (cart/wishlist resolve);
  * listing/search dùng endpoint này để không tải toàn bộ về client.
  */

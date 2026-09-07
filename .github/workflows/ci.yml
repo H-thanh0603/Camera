@@ -135,3 +135,8 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d lumina -c 'SELECT count(*) FROM "Product";' | grep -q "18"
           PGPASSWORD=postgres psql -h localhost -U postgres -d lumina -c 'SELECT count(*) FROM "Coupon";' | grep -q "3"
           PGPASSWORD=postgres psql -h localhost -U postgres -d lumina -c 'EXPLAIN SELECT * FROM "Order" WHERE status='"'"'pending'"'"' ORDER BY "createdAt" DESC LIMIT 20;' | grep -q "Order_status_idx"
+
+      - name: pg_trgm extensions + smoke
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d lumina -f prisma/postgres-extensions.sql
+          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/lumina" npx tsx scripts/smoke-trigram.ts

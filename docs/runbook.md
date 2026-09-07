@@ -13,10 +13,13 @@
      (`paymentDemoMode` phải `false`).
 3. Schema lần đầu trên Postgres: history migrations là SQLite-only nên
    **không** `migrate deploy`. Đổi `provider = "postgresql"` trong
-   `prisma/schema.prisma`, chạy `npx prisma db push && npx prisma db seed`
-   (đã chứng minh trên Postgres 18 + seed 18 SP/3 coupon, EXPLAIN dùng
-   `Order_status_idx` + `Review_productId_approved_idx`; CI job
-   `postgres-check` khóa lại mỗi push).
+    `prisma/schema.prisma`, chạy `npx prisma db push && npx prisma db seed`
+    (đã chứng minh trên Postgres 18 + seed 18 SP/3 coupon, EXPLAIN dùng
+    `Order_status_idx` + `Review_productId_approved_idx`; CI job
+    `postgres-check` khóa lại mỗi push).
+    Sau push: `psql "$DATABASE_URL" -f prisma/postgres-extensions.sql`
+    (pg_trgm + 4 GIN index cho fuzzy search — idempotent), rồi verify
+    `DATABASE_URL=... npx tsx scripts/smoke-trigram.ts`.
 4. Gắn uptime monitor vào `GET /api/health` (200 = ok; 503 = DB down).
    Response còn báo `paymentWebhook/email/sentry/redis` đã cấu hình hay chưa.
 
@@ -86,6 +89,6 @@
 
 | Phase | Trigger | Doc | Effort |
 |-------|---------|-----|--------|
-| 2.2 pg_trgm | Catalogue >1K products, cần fuzzy search | `docs/migration-pg-trgm.md` | 2-3 ngày |
+| 2.2 pg_trgm | ✅ implemented (SQLite fallback giữ nguyên) | `docs/migration-pg-trgm.md` | — |
 | 2.3 S3/R2 | Upload ảnh thật, CDN, optimization | `docs/migration-s3-r2-images.md` | 3-5 ngày |
 | 2.4 BullMQ | Async email, retry, background jobs | `docs/migration-bullmq-queue.md` | 3-4 ngày |

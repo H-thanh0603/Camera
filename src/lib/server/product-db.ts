@@ -1,6 +1,12 @@
 import type { Product } from "@/lib/types";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
+import {
+  buildOrderSql,
+  buildWhereSql,
+  isPostgresDialect,
+  splitTerms,
+} from "./product-search-pg";
 
 /**
  * Server-side DB catalogue — nguồn chuẩn khi admin quản trị sản phẩm.
@@ -169,6 +175,7 @@ function buildProductWhere(params: Pick<ProductSearchParams, "q" | "brand" | "br
  * Tìm kiếm + phân trang server-side cho catalogue lớn.
  * Sort featured ≈ rating rồi reviewCount (xấp xỉ rating×reviewCount của
  * bản client — không có expression index nên dùng 2 cột có index).
+ * Trên Postgres + có q: dùng pg_trgm (ILIKE + similarity, sort relevance).
  */
 export async function dbQueryProducts(params: ProductSearchParams): Promise<{
   items: Product[];
@@ -179,6 +186,10 @@ export async function dbQueryProducts(params: ProductSearchParams): Promise<{
 }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(60, Math.max(1, params.pageSize ?? 12));
+  const terms = splitTerms(params.q);
+  if (terms.length > 0 && isPostgresDialect()) {
+    return dbQueryProductsPg(params, terms, page, pageSize);
+  }
   const where = buildProductWhere(params);
   const orderBy: Prisma.ProductOrderByWithRelationInput[] =
     params.sort === "price_asc"
@@ -213,15 +224,50 @@ export async function dbQueryProducts(params: ProductSearchParams): Promise<{
 }
 
 /**
+ * Nhánh Postgres + trigram: raw COUNT + raw IDs (đúng thứ tự relevance),
+ * rồi findMany INCLUDE theo ids và sắp lại — tái dùng mapping + variants.
+ */
+async function dbQueryProductsPg(
+  params: ProductSearchParams,
+  terms: string[],
+  page: number,
+  pageSize: number,
+): Promise<{ items: Product[]; total: number; page: number; pageSize: number; totalPages: number }> {
+  const where = buildWhereSql(params);
+  const order = buildOrderSql(params.sort, terms);
+  const skip = (page - 1) * pageSize;
+  const [countRows, idRows] = await Promise.all([
+    prisma.$queryRaw<{ count: bigint }[]>`SELECT COUNT(*) AS count FROM "Product" WHERE ${where}`,
+    prisma.$queryRaw<{ id: string }[]>`SELECT id FROM "Product" WHERE ${where} ORDER BY ${order} LIMIT ${pageSize} OFFSET ${skip}`,
+  ]);
+  const total = Number(countRows[0]?.count ?? BigInt(0));
+  const ids = idRows.map((r) => r.id);
+  const rows = ids.length
+    ? await prisma.product.findMany({ where: { id: { in: ids } }, include: INCLUDE })
+    : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const items = ids.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [dbProductToDomain(row)] : [];
+  });
+  return { items, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+}
+
+/**
  * Facets server-side (bounded: groupBy + min/max, không tải rows).
  * Đếm theo brands/categories TRÊN tập đã lọc các điều kiện khác
  * (khớp semantics getFacets client).
+ * Trên Postgres + có q: raw GROUP BY với cùng WHERE trigram.
  */
 export async function dbFacets(params: Pick<ProductSearchParams, "q" | "minPrice" | "maxPrice" | "minRating" | "inStockOnly" | "tag">): Promise<{
   brands: { value: string; count: number }[];
   categories: { value: import("@/lib/types").Category; count: number }[];
   priceRange: { min: number; max: number };
 }> {
+  const terms = splitTerms(params.q);
+  if (terms.length > 0 && isPostgresDialect()) {
+    return dbFacetsPg(params);
+  }
   const where = buildProductWhere(params);
   const [brandGroups, categoryGroups, agg] = await Promise.all([
     prisma.product.groupBy({ by: ["brand"], where, _count: { brand: true }, orderBy: { _count: { brand: "desc" } } }),
@@ -235,6 +281,27 @@ export async function dbFacets(params: Pick<ProductSearchParams, "q" | "minPrice
       count: g._count.category,
     })),
     priceRange: { min: agg._min.price ?? 0, max: agg._max.price ?? 0 },
+  };
+}
+
+async function dbFacetsPg(params: ProductSearchParams): Promise<{
+  brands: { value: string; count: number }[];
+  categories: { value: import("@/lib/types").Category; count: number }[];
+  priceRange: { min: number; max: number };
+}> {
+  const where = buildWhereSql(params);
+  const [brandRows, categoryRows, aggRows] = await Promise.all([
+    prisma.$queryRaw<{ value: string; count: number }[]>`SELECT "brand" AS value, COUNT(*)::int AS count FROM "Product" WHERE ${where} GROUP BY "brand" ORDER BY count DESC`,
+    prisma.$queryRaw<{ value: string; count: number }[]>`SELECT "category" AS value, COUNT(*)::int AS count FROM "Product" WHERE ${where} GROUP BY "category"`,
+    prisma.$queryRaw<{ min: number | null; max: number | null }[]>`SELECT MIN("price") AS min, MAX("price") AS max FROM "Product" WHERE ${where}`,
+  ]);
+  return {
+    brands: brandRows.map((r) => ({ value: r.value, count: Number(r.count) })),
+    categories: categoryRows.map((r) => ({
+      value: r.value as import("@/lib/types").Category,
+      count: Number(r.count),
+    })),
+    priceRange: { min: Number(aggRows[0]?.min ?? 0), max: Number(aggRows[0]?.max ?? 0) },
   };
 }
 
