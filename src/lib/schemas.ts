@@ -5,7 +5,7 @@ import { z } from "zod";
  * Sửa rule ở đây là cả hai phía cập nhật — hết cảnh trùng lặp validation thủ công.
  */
 
-const email = z.string().trim().min(1, "Email là bắt buộc.").email("Email không hợp lệ.");
+const email = z.string().trim().toLowerCase().min(1, "Email là bắt buộc.").email("Email không hợp lệ.");
 
 /** SĐT Việt Nam: 0xxxxxxxxx hoặc +84xxxxxxxxx. */
 export const phoneVN = z

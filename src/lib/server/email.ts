@@ -1,5 +1,6 @@
 import { logger } from "./logger";
 import { hashId } from "./scrub";
+import { fetchWithTimeout } from "./fetch";
 
 /**
  * Email giao dịch — Resend khi có RESEND_API_KEY, ngược lại chế độ log
@@ -21,7 +22,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
     return { sent: false, mode: "log" };
   }
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const res = await fetchWithTimeout("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from, to: input.to, subject: input.subject, html: input.html }),

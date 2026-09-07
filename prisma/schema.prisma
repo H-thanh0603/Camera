@@ -201,3 +201,17 @@ model Coupon {
 
   @@index([active])
 }
+
+model PaymentEvent {
+  // Dedupe webhook cổng thanh toán: (provider, eventId) duy nhất.
+  // Retry cùng event → phát hiện trùng, không apply 2 lần.
+  id          String   @id @default(cuid())
+  provider    String
+  eventId     String
+  orderNumber String
+  status      String
+  createdAt   DateTime @default(now())
+
+  @@unique([provider, eventId])
+  @@index([orderNumber])
+}

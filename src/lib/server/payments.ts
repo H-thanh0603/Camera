@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PaymentWebhookInput } from "@/lib/schemas";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import { logAudit } from "./audit";
@@ -42,16 +43,40 @@ export interface WebhookOutcome {
 }
 
 /**
- * Xử lý sự kiện đã verify: đối soát số tiền với totals server đã tính,
- * chuyển pending → paid. Webhook "failed" giữ nguyên pending để khách
- * thanh toán lại + ghi audit. Idempotent theo trạng thái đơn — webhook
- * gửi lại (retry) khi đơn đã ở trạng thái cuối thì trả deduped.
+ * Xử lý sự kiện đã verify: dedupe theo (provider, eventId), đối soát số
+ * tiền với totals server đã tính, chuyển pending → paid bằng claim có điều
+ * kiện. Webhook "failed" giữ nguyên pending để khách thanh toán lại.
  */
 export async function handlePaymentWebhook(input: PaymentWebhookInput): Promise<WebhookOutcome> {
   const skew = Math.abs(Date.now() / 1000 - input.timestamp);
   if (skew > WEBHOOK_MAX_SKEW_SECONDS) {
     throw new PaymentWebhookError("Webhook đã hết hạn (timestamp lệch quá 5 phút).", 400);
   }
+  // Claim event TRƯỚC mọi xử lý: retry/replay cùng event → P2002 → deduped,
+  // không bao giờ apply 2 lần dù race.
+  try {
+    await prisma.paymentEvent.create({
+      data: {
+        provider: input.provider,
+        eventId: input.eventId,
+        orderNumber: input.orderNumber,
+        status: input.status,
+      },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const order = await prisma.order.findUnique({ where: { number: input.orderNumber } });
+      logger.info("payment.webhook_deduped", { provider: input.provider, eventId: input.eventId });
+      return {
+        orderId: order?.id ?? "unknown",
+        orderNumber: input.orderNumber,
+        status: order?.status ?? "unknown",
+        deduped: true,
+      };
+    }
+    throw e;
+  }
+
   const order = await prisma.order.findUnique({
     where: { number: input.orderNumber },
     include: { lines: true },
@@ -74,7 +99,14 @@ export async function handlePaymentWebhook(input: PaymentWebhookInput): Promise<
     });
     return { orderId: order.id, orderNumber: order.number, status: order.status, deduped: false };
   }
-  await prisma.order.update({ where: { id: order.id }, data: { status: "paid" } });
+  // Claim chuyển trạng thái có điều kiện — thua race thì coi như deduped
+  const claimed = await prisma.order.updateMany({
+    where: { id: order.id, status: "pending" },
+    data: { status: "paid" },
+  });
+  if (claimed.count === 0) {
+    return { orderId: order.id, orderNumber: order.number, status: "paid", deduped: true };
+  }
   logger.info("payment.webhook_applied", {
     orderNumber: order.number,
     status: "paid",

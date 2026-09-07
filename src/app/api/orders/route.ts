@@ -42,7 +42,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const idempotencyKey = request.headers.get("idempotency-key") ?? undefined;
+    // Idempotency key: 1 nguồn duy nhất là header `Idempotency-Key`
+    // (chuẩn HTTP). Field body `idempotencyKey` trong schema chỉ giữ để
+    // tương thích client cũ — header luôn thắng khi cả hai tồn tại.
+    const idempotencyKey = request.headers.get("idempotency-key") ?? parsed.data.idempotencyKey;
     const order = await placeOrderServer({ ...parsed.data, idempotencyKey });
     return NextResponse.json({ order }, { status: 201 });
   } catch (error) {

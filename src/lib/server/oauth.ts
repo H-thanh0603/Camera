@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import { createSession } from "./session";
 import { logger } from "./logger";
 import { logAudit } from "./audit";
+import { fetchWithTimeout } from "./fetch";
 
 /**
  * Đăng nhập Google OAuth2 (Authorization Code + PKCE-less server flow).
@@ -75,7 +76,7 @@ export async function finishGoogleLogin(code: string, state: string): Promise<{ 
     throw new OAuthError("Phiên đăng nhập hết hạn. Vui lòng thử lại.");
   }
 
-  const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
+  const tokenRes = await fetchWithTimeout(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -93,7 +94,7 @@ export async function finishGoogleLogin(code: string, state: string): Promise<{ 
   const { access_token: accessToken } = (await tokenRes.json()) as { access_token?: string };
   if (!accessToken) throw new OAuthError("Không xác thực được với Google. Vui lòng thử lại.");
 
-  const meRes = await fetch(GOOGLE_USERINFO_URL, {
+  const meRes = await fetchWithTimeout(GOOGLE_USERINFO_URL, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!meRes.ok) throw new OAuthError("Không lấy được thông tin Google. Vui lòng thử lại.");

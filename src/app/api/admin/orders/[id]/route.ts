@@ -96,5 +96,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     to: status,
     restocked: restock,
   });
+  // Hủy/hoàn tiền → hoàn lượt coupon đã dùng (floor 0, idempotent)
+  if (restock) {
+    const { couponCodeOfTotals, releaseCouponUsage } = await import("@/lib/server/coupons");
+    const coupon = couponCodeOfTotals(order.totals);
+    if (coupon) await releaseCouponUsage(coupon);
+  }
   return NextResponse.json({ ok: true, status, currentStep });
 }

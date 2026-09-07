@@ -28,3 +28,23 @@ export async function incrementCouponUsage(code: string): Promise<void> {
     data: { usedCount: { increment: 1 } },
   });
 }
+
+/**
+ * Hoàn lượt coupon khi đơn bị hủy/hoàn tiền (không để maxUses cạn oan).
+ * Floor 0 — không bao giờ âm.
+ */
+export async function releaseCouponUsage(code: string): Promise<void> {
+  await prisma.coupon.updateMany({
+    where: { code, usedCount: { gt: 0 } },
+    data: { usedCount: { decrement: 1 } },
+  });
+}
+
+/** Đọc mã coupon đã áp trên đơn (lưu trong totals snapshot khi đặt hàng). */
+export function couponCodeOfTotals(totals: unknown): string | null {
+  if (totals && typeof totals === "object" && "couponCode" in totals) {
+    const code = (totals as { couponCode?: unknown }).couponCode;
+    return typeof code === "string" && code ? code : null;
+  }
+  return null;
+}

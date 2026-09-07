@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { CANCELLABLE_STATUSES } from "./order-status";
+import { couponCodeOfTotals, releaseCouponUsage } from "./coupons";
 
 /**
  * Hủy đơn — core dùng chung cho route (đã authorize) và test.
@@ -16,6 +17,7 @@ export class CancelConflict extends Error {
 }
 
 export async function completeCancel(orderId: string): Promise<void> {
+  let coupon: string | null = null;
   await prisma.$transaction(async (tx) => {
     // Claim TRƯỚC: thua → throw trong tx → rollback trắng, không hoàn kho.
     const claim = await tx.order.updateMany({
@@ -23,6 +25,8 @@ export async function completeCancel(orderId: string): Promise<void> {
       data: { status: "cancelled" },
     });
     if (claim.count === 0) throw new CancelConflict();
+    const order = await tx.order.findUnique({ where: { id: orderId } });
+    coupon = couponCodeOfTotals(order?.totals);
     const lines = await tx.orderLine.findMany({ where: { orderId } });
     for (const l of lines) {
       if (l.variantId) {
@@ -37,4 +41,6 @@ export async function completeCancel(orderId: string): Promise<void> {
       });
     }
   });
+  // Hoàn lượt coupon NGOÀI tx (không ảnh hưởng claim; floor 0 nên idempotent)
+  if (coupon) await releaseCouponUsage(coupon);
 }
