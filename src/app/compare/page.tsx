@@ -48,8 +48,7 @@ function parseNumber(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function verdictFor(metric: Metric, products: Product[], target: Product): "better" | "worse" | "same" | null {
-  if (!metric.num || !metric.direction) return null;
+function verdictFor(metric: Metric, products: Product[], target: Product): "better" | "worse" | "same" | null {  if (!metric.num || !metric.direction) return null;
   const values = products.map((p) => metric.num!(p)).filter((v): v is number => v !== undefined);
   if (values.length < 2) return null;
   const targetVal = metric.num(target);
@@ -102,8 +101,7 @@ export default function ComparePage() {
       </header>
 
       {products.length === 0 ? (
-        <EmptyState
-          icon="compare_arrows"
+        <EmptyState          icon="compare_arrows"
           title="Chưa chọn thiết bị nào"
           description="Thêm 2–4 sản phẩm từ catalogue để bắt đầu màn so sánh thông số chi tiết."
           action={
@@ -113,7 +111,9 @@ export default function ComparePage() {
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-xl bg-surface-container shadow-xl">
+        <>
+          <BattleBars products={products} />
+          <div className="overflow-x-auto rounded-xl bg-surface-container shadow-xl">
           <table className="w-full min-w-[720px] border-collapse">
             <caption className="sr-only">Bảng so sánh thông số {products.map((p) => p.name).join(", ")}</caption>
             <thead>
@@ -164,7 +164,52 @@ export default function ComparePage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
+  );
+}
+
+/** Battle bars: chuẩn hóa 0–100 từng chỉ số số học + đếm hạng mục thắng. */
+function BattleBars({ products }: { products: Product[] }) {
+  const numeric = METRICS.filter((m) => m.num && m.direction);
+  const bars = numeric.map((m) => {
+    const vals = products.map((p) => ({ p, v: m.num!(p) }));
+    const max = Math.max(0, ...vals.map((x) => x.v ?? 0));
+    return { metric: m, vals: vals.map((x) => ({ ...x, pct: x.v != null && max > 0 ? Math.round((x.v / max) * 100) : 0 })) };
+  });
+  const wins = new Map<string, number>();
+  for (const p of products) {
+    let w = 0;
+    for (const m of numeric) if (verdictFor(m, products, p) === "better") w++;
+    wins.set(p.id, w);
+  }
+  const champion = products.reduce((a, b) => ((wins.get(b.id) ?? 0) > (wins.get(a.id) ?? 0) ? b : a));
+
+  return (
+    <section aria-label="Battle bars" className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg shadow-xl">
+      <div className="flex items-center justify-between">
+        <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Camera Battle</h2>
+        <span className="rounded-lg bg-primary px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs font-bold uppercase text-on-primary">
+          {champion.name} thắng {wins.get(champion.id)} hạng mục
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-space-md md:grid-cols-2">
+        {bars.map(({ metric, vals }) => (
+          <div key={metric.key} className="flex flex-col gap-space-2xs">
+            <span className="font-telemetry-xs text-telemetry-xs uppercase text-on-surface-variant">{metric.label}</span>
+            {vals.map(({ p, v, pct }) => (
+              <div key={p.id} className="grid grid-cols-[110px_1fr_40px] items-center gap-space-xs">
+                <span className="truncate font-body-sm text-body-sm text-on-surface">{p.brand} {p.name.split(" ").slice(-2).join(" ")}</span>
+                <div className="h-2 overflow-hidden rounded-full bg-surface-container-high">
+                  <div className={cn("h-full rounded-full", pct === 100 && v != null ? "bg-primary" : "bg-outline")} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-right font-telemetry-data text-telemetry-data text-on-surface-variant">{v ?? "—"}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
