@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { FinderAnswers, PhotographyStyle } from "@/lib/types";
-import { findRecommendations, BUDGET_RANGES } from "@/lib/services/finder-service";
+import { findRecommendations, styleAffinity, BUDGET_RANGES } from "@/lib/services/finder-service";
 import { formatVND, cn } from "@/lib/utils/format";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { AppImage } from "@/components/ui/app-image";
@@ -74,6 +74,8 @@ export default function CameraFinderPage() {
   const [answers, setAnswers] = useState<FinderAnswers>(DEFAULT_ANSWERS);
   const [submitted, setSubmitted] = useState(false);
   const recommendations = findRecommendations(answers, 3);
+  const dna = styleAffinity(answers);
+  const styleLabel = (s: PhotographyStyle) => STYLE_OPTIONS.find((o) => o.value === s)?.label ?? s;
 
   const toggleStyle = (style: PhotographyStyle) => {
     setAnswers((a) => {
@@ -154,7 +156,31 @@ export default function CameraFinderPage() {
 
         <section className="flex flex-col gap-space-md lg:col-span-5" aria-label="Kết quả gợi ý" aria-live="polite">
           {submitted ? (
-            recommendations.length > 0 ? (
+            <>
+              <div className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Camera DNA của bạn</h2>
+                  <span className="material-symbols-outlined text-[20px] text-primary" aria-hidden="true">genetics</span>
+                </div>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Điểm cao nhất trong vault cho từng thể loại — với đúng ngân sách và sở thích của bạn.
+                </p>
+                <div className="flex flex-col gap-space-xs">
+                  {dna.map(({ style, percent }) => (
+                    <div key={style} className="grid grid-cols-[110px_1fr_44px] items-center gap-space-xs">
+                      <span className="font-body-sm text-body-sm text-on-surface-variant">{styleLabel(style)}</span>
+                      <div className="h-2 overflow-hidden rounded-full bg-surface-container-high" role="img" aria-label={`${styleLabel(style)} ${percent} phần trăm`}>
+                        <div
+                          className={percent >= 70 ? "h-full rounded-full bg-primary" : "h-full rounded-full bg-outline"}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <span className="text-right font-telemetry-data text-telemetry-data text-primary">{percent}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {recommendations.length > 0 ? (
               recommendations.map((rec, index) => (
                 <article key={rec.product.id} className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg shadow-xl">
                   <div className="flex items-center justify-between">
@@ -198,7 +224,8 @@ export default function CameraFinderPage() {
               <p className="rounded-xl bg-surface-container p-space-lg font-body-md text-body-md text-on-surface-variant" role="status">
                 Không có thiết bị nào khớp hoàn toàn. Thử mở rộng ngân sách hoặc thay đổi sở thích cảm biến.
               </p>
-            )
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center gap-space-sm rounded-xl bg-surface-container p-space-2xl text-center shadow-xl">
               <span className="material-symbols-outlined text-[40px] text-primary" aria-hidden="true">explore</span>

@@ -71,3 +71,21 @@ describe("findRecommendations", () => {
     expect(BUDGET_RANGES.under_100m.label).toContain("Dưới 100");
   });
 });
+
+describe("styleAffinity (Camera DNA)", () => {
+  it("trả đủ 8 style, sắp xếp giảm dần, percent 0..100", async () => {
+    const { styleAffinity } = await import("@/lib/services/finder-service");
+    const dna = styleAffinity(base);
+    expect(dna).toHaveLength(8);
+    for (let i = 1; i < dna.length; i++) {
+      expect(dna[i - 1].percent).toBeGreaterThanOrEqual(dna[i].percent);
+      expect(dna[i].percent).toBeGreaterThanOrEqual(0);
+      expect(dna[i].percent).toBeLessThanOrEqual(100);
+    }
+  });
+  it("portrait có điểm cao với ngân sách khớp", async () => {
+    const { styleAffinity } = await import("@/lib/services/finder-service");
+    const dna = styleAffinity(base);
+    expect(dna.find((d) => d.style === "portrait")!.percent).toBeGreaterThan(50);
+  });
+});

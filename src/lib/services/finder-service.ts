@@ -82,6 +82,25 @@ function buildReasons(product: Product, answers: FinderAnswers): string[] {
   return reasons.slice(0, 4);
 }
 
+export interface StyleAffinity {
+  style: PhotographyStyle;
+  percent: number;
+}
+
+/**
+ * Camera DNA: với mỗi style, lấy điểm cao nhất trong vault khi giữ nguyên
+ * ngân sách/cảm biến/kích thước mà chỉ đổi style → % thực từ dữ liệu,
+ * không phải số tự khai.
+ */
+export function styleAffinity(answers: FinderAnswers): StyleAffinity[] {
+  const catalog = getCatalog();
+  return STYLE_TAGS.map((style) => {
+    const probe = { ...answers, styles: [style] };
+    const best = catalog.reduce((m, p) => Math.max(m, scoreProduct(p, probe)), 0);
+    return { style, percent: Math.round(best * 100) };
+  }).sort((a, b) => b.percent - a.percent);
+}
+
 export function findRecommendations(answers: FinderAnswers, limit = 3): FinderRecommendation[] {
   return getCatalog().map((product) => ({ product, score: scoreProduct(product, answers) }))
     .filter((r) => r.score > 0.15)
