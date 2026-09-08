@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
       ...(r2Host ? [{ protocol: "https" as const, hostname: r2Host }] : []),
     ],
     formats: ["image/avif", "image/webp"],
+    qualities: [75, 90],
   },
   async headers() {
     return [

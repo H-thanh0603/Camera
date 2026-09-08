@@ -86,6 +86,8 @@ export function SensorLab() {
                 style={{ filter: imgFilter }}
                 alt="Chân dung thiếu sáng với bokeh mịn và kiểm soát nhiễu vượt trội"
                 src={IMG.lowLightPortrait}
+                sizes="(max-width: 1024px) 100vw, 66vw"
+                quality={90}
               />
               <div className="pointer-events-none absolute flex h-full w-full items-start justify-end border-2 border-primary p-space-xs transition-all duration-500" style={{ width: SENSORS[sensor].size, height: SENSORS[sensor].size }} aria-hidden="true">
                 <span className="rounded bg-primary px-1.5 py-0.5 font-telemetry-xs text-[10px] font-bold uppercase text-on-primary">{SENSORS[sensor].crop}</span>
