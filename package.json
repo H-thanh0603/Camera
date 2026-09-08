@@ -16,6 +16,7 @@
     "test:unit": "vitest run",
     "smoke:prod": "node scripts/smoke-prod.mjs",
     "worker:email": "tsx scripts/email-worker.ts",
+    "reminder:sensor": "tsx scripts/sensor-reminder.ts",
     "test:load": "k6 run scripts/load-test.js",
     "prepare": "husky",
     "check:bundle": "node scripts/check-bundle.mjs"
