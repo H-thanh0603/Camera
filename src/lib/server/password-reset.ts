@@ -40,11 +40,16 @@ export async function requestPasswordReset(email: string): Promise<{ ok: true }>
     });
     const site = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
     const link = `${site}/reset-password?token=${token}`;
-    await sendEmail({
+    const mail = {
+      kind: "password-reset",
       to: user.email,
       subject: "Đặt lại mật khẩu Lumina Optics",
       html: passwordResetHtml(link),
-    });
+    };
+    // Queue nhanh hơn inline; fallback inline nếu Redis chưa cấu hình
+    const { enqueueEmail, getQueueRedis } = await import("./email-queue");
+    const { queued } = await enqueueEmail(getQueueRedis(), mail);
+    if (!queued) await sendEmail(mail);
     logger.info("auth.password_reset_requested", { userId: user.id });
   }
   return { ok: true };

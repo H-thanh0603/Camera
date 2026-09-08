@@ -1,5 +1,11 @@
 # Phase 2.4 — BullMQ/Upstash Queue Migration
 
+> ✅ IMPLEMENTED (biến thể Redis-list, KHÔNG BullMQ): `src/lib/server/email-queue.ts`,
+> `scripts/email-worker.ts`, `GET /api/admin/queue`, `tests/email-queue.test.ts`.
+> Lý do bỏ BullMQ: BullMQ cần TCP persistent, Upstash REST (HTTP) không hỗ trợ —
+> queue tự cài trên list+zset đủ cho email (pending/delayed-backoff/dead).
+> Chưa làm: order-event queue, scheduled jobs (abandoned cart), QStash.
+
 ## Trigger
 Khi cần background jobs đáng tin: email async, payment webhook processing,
 order status updates, inventory sync, retry logic, hoặc scheduled tasks

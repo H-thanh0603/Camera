@@ -91,4 +91,4 @@
 |-------|---------|-----|--------|
 | 2.2 pg_trgm | ✅ implemented (SQLite fallback giữ nguyên) | `docs/migration-pg-trgm.md` | — |
 | 2.3 S3/R2 | ✅ implemented (upload endpoint + admin UI; chưa sharp/seed-migrate) | `docs/migration-s3-r2-images.md` | — |
-| 2.4 BullMQ | Async email, retry, background jobs | `docs/migration-bullmq-queue.md` | 3-4 ngày |
+| 2.4 BullMQ | ✅ implemented (email queue Redis-list; chưa order-events) | `docs/migration-bullmq-queue.md` | — |

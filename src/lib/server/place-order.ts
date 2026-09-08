@@ -283,14 +283,20 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
     coupon: appliedCoupon ?? null,
   });
 
-  // Email xác nhận — fire-and-forget, không chặn response đặt hàng.
-  void import("./email").then(({ orderConfirmationHtml, sendEmail }) =>
-    sendEmail({
+  // Email xác nhận — qua queue (retry/backoff), fallback inline nếu
+  // Redis chưa cấu hình. Không chặn response đặt hàng.
+  void (async () => {
+    const { enqueueEmail, getQueueRedis } = await import("./email-queue");
+    const { orderConfirmationHtml, sendEmail } = await import("./email");
+    const mail = {
+      kind: "order-confirmation",
       to: contact.email,
       subject: `Xác nhận đơn hàng ${dbOrder.number} — Lumina Optics`,
       html: orderConfirmationHtml(dbOrder.number, totals.total, contact.fullName),
-    }),
-  ).catch(() => undefined);
+    };
+    const { queued } = await enqueueEmail(getQueueRedis(), mail);
+    if (!queued) await sendEmail(mail);
+  })().catch(() => undefined);
 
   return {
     id: dbOrder.id,
