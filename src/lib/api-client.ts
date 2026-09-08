@@ -108,6 +108,7 @@ export async function apiSubmitReview(input: {
   rating: number;
   title: string;
   body: string;
+  photos?: string[];
 }): Promise<{ ok: true }> {
   return request<{ ok: true }>("/api/reviews", { method: "POST", body: JSON.stringify(input) });
 }

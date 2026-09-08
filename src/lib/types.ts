@@ -61,6 +61,7 @@ export interface Review {
   title: string;
   body: string;
   verified: boolean;
+  photos?: string[];
 }
 
 export interface Product {

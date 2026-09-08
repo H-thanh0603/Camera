@@ -15,7 +15,7 @@ import {
 
 const INCLUDE = { variants: true } as const;
 
-type ApprovedReviewRow = { id: string; author: string; rating: number; date: Date; title: string; body: string; verified: boolean };
+type ApprovedReviewRow = { id: string; author: string; rating: number; date: Date; title: string; body: string; verified: boolean; photos: unknown };
 
 type ProductRow = Prisma.ProductGetPayload<{ include: typeof INCLUDE }>;
 
@@ -67,6 +67,7 @@ export function dbProductToDomain(row: ProductRow, approvedReviews: ApprovedRevi
           title: r.title,
           body: r.body,
           verified: r.verified,
+          photos: (Array.isArray(r.photos) ? r.photos.filter((u): u is string => typeof u === "string") : undefined) as import("@/lib/types").Review["photos"],
         }))
       : undefined,
   };
@@ -88,7 +89,7 @@ export async function dbAllProducts(): Promise<Product[]> {
   const byProduct = new Map<string, ApprovedReviewRow[]>();
   for (const r of reviews) {
     const list = byProduct.get(r.productId) ?? [];
-    list.push({ id: r.id, author: r.author, rating: r.rating, date: r.createdAt, title: r.title, body: r.body, verified: r.verified });
+    list.push({ id: r.id, author: r.author, rating: r.rating, date: r.createdAt, title: r.title, body: r.body, verified: r.verified, photos: r.photos });
     byProduct.set(r.productId, list);
   }
   return rows.map((row) => dbProductToDomain(row, byProduct.get(row.id) ?? []));
@@ -103,7 +104,7 @@ export async function dbGetProductBySlug(slug: string): Promise<Product | null> 
   });
   return dbProductToDomain(
     row,
-    reviews.map((r) => ({ id: r.id, author: r.author, rating: r.rating, date: r.createdAt, title: r.title, body: r.body, verified: r.verified })),
+    reviews.map((r) => ({ id: r.id, author: r.author, rating: r.rating, date: r.createdAt, title: r.title, body: r.body, verified: r.verified, photos: r.photos })),
   );
 }
 

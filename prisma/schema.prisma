@@ -183,6 +183,9 @@ model Review {
   // review phải qua kiểm duyệt trước khi hiển thị công khai
   approved  Boolean  @default(false)
   verified  Boolean  @default(false)
+  // ảnh thực tế (tối đa 3 URL) + mã thưởng khi review có ảnh được duyệt
+  photos      Json     @default("[]")
+  rewardCode  String?
   createdAt DateTime @default(now())
 
   @@index([productId])

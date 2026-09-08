@@ -26,6 +26,9 @@ export function ReviewsSection({ product }: { product: Product }) {
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [submitFailed, setSubmitFailed] = useState(false);
   const [submittedOk, setSubmittedOk] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const form = useForm<ReviewInput>({
     resolver: zodResolver(reviewSchema),
@@ -52,10 +55,11 @@ export function ReviewsSection({ product }: { product: Product }) {
   const onSubmit = async (values: ReviewInput) => {
     setSubmitFailed(false);
     try {
-      await apiSubmitReview({ productId: product.id, ...values });
+      await apiSubmitReview({ productId: product.id, ...values, photos });
       setSubmittedOk(true);
       setShowForm(false);
       form.reset({ author: "", rating: 0, title: "", body: "" });
+      setPhotos([]);
       setServerErrors({});
       refreshPending();
     } catch (error) {
@@ -165,8 +169,63 @@ export function ReviewsSection({ product }: { product: Product }) {
             {fieldError("author") && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{fieldError("author")}</p>}
           </div>
 
-          {submitFailed && (
-            <div className="flex items-center justify-between gap-space-sm rounded-lg border border-error/40 bg-error-container/20 p-space-sm" role="alert">
+          <div className="flex flex-col gap-space-2xs">
+            <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">
+              Ảnh thực tế (tối đa 3){user ? "" : " — đăng nhập để nhận coupon 5% khi review có ảnh được duyệt"}
+            </span>
+            <div className="flex flex-wrap items-center gap-space-xs">
+              {photos.map((url) => (
+                <div key={url} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="Ảnh review" className="h-16 w-16 rounded-lg object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotos((p) => p.filter((u) => u !== url))}
+                    className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-surface-container-highest text-on-surface"
+                    aria-label="Xóa ảnh này"
+                  >
+                    <span className="material-symbols-outlined text-[14px]" aria-hidden="true">close</span>
+                  </button>
+                </div>
+              ))}
+              {photos.length < 3 && (
+                <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant transition-colors hover:text-on-surface">
+                  <span className="material-symbols-outlined text-[24px]" aria-hidden="true">{uploading ? "progress_activity" : "add_a_photo"}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+                    className="sr-only"
+                    disabled={uploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!file) return;
+                      setUploading(true);
+                      setUploadError(null);
+                      try {
+                        const form = new FormData();
+                        form.set("file", file);
+                        const res = await fetch("/api/upload/review", { method: "POST", body: form });
+                        const data = await res.json();
+                        if (!res.ok) {
+                          setUploadError(data.error ?? "Upload thất bại.");
+                          return;
+                        }
+                        setPhotos((p) => [...p, data.url].slice(0, 3));
+                      } catch {
+                        setUploadError("Upload thất bại. Thử lại sau.");
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            {uploadError && <p className="font-telemetry-xs text-telemetry-xs text-error" role="alert">{uploadError}</p>}
+          </div>
+
+          {submitFailed && (            <div className="flex items-center justify-between gap-space-sm rounded-lg border border-error/40 bg-error-container/20 p-space-sm" role="alert">
               <p className="font-body-sm text-body-sm text-error">Không gửi được do lỗi mạng. Vui lòng thử lại.</p>
               <button type="button" onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting} className="shrink-0 rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface">
                 Thử lại
@@ -201,6 +260,16 @@ export function ReviewsSection({ product }: { product: Product }) {
               </div>
               <h3 className="font-headline-sm text-headline-sm text-on-surface">{review.title}</h3>
               <p className="font-body-sm text-body-sm text-on-surface-variant">{review.body}</p>
+              {review.photos && review.photos.length > 0 && (
+                <div className="flex flex-wrap gap-space-xs">
+                  {review.photos.slice(0, 3).map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer" aria-label="Xem ảnh review cỡ lớn">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Ảnh thực tế từ ${review.author}`} loading="lazy" className="h-20 w-20 rounded-lg object-cover transition-transform hover:scale-105" />
+                    </a>
+                  ))}
+                </div>
+              )}
               <footer className="flex items-center gap-space-xs pt-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-outline">
                 <span className="text-on-surface">{review.author}</span>
                 {isPending ? (

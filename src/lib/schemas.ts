@@ -49,6 +49,7 @@ export const reviewSchema = z.object({
     .max(5, "Vui lòng chọn số sao từ 1 đến 5."),
   title: z.string().trim().min(4, "Tiêu đề cần tối thiểu 4 ký tự.").max(120),
   body: z.string().trim().min(20, "Nội dung cần tối thiểu 20 ký tự.").max(2000),
+  photos: z.array(z.string().url("URL ảnh không hợp lệ.")).max(3, "Tối đa 3 ảnh.").optional(),
 });
 
 export const orderLineSchema = z.object({

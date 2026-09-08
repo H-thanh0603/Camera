@@ -5,6 +5,7 @@ import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { dbGetProductById } from "@/lib/server/product-db";
 import { reviewSchema, zodFieldErrors } from "@/lib/schemas";
+import type { Prisma } from "@prisma/client";
 
 /**
  * POST /api/reviews — gửi đánh giá.
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Quá nhiều đánh giá. Thử lại sau một phút." }, { status: 429 });
   }
 
-  let body: { productId?: string; author?: string; rating?: number; title?: string; body?: string };
+  let body: { productId?: string; author?: string; rating?: number; title?: string; body?: string; photos?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   const fieldErrors: Record<string, string> = {};
-  const parsed = reviewSchema.safeParse({ author: body.author, rating: body.rating, title: body.title, body: body.body });
+  const parsed = reviewSchema.safeParse({ author: body.author, rating: body.rating, title: body.title, body: body.body, photos: body.photos });
   if (!parsed.success) {
     return NextResponse.json({ error: "Đánh giá chưa hợp lệ.", fieldErrors: { ...fieldErrors, ...zodFieldErrors(parsed.error) } }, { status: 422 });
   }
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
       rating: parsed.data.rating,
       title: parsed.data.title,
       body: parsed.data.body,
+      photos: (parsed.data.photos ?? []) as unknown as Prisma.InputJsonValue,
       approved: false,
       verified: false,
     },
