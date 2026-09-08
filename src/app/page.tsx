@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { HeroHud } from "@/components/home/hero-hud";
 import { LensAnatomy } from "@/components/home/lens-anatomy";
 import { CollectionGrid } from "@/components/home/collection-grid";
+import { CraftFilm } from "@/components/home/craft-film";
 import { SensorLab } from "@/components/home/sensor-lab";
 import { VaultBestsellers } from "@/components/home/vault-bestsellers";
 import { Testimonials } from "@/components/home/testimonials";
@@ -21,6 +22,7 @@ export default function HomePage() {
       <HeroHud />
       <LensAnatomy />
       <CollectionGrid />
+      <CraftFilm />
       <SensorLab />
       <VaultBestsellers />
       <Testimonials />
