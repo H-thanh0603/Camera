@@ -20,6 +20,9 @@ export default function WishlistPage() {
     .map((entry) => ({ entry, product: getProductsByIds([entry.productId])[0] }))
     .filter((e): e is { entry: (typeof wishlist)[number]; product: NonNullable<(typeof e)["product"]> } => Boolean(e.product));
 
+  const drops = entries.filter(({ entry, product }) => product.price < entry.priceAtAdd);
+  const totalSavings = drops.reduce((sum, { entry, product }) => sum + (entry.priceAtAdd - product.price), 0);
+
   return (
     <div className="container-page flex flex-col gap-space-xl py-space-xl">
       <header className="flex flex-col gap-space-2xs">
@@ -40,7 +43,22 @@ export default function WishlistPage() {
           }
         />
       ) : (
-        <ul className="flex flex-col gap-space-md">
+        <>
+          {drops.length > 0 && (
+            <div className="flex flex-col gap-space-2xs rounded-xl bg-primary p-space-lg text-on-primary shadow-xl sm:flex-row sm:items-center sm:justify-between" role="status">
+              <div className="flex items-center gap-space-sm">
+                <span className="material-symbols-outlined text-[28px]" aria-hidden="true">trending_down</span>
+                <div>
+                  <p className="font-headline-sm text-headline-sm">{drops.length} món bạn thích đang giảm giá</p>
+                  <p className="font-body-sm text-body-sm opacity-85">Mua ngay cả bộ, tiết kiệm {formatVND(totalSavings)} so với lúc bạn lưu.</p>
+                </div>
+              </div>
+              <Link href="/cart" className="rounded-lg bg-surface-container-lowest px-space-lg py-space-xs text-center font-headline-sm text-telemetry-data uppercase text-on-surface">
+                Xem giỏ hàng
+              </Link>
+            </div>
+          )}
+          <ul className="flex flex-col gap-space-md">
           {entries.map(({ entry, product }) => {
             const priceChanged = product.price < entry.priceAtAdd;
             return (
@@ -90,8 +108,9 @@ export default function WishlistPage() {
                 </div>
               </li>
             );
-          })}
-        </ul>
+            })}
+          </ul>
+        </>
       )}
     </div>
   );
