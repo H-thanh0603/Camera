@@ -28,6 +28,7 @@ model User {
   reviews      Review[]
   auditLogs    AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  savedBattles SavedBattle[]
 }
 
 model Product {
@@ -208,8 +209,7 @@ model Coupon {
   @@index([active])
 }
 
-model PaymentEvent {
-  // Dedupe webhook cổng thanh toán: (provider, eventId) duy nhất.
+model PaymentEvent {  // Dedupe webhook cổng thanh toán: (provider, eventId) duy nhất.
   // Retry cùng event → phát hiện trùng, không apply 2 lần.
   id          String   @id @default(cuid())
   provider    String
@@ -220,4 +220,15 @@ model PaymentEvent {
 
   @@unique([provider, eventId])
   @@index([orderNumber])
+}
+
+model SavedBattle {  // Battle user đã lưu: share + xem lại sau.
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String   @default("")
+  productIds Json     // string[] (2-4 id)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
 }

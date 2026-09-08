@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getProductsByIds } from "@/lib/repositories/product-repository";
 import { useStore } from "@/state/store";
@@ -63,9 +63,26 @@ function verdictFor(metric: Metric, products: Product[], target: Product): "bett
 export default function ComparePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { compare, toggleCompare, hydrated } = useStore();
+  const { compare, toggleCompare, hydrated, user, pushToast } = useStore();
   // Import lần đầu từ URL (khi user mở link ?ids=...) — sau đó store là source of truth
   const importedRef = useRef(false);
+  const [saved, setSaved] = useState<{ id: string; name: string; productIds: string[] }[]>([]);
+  const [copied, setCopied] = useState(false);
+
+  const refreshSaved = async () => {
+    try {
+      const res = await fetch("/api/battles");
+      if (res.ok) {
+        const data = await res.json();
+        setSaved(Array.isArray(data.battles) ? data.battles : []);
+      }
+    } catch { /* im lặng */ }
+  };
+
+  useEffect(() => {
+    if (hydrated && user) refreshSaved();
+    else if (hydrated) setSaved([]);
+  }, [hydrated, user]);
 
   useEffect(() => {
     if (!hydrated || importedRef.current) return;
@@ -98,6 +115,51 @@ export default function ComparePage() {
         <span className="section-telemetry">SIDE-BY-SIDE OPTICAL DUEL</span>
         <h1 className="font-headline-lg text-headline-lg text-on-surface">So Sánh Thiết Bị</h1>
         <p className="font-body-md text-body-md text-on-surface-variant">Tối đa 4 thiết bị. Thêm từ nút “So sánh” trên card sản phẩm.</p>
+        {products.length >= 2 && (
+          <div className="flex flex-wrap gap-space-xs pt-space-xs">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(window.location.href);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  pushToast("Không sao chép được link.", "error");
+                }
+              }}
+              className="flex items-center gap-space-2xs rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest"
+            >
+              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">link</span>
+              <span>{copied ? "Đã sao chép!" : "Sao chép link battle"}</span>
+            </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch("/api/battles", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: products.map((p) => p.name).join(" vs "), productIds: products.map((p) => p.id) }),
+                  });
+                  if (res.ok) {
+                    pushToast("Đã lưu battle vào tài khoản.", "success");
+                    refreshSaved();
+                  } else {
+                    const data = await res.json().catch(() => ({}));
+                    pushToast(data.error ?? "Lưu thất bại.", "error");
+                  }
+                }}
+                className="flex items-center gap-space-2xs rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest"
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">bookmark_add</span>
+                <span>Lưu battle</span>
+              </button>
+            ) : (
+              <Link href="/account" className="font-body-sm text-body-sm text-on-surface-variant underline">Đăng nhập để lưu battle</Link>
+            )}
+          </div>
+        )}
       </header>
 
       {products.length === 0 ? (
@@ -113,6 +175,34 @@ export default function ComparePage() {
       ) : (
         <>
           <BattleBars products={products} />
+          {user && saved.length > 0 && (
+            <section aria-label="Battle đã lưu" className="flex flex-col gap-space-xs rounded-xl bg-surface-container p-space-lg shadow-xl">
+              <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Battle đã lưu</h2>
+              <ul className="flex flex-col gap-space-2xs">
+                {saved.map((b) => (
+                  <li key={b.id} className="flex items-center gap-space-sm">
+                    <Link
+                      href={`/compare?ids=${(Array.isArray(b.productIds) ? b.productIds : []).join(",")}`}
+                      className="flex-1 truncate font-body-sm text-body-sm text-on-surface hover:text-primary"
+                    >
+                      {b.name || (Array.isArray(b.productIds) ? b.productIds.join(" vs ") : "Battle")}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await fetch(`/api/battles?id=${b.id}`, { method: "DELETE" });
+                        refreshSaved();
+                      }}
+                      className="font-telemetry-xs text-telemetry-xs uppercase text-outline hover:text-error"
+                      aria-label={`Xóa battle ${b.name}`}
+                    >
+                      Xóa
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <div className="overflow-x-auto rounded-xl bg-surface-container shadow-xl">
           <table className="w-full min-w-[720px] border-collapse">
             <caption className="sr-only">Bảng so sánh thông số {products.map((p) => p.name).join(", ")}</caption>
