@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/coupons", label: "Mã giảm giá", icon: "sell" },
   { href: "/admin/users", label: "Tài khoản", icon: "group" },
   { href: "/admin/reviews", label: "Kiểm duyệt", icon: "rate_review" },
+  { href: "/admin/trade-in", label: "Thu cũ", icon: "autorenew" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

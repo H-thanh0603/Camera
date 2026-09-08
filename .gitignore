@@ -49,3 +49,6 @@ prisma/dev.db-journal
 # env example được commit
 !.env.example
 .husky/_
+
+# video goc ngoai repo
+/video.mp4

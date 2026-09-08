@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 }));
 
 const { prisma } = await import("@/lib/server/prisma");
-const { grantPhotoReviewReward } = await import("@/app/api/admin/reviews/[id]/route");
+const { grantPhotoReviewReward } = await import("@/lib/server/review-reward");
 
 const createdReviewIds: string[] = [];
 const createdCouponCodes: string[] = [];

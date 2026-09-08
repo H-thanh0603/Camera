@@ -232,3 +232,18 @@ model SavedBattle {  // Battle user đã lưu: share + xem lại sau.
 
   @@index([userId])
 }
+
+model TradeInLead {  // Lead thu cũ đổi mới: form public, admin gọi lại.
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  email        String   @default("")
+  deviceBrand  String
+  deviceModel  String
+  condition    String   // like_new | good | fair | broken
+  note         String   @default("")
+  status       String   @default("new") // new | contacted | quoted | done | dropped
+  createdAt    DateTime @default(now())
+
+  @@index([status])
+}
