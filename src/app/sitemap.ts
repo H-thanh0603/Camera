@@ -16,6 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/journal`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${siteUrl}/camera-finder`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${siteUrl}/photo-lab`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${siteUrl}/kit`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${siteUrl}/compare`, changeFrequency: "monthly", priority: 0.3 },
   ];
 
