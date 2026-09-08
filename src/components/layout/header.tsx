@@ -17,7 +17,7 @@ const NAV_LINKS = [
 ];
 
 export function Header() {
-  const { cartSnapshot, wishlist, user, setSearchOpen, setCartDrawerOpen, hydrated } = useStore();
+  const { cartSnapshot, wishlist, user, setSearchOpen, setCartDrawerOpen, hydrated, theme, toggleTheme } = useStore();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Phím tắt ⌘K / Ctrl+K mở search
@@ -77,6 +77,18 @@ export function Header() {
             <span className="material-symbols-outlined text-[20px]" aria-hidden="true">favorite</span>
             <Badge value={wishlistCount} tone="gold" />
           </Link>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-space-2xs text-on-surface-variant transition-colors hover:text-on-surface"
+            aria-label={theme === "dark" ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
+            aria-pressed={theme === "light"}
+          >
+            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+              {theme === "dark" ? "light_mode" : "dark_mode"}
+            </span>
+          </button>
 
           <button
             type="button"

@@ -26,6 +26,7 @@ interface AppState {
   recent: string[];
   user: SessionUser | null;
   catalogVersion: number;
+  theme: "dark" | "light";
 }
 
 type Action =
@@ -40,9 +41,17 @@ type Action =
   | { type: "compare/remove"; productId: string }
   | { type: "recent/add"; productId: string }
   | { type: "auth/set"; user: SessionUser | null }
-  | { type: "catalog/refresh" };
+  | { type: "catalog/refresh" }
+  | { type: "theme/set"; theme: "dark" | "light" };
 
 const lineKey = (l: { productId: string; variantId?: string }) => `${l.productId}::${l.variantId ?? ""}`;
+
+/** Đồng bộ class theme lên <html> (dark = mặc định, light = .light). */
+function applyThemeClass(theme: "dark" | "light"): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("light", theme === "light");
+  document.documentElement.classList.toggle("dark", theme === "dark");
+}
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -98,6 +107,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, user: action.user };
     case "catalog/refresh":
       return { ...state, catalogVersion: state.catalogVersion + 1 };
+    case "theme/set":
+      return { ...state, theme: action.theme };
     default:
       return state;
   }
@@ -135,6 +146,8 @@ interface StoreContextValue {
   setCartDrawerOpen: (open: boolean) => void;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
+  theme: "dark" | "light";
+  toggleTheme: () => void;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
@@ -147,6 +160,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     recent: [],
     user: null,
     catalogVersion: 0,
+    theme: "dark",
   });
   const [hydrated, setHydrated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -157,6 +171,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Hydrate từ localStorage sau mount — tránh mismatch SSR.
   useEffect(() => {
+    const savedTheme = loadJSON<"dark" | "light">("theme", "dark");
+    const theme = savedTheme === "light" ? "light" : "dark";
+    dispatch({ type: "hydrate", state: { theme } });
+    applyThemeClass(theme);
     dispatch({
       type: "hydrate",
       state: {
@@ -198,6 +216,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (hydrated) saveJSON("recent", state.recent);
   }, [state.recent, hydrated]);
+  useEffect(() => {
+    if (!hydrated) return;
+    saveJSON("theme", state.theme);
+    applyThemeClass(state.theme);
+  }, [state.theme, hydrated]);
 
   const cartSnapshot = useMemo(
     () => buildCartSnapshot(state.cart, getProductById),
@@ -286,6 +309,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setCartDrawerOpen,
       searchOpen,
       setSearchOpen,
+      theme: state.theme,
+      toggleTheme: () => dispatch({ type: "theme/set", theme: state.theme === "dark" ? "light" : "dark" }),
     };
   }, [hydrated, state, authLoading, cartSnapshot, toasts, cartDrawerOpen, searchOpen, pushToast, dismissToast]);
 

@@ -33,6 +33,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="vi" className={`dark ${syne.variable} ${hanken.variable} ${jetbrains.variable}`}>
       <head>
+        {/* Pre-paint theme: đọc localStorage trước khi render — chống flash sai theme */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=JSON.parse(localStorage.getItem("lumina.theme")||'"dark"');if(t!=="light")t="dark";document.documentElement.classList.toggle("light",t==="light");document.documentElement.classList.toggle("dark",t==="dark");}catch(e){}})();`,
+          }}
+        />
         {/* display=block cho icon font: tránh flash text ligature gây layout shift (CLS).
             2 warning next/font không áp dụng: đây là icon font trong App Router. */}
         {/* eslint-disable-next-line @next/next/google-font-display, @next/next/no-page-custom-font */}
