@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { getProductById, getCatalog } from "@/lib/repositories/product-repository";
 import { useStore } from "@/state/store";
 import { formatVND, cn } from "@/lib/utils/format";
@@ -64,7 +65,8 @@ function buildSuggestions(items: Product[]): Suggestion[] {
 }
 
 export default function KitPage() {
-  const { cartSnapshot, hydrated, addToCart } = useStore();
+  const { cartSnapshot, hydrated, addToCart, user } = useStore();
+  const [mailState, setMailState] = useState<"idle" | "sending" | "done" | "error">("idle");
 
   if (!hydrated) {
     return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
@@ -131,6 +133,35 @@ export default function KitPage() {
                 <span>Xem giỏ & thanh toán</span>
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span>
               </Link>
+              {user ? (
+                <button
+                  type="button"
+                  disabled={mailState === "sending" || mailState === "done"}
+                  onClick={async () => {
+                    setMailState("sending");
+                    try {
+                      const res = await fetch("/api/kit/share-email", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          items: cartSnapshot.lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+                        }),
+                      });
+                      setMailState(res.ok ? "done" : "error");
+                    } catch {
+                      setMailState("error");
+                    }
+                  }}
+                  className="mt-space-xs inline-flex items-center gap-space-xs rounded-lg bg-surface-container-lowest/20 px-space-lg py-space-xs font-headline-sm text-headline-sm uppercase text-on-primary disabled:opacity-60"
+                >
+                  <span className="material-symbols-outlined text-[18px]" aria-hidden="true">mail</span>
+                  <span>{mailState === "done" ? "Đã gửi vào email" : mailState === "sending" ? "Đang gửi…" : mailState === "error" ? "Gửi lỗi — thử lại" : "Gửi kit qua email"}</span>
+                </button>
+              ) : (
+                <Link href="/account" className="mt-space-xs inline-flex items-center gap-space-xs font-body-sm text-body-sm text-on-primary underline">
+                  Đăng nhập để gửi kit qua email
+                </Link>
+              )}
             </section>
 
             <section aria-label="Tối ưu kit" className="flex flex-col gap-space-sm rounded-xl bg-surface-container p-space-lg shadow-xl">
