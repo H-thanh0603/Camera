@@ -280,6 +280,20 @@ export default function AccountPage() {
                     <p className="rounded-lg bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error">Đơn hàng đã bị hủy. Liên hệ concierge nếu cần hỗ trợ thêm.</p>
                   )}
 
+                  {(order.trackingCode || order.shipping.companyName) && (
+                    <p className="flex flex-wrap gap-space-xs font-telemetry-xs text-telemetry-xs uppercase">
+                      {order.trackingCode && (
+                        <span className="rounded-lg bg-surface-container-low px-space-xs py-space-2xs text-on-surface">
+                          Vận đơn {order.carrier ? `(${order.carrier.toUpperCase()})` : ""}: <strong>{order.trackingCode}</strong>
+                        </span>
+                      )}
+                      {order.shipping.companyName && (
+                        <span className="rounded-lg bg-surface-container-low px-space-xs py-space-2xs text-on-surface">
+                          VAT: {order.shipping.companyName} • MST {order.shipping.taxCode}
+                        </span>
+                      )}
+                    </p>
+                  )}
                   <ul className="flex flex-wrap gap-space-sm">
                     {order.lines.map((line) => (
                       <li key={`${line.productId}-${line.variantId ?? ""}`} className="flex items-center gap-space-2xs rounded-lg bg-surface-container-low p-space-2xs">

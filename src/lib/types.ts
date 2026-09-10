@@ -205,6 +205,10 @@ export interface ShippingInfo {
   district: string;
   city: string;
   notes?: string;
+  /** Hóa đơn VAT (optional): đủ 3 trường thì xuất hóa đơn công ty. */
+  companyName?: string;
+  taxCode?: string;
+  companyAddress?: string;
 }
 
 export type DeliveryMethod = "standard" | "express" | "pickup";
@@ -239,6 +243,14 @@ export interface OrderLine {
   image: string;
 }
 
+export type Carrier = "ghn" | "ghtk" | "manual";
+
+export interface InvoiceInfo {
+  companyName: string;
+  taxCode: string;
+  companyAddress: string;
+}
+
 export interface Order {
   id: string;
   number: string;
@@ -251,6 +263,9 @@ export interface Order {
   payment: PaymentMethod;
   lines: OrderLine[];
   totals: CartTotals;
+  /** Vận đơn do admin nhập khi bàn giao cho đơn vị vận chuyển. */
+  trackingCode?: string;
+  carrier?: Carrier;
   /**
    * Token sở hữu đơn khách vãng lai — server trả đúng 1 lần lúc đặt hàng,
    * client lưu localStorage để xem/hủy/thanh toán. KHÔNG log token này.

@@ -135,6 +135,9 @@ model Order {
   // Đơn khách vãng lai: chỉ ai giữ raw token (trả 1 lần lúc đặt hàng) mới
   // được xem/hủy/thanh toán. DB chỉ lưu SHA-256 — lộ DB không đủ mạo danh.
   guestTokenHash String? @unique
+  // Vận đơn: admin nhập khi bàn giao cho GHN/GHTK (xem docs/shipping-integration.md)
+  trackingCode String?
+  carrier String?
   lines      OrderLine[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt

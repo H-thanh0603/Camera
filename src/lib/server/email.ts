@@ -38,11 +38,17 @@ export async function sendEmail(input: SendEmailInput): Promise<{ sent: boolean;
   }
 }
 
-export function orderConfirmationHtml(orderNumber: string, total: number, name: string): string {
+export function orderConfirmationHtml(
+  orderNumber: string,
+  total: number,
+  name: string,
+  invoice?: { companyName: string; taxCode: string } | null,
+): string {
   const amount = total.toLocaleString("vi-VN");
   return `<div style="font-family:sans-serif;max-width:560px">
 <h2>Cảm ơn ${name}, đơn hàng ${orderNumber} đã được ghi nhận</h2>
 <p>Tổng giá trị: <strong>${amount}₫</strong></p>
+${invoice ? `<p>Hóa đơn VAT: <strong>${invoice.companyName}</strong> (MST ${invoice.taxCode}) — kế toán gửi hóa đơn điện tử qua email này.</p>` : ""}
 <p>Concierge Lumina sẽ liên hệ xác nhận trong 30 phút. Theo dõi đơn tại tài khoản của bạn.</p>
 </div>`;
 }

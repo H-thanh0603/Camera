@@ -27,6 +27,10 @@ const envSchema = z.object({
   R2_BUCKET: z.string().min(1).optional(),
   R2_PUBLIC_URL: z.string().url().optional(),
   TRUST_PROXY_COUNT: z.string().regex(/^\d+$/).optional(),
+  // Vận chuyển: thiếu thì admin nhập mã vận đơn tay (manual).
+  GHN_TOKEN: z.string().min(1).optional(),
+  GHN_SHOP_ID: z.string().min(1).optional(),
+  GHTK_TOKEN: z.string().min(1).optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

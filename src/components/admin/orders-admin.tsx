@@ -34,6 +34,34 @@ export function OrdersAdmin() {
   const orders = data?.orders ?? [];
   const totalPages = data?.totalPages ?? 1;
 
+  const saveTracking = useMutation({
+    mutationFn: async ({ id, trackingCode, carrier }: { id: string; trackingCode: string; carrier: string }) => {
+      const res = await fetch(`/api/admin/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trackingCode, carrier }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Lưu vận đơn thất bại.");
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.setQueryData<{ orders: Order[]; total: number; totalPages: number }>(
+        ["admin", "orders", page, filter],
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                orders: prev.orders.map((o) =>
+                  o.id === variables.id
+                    ? { ...o, trackingCode: variables.trackingCode || undefined, carrier: variables.carrier as Order["carrier"] }
+                    : o,
+                ),
+              }
+            : prev,
+      );
+    },
+  });
+
   const changeStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: OrderStatus }) => {
       const res = await fetch(`/api/admin/orders/${id}`, {
@@ -132,7 +160,9 @@ export function OrdersAdmin() {
               </ul>
               <p className={cn("font-telemetry-xs text-telemetry-xs uppercase text-outline")}>
                 Giao nhận: {o.delivery} • Thanh toán: {o.payment} • Địa chỉ: {o.shipping.address}, {o.shipping.district}, {o.shipping.city}
+                {o.shipping.companyName ? ` • VAT: ${o.shipping.companyName} (MST ${o.shipping.taxCode})` : ""}
               </p>
+              <TrackingEditor order={o} onSave={(trackingCode, carrier) => saveTracking.mutate({ id: o.id, trackingCode, carrier })} saving={saveTracking.isPending} />
             </li>
           ))}
         </ul>
@@ -150,5 +180,55 @@ export function OrdersAdmin() {
         </>
       )}
     </div>
+  );
+}
+
+function TrackingEditor({
+  order,
+  onSave,
+  saving,
+}: {
+  order: Order;
+  onSave: (trackingCode: string, carrier: string) => void;
+  saving: boolean;
+}) {
+  const [code, setCode] = useState(order.trackingCode ?? "");
+  const [carrier, setCarrier] = useState<string>(order.carrier ?? "manual");
+  const dirty = code !== (order.trackingCode ?? "") || carrier !== (order.carrier ?? "manual");
+  return (
+    <form
+      className="flex flex-wrap items-center gap-space-xs"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(code.trim(), carrier);
+      }}
+    >
+      <label className="sr-only" htmlFor={`carrier-${order.id}`}>Đơn vị vận chuyển {order.number}</label>
+      <select
+        id={`carrier-${order.id}`}
+        value={carrier}
+        onChange={(e) => setCarrier(e.target.value)}
+        className="rounded-lg bg-surface-container-low px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface outline-none"
+      >
+        <option value="manual">Tự bàn giao</option>
+        <option value="ghn">GHN</option>
+        <option value="ghtk">GHTK</option>
+      </select>
+      <label className="sr-only" htmlFor={`tracking-${order.id}`}>Mã vận đơn {order.number}</label>
+      <input
+        id={`tracking-${order.id}`}
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder="Mã vận đơn…"
+        className="min-w-40 flex-1 rounded-lg bg-surface-container-low px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs text-on-surface outline-none placeholder:text-outline focus:ring-1 focus:ring-primary"
+      />
+      <button
+        type="submit"
+        disabled={!dirty || saving}
+        className="rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-primary hover:text-on-primary disabled:opacity-40"
+      >
+        {saving ? "Đang lưu…" : "Lưu vận đơn"}
+      </button>
+    </form>
   );
 }

@@ -103,6 +103,8 @@ CREATE TABLE "Order" (
     "totalAmount" INTEGER NOT NULL DEFAULT 0,
     "idempotencyKey" TEXT,
     "guestTokenHash" TEXT,
+    "trackingCode" TEXT,
+    "carrier" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

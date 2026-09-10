@@ -287,7 +287,14 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         kind: "order-confirmation",
         to: contact.email,
         subject: `Xác nhận đơn hàng ${created.number} — Lumina Optics`,
-        html: orderConfirmationHtml(created.number, totals.total, contact.fullName),
+        html: orderConfirmationHtml(
+          created.number,
+          totals.total,
+          contact.fullName,
+          shipping.companyName && shipping.taxCode
+            ? { companyName: shipping.companyName, taxCode: shipping.taxCode }
+            : null,
+        ),
       },
       tx,
     );

@@ -18,6 +18,8 @@ type OrderRow = {
   delivery: string;
   payment: string;
   totals: unknown;
+  trackingCode: string | null;
+  carrier: string | null;
   lines: {
     productId: string;
     variantId: string | null;
@@ -41,6 +43,8 @@ export function dbOrderToDomain(order: OrderRow): Order {
     delivery: order.delivery as Order["delivery"],
     payment: order.payment as Order["payment"],
     totals: order.totals as Order["totals"],
+    ...(order.trackingCode ? { trackingCode: order.trackingCode } : {}),
+    ...(order.carrier ? { carrier: order.carrier as Order["carrier"] } : {}),
     lines: order.lines.map((l) => ({
       productId: l.productId,
       variantId: l.variantId ?? undefined,

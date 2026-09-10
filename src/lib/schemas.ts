@@ -21,13 +21,36 @@ export const contactSchema = z.object({
   phone: phoneVN,
 });
 
-export const shippingSchema = z.object({
-  address: z.string().trim().min(4, "Địa chỉ là bắt buộc."),
-  ward: z.string().trim().min(1, "Phường/xã là bắt buộc."),
-  district: z.string().trim().min(1, "Quận/huyện là bắt buộc."),
-  city: z.string().trim().min(1, "Tỉnh/thành phố là bắt buộc."),
-  notes: z.string().trim().max(500).optional(),
-});
+/** Mã số thuế VN: 10 số, chi nhánh thêm -001… */
+export const taxCodeVN = z
+  .string()
+  .trim()
+  .regex(/^\d{10}(-\d{3})?$/, "Mã số thuế gồm 10 số (chi nhánh thêm -XXX).");
+
+export const shippingSchema = z
+  .object({
+    address: z.string().trim().min(4, "Địa chỉ là bắt buộc."),
+    ward: z.string().trim().min(1, "Phường/xã là bắt buộc."),
+    district: z.string().trim().min(1, "Quận/huyện là bắt buộc."),
+    city: z.string().trim().min(1, "Tỉnh/thành phố là bắt buộc."),
+    notes: z.string().trim().max(500).optional(),
+    // Hóa đơn VAT: bỏ trống cả 3 = không xuất; điền thì phải đủ cả 3.
+    companyName: z.string().trim().max(160).optional(),
+    taxCode: z.string().trim().max(14).optional(),
+    companyAddress: z.string().trim().max(220).optional(),
+  })
+  .superRefine((v, ctx) => {
+    const filled = [v.companyName, v.taxCode, v.companyAddress].filter((s) => s && s.length > 0);
+    if (filled.length > 0 && filled.length < 3) {
+      ctx.addIssue({ code: "custom", message: "Xuất hóa đơn cần đủ tên công ty, mã số thuế và địa chỉ.", path: ["companyName"] });
+    }
+    if (v.taxCode) {
+      const parsed = taxCodeVN.safeParse(v.taxCode);
+      if (!parsed.success) {
+        ctx.addIssue({ code: "custom", message: parsed.error.issues[0]?.message ?? "Mã số thuế không hợp lệ.", path: ["taxCode"] });
+      }
+    }
+  });
 
 export const registerSchema = z.object({
   name: z.string().trim().min(2, "Vui lòng nhập họ tên."),

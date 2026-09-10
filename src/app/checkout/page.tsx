@@ -46,6 +46,7 @@ export default function CheckoutPage() {
 
   const [contact, setContact] = useState<ContactInfo | null>(null);
   const [shipping, setShipping] = useState<ShippingInfo | null>(null);
+  const [wantInvoice, setWantInvoice] = useState(false);
   const [delivery, setDelivery] = useState<"standard" | "express" | "pickup">("standard");
   const [payment, setPayment] = useState<"bank_transfer" | "cod" | "card_on_delivery">("bank_transfer");
 
@@ -303,7 +304,13 @@ export default function CheckoutPage() {
           {step === 1 && (
             <form
               onSubmit={shippingForm.handleSubmit((values) => {
-                setShipping(values);
+                // Không xuất hóa đơn → bỏ trống 3 trường VAT (schema bắt đủ bộ khi điền)
+                const { companyName, taxCode, companyAddress, ...rest } = values;
+                setShipping(
+                  wantInvoice
+                    ? values
+                    : rest,
+                );
                 setStep(2);
               })}
               noValidate
@@ -317,6 +324,19 @@ export default function CheckoutPage() {
                 <Field label="Tỉnh/thành" inputProps={shippingForm.register("city")} error={shippingForm.formState.errors.city?.message} />
               </div>
               <Field label="Ghi chú cho kỹ thuật viên (tùy chọn)" inputProps={shippingForm.register("notes")} />
+              <label className="flex cursor-pointer items-center gap-space-xs rounded-lg bg-surface-container-low p-space-sm">
+                <input type="checkbox" checked={wantInvoice} onChange={(e) => setWantInvoice(e.target.checked)} className="h-4 w-4 accent-primary" />
+                <span className="font-body-sm text-body-sm text-on-surface">Xuất hóa đơn VAT công ty</span>
+              </label>
+              {wantInvoice && (
+                <div className="flex flex-col gap-space-sm rounded-lg border border-surface-container-high p-space-sm">
+                  <Field label="Tên công ty" inputProps={shippingForm.register("companyName")} error={shippingForm.formState.errors.companyName?.message} autoComplete="organization" />
+                  <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2">
+                    <Field label="Mã số thuế (10 số)" inputProps={shippingForm.register("taxCode")} error={shippingForm.formState.errors.taxCode?.message} placeholder="0312345678" />
+                    <Field label="Địa chỉ công ty" inputProps={shippingForm.register("companyAddress")} error={shippingForm.formState.errors.companyAddress?.message} />
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <button type="button" onClick={() => setStep(0)} className="font-telemetry-data text-telemetry-data uppercase text-on-surface-variant transition-colors hover:text-primary">
                   Bước trước
@@ -397,7 +417,7 @@ export default function CheckoutPage() {
               <h2 className="font-headline-sm text-headline-sm uppercase text-on-surface">Xem lại đơn hàng</h2>
               <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2">
                 <SummaryBlock title="Liên hệ" onEdit={() => setStep(0)} rows={[contact.fullName, contact.email, contact.phone]} />
-                <SummaryBlock title="Vận chuyển" onEdit={() => setStep(1)} rows={[`${shipping.address}, ${shipping.ward}`, `${shipping.district}, ${shipping.city}`, shipping.notes || "—"]} />
+                <SummaryBlock title="Vận chuyển" onEdit={() => setStep(1)} rows={[`${shipping.address}, ${shipping.ward}`, `${shipping.district}, ${shipping.city}`, shipping.notes || "—", shipping.companyName ? `VAT: ${shipping.companyName} • MST ${shipping.taxCode}` : "Không xuất hóa đơn"]} />
                 <SummaryBlock title="Giao nhận" onEdit={() => setStep(2)} rows={[DELIVERY_OPTIONS.find((d) => d.value === delivery)?.label ?? ""]} />
                 <SummaryBlock title="Thanh toán" onEdit={() => setStep(3)} rows={[PAYMENT_OPTIONS.find((p) => p.value === payment)?.label ?? ""]} />
               </div>
