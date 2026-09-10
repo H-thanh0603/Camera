@@ -166,6 +166,21 @@ export async function apiResolveProducts(ids: string[]): Promise<import("@/lib/t
   return products;
 }
 
+/* ---------- GDPR tự phục vụ ---------- */
+
+export async function apiExportAccount(): Promise<Record<string, unknown>> {
+  const res = await fetch("/api/account/export");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(res.status, (data as { error?: string }).error ?? "Không xuất được dữ liệu.");
+  }
+  return data as Record<string, unknown>;
+}
+
+export async function apiDeleteAccount(input: { password?: string; confirmEmail?: string }): Promise<void> {
+  await request<{ ok: true }>("/api/account/delete", { method: "POST", body: JSON.stringify(input) });
+}
+
 /* ---------- Reviews ---------- */
 
 export async function apiSubmitReview(input: {

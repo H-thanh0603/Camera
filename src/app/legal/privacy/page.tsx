@@ -26,7 +26,7 @@ const SECTIONS = [
   {
     title: "4. Quyền của bạn",
     body: [
-      "Bạn có quyền xem, sửa hoặc yêu cầu xóa dữ liệu cá nhân của mình bất kỳ lúc nào bằng cách liên hệ concierge. Yêu cầu xóa tài khoản được xử lý trong vòng 30 ngày, trừ dữ liệu hóa đơn bắt buộc lưu theo quy định kế toán.",
+      "Bạn có thể tự tải toàn bộ dữ liệu (JSON) và xóa tài khoản ngay trong trang Tài khoản — có hiệu lực tức thì. Đơn hàng đã giao được giữ lại ẩn danh cho kế toán theo quy định. Nếu cần hỗ trợ, liên hệ concierge (xử lý trong vòng 30 ngày).",
     ],
   },
   {

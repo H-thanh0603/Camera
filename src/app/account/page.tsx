@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { Order, OrderStep } from "@/lib/types";
 import { ORDER_STEP_ORDER } from "@/lib/types";
 import { listOrders, cancelOrder } from "@/lib/services/order-service";
-import { toAuthError } from "@/lib/api-client";
+import { toAuthError, apiExportAccount, apiDeleteAccount, ApiError } from "@/lib/api-client";
 import { AppImage } from "@/components/ui/app-image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -294,7 +294,98 @@ export default function AccountPage() {
           </ul>
         )}
       </section>
+
+      <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg" aria-label="Dữ liệu cá nhân">
+        <h2 className="font-headline-md text-headline-md text-on-surface">Dữ Liệu Của Tôi</h2>
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          Tải toàn bộ dữ liệu (hồ sơ, đơn hàng, đánh giá) hoặc xóa tài khoản vĩnh viễn.
+          Đơn hàng đã giao được giữ lại ẩn danh cho kế toán.
+        </p>
+        <div className="flex flex-wrap gap-space-sm">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const data = await apiExportAccount();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "lumina-du-lieu.json";
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                pushToast("Không xuất được dữ liệu. Thử lại sau.", "error");
+              }
+            }}
+            className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest"
+          >
+            Tải dữ liệu (JSON)
+          </button>
+          <DeleteAccountButton pushToast={pushToast} />
+        </div>
+      </section>
     </div>
+  );
+}
+
+function DeleteAccountButton({ pushToast }: { pushToast: (m: string, t: "success" | "error" | "info") => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [secret, setSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="rounded-lg px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-error transition-colors hover:bg-error-container/20"
+      >
+        Xóa tài khoản…
+      </button>
+    );
+  }
+  return (
+    <form
+      className="flex w-full flex-col gap-space-sm rounded-lg border border-error/40 p-space-md"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          // Tài khoản mật khẩu nhập password; tài khoản Google nhập lại email.
+          const payload = secret.includes("@") ? { confirmEmail: secret } : { password: secret };
+          await apiDeleteAccount(payload);
+          window.location.href = "/";
+        } catch (err) {
+          setError(err instanceof ApiError ? err.message : "Không xóa được tài khoản.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <p className="font-body-sm text-body-sm text-error" role="alert">
+        Hành động không thể hoàn tác. Nhập <strong>mật khẩu</strong> (hoặc <strong>email</strong> nếu đăng nhập bằng Google) để xác nhận.
+      </p>
+      {error && <p className="font-body-sm text-body-sm text-error" role="alert">{error}</p>}
+      <div className="flex flex-wrap gap-space-sm">
+        <input
+          type="password"
+          autoComplete="off"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          placeholder="Mật khẩu hoặc email"
+          aria-label="Xác nhận xóa tài khoản"
+          className="min-w-0 flex-1 rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-error"
+        />
+        <button type="submit" disabled={busy || !secret} className="rounded-lg bg-error px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary disabled:opacity-60">
+          {busy ? "Đang xóa…" : "Xác nhận xóa"}
+        </button>
+        <button type="button" onClick={() => { setConfirming(false); setSecret(""); setError(null); pushToast("Đã hủy xóa tài khoản.", "info"); }} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface">
+          Hủy
+        </button>
+      </div>
+    </form>
   );
 }
 
