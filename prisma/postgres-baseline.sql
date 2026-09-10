@@ -10,8 +10,23 @@ CREATE TABLE "User" (
     "role" TEXT NOT NULL DEFAULT 'customer',
     "isBanned" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "totpSecret" TEXT,
+    "totpEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "totpBackupCodes" JSONB NOT NULL DEFAULT '[]',
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TotpChallenge" (
+    "id" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TotpChallenge_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -233,6 +248,12 @@ CREATE TABLE "TradeInLead" (
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "TotpChallenge_tokenHash_key" ON "TotpChallenge"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "TotpChallenge_userId_idx" ON "TotpChallenge"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Product_sku_key" ON "Product"("sku");
 
 -- CreateIndex
@@ -324,6 +345,9 @@ CREATE INDEX "EmailOutbox_sentAt_nextRunAt_idx" ON "EmailOutbox"("sentAt", "next
 
 -- CreateIndex
 CREATE INDEX "TradeInLead_status_idx" ON "TradeInLead"("status");
+
+-- AddForeignKey
+ALTER TABLE "TotpChallenge" ADD CONSTRAINT "TotpChallenge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProductVariant" ADD CONSTRAINT "ProductVariant_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;

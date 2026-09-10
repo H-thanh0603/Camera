@@ -29,6 +29,23 @@ model User {
   auditLogs    AuditLog[]
   passwordResetTokens PasswordResetToken[]
   savedBattles SavedBattle[]
+  totpChallenges TotpChallenge[]
+  // 2FA TOTP: secret base32 (chỉ có nghĩa khi totpEnabled), backup codes SHA-256
+  totpSecret String?
+  totpEnabled Boolean @default(false)
+  totpBackupCodes Json @default("[]")
+}
+
+model TotpChallenge {  // Thử thách 2FA sau password: 5 phút, dùng 1 lần.
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Product {

@@ -35,12 +35,43 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 /* ---------- Auth ---------- */
 
-export async function apiLogin(email: string, password: string): Promise<SessionUser> {
-  const { user } = await request<{ user: SessionUser }>("/api/auth/login", {
+export type LoginResult =
+  | { user: SessionUser }
+  | { twoFactorRequired: true; challengeToken: string };
+
+export async function apiLogin(email: string, password: string): Promise<LoginResult> {
+  const data = await request<{ user?: SessionUser; twoFactorRequired?: true; challengeToken?: string }>(
+    "/api/auth/login",
+    { method: "POST", body: JSON.stringify({ email, password }) },
+  );
+  if (data.twoFactorRequired && data.challengeToken) {
+    return { twoFactorRequired: true, challengeToken: data.challengeToken };
+  }
+  return { user: data.user as SessionUser };
+}
+
+export async function apiVerify2fa(challengeToken: string, code: string): Promise<SessionUser> {
+  const { user } = await request<{ user: SessionUser }>("/api/auth/2fa/verify", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ challengeToken, code }),
   });
   return user;
+}
+
+export async function api2faStatus(): Promise<{ enabled: boolean }> {
+  return request<{ enabled: boolean }>("/api/auth/2fa/status");
+}
+
+export async function api2faSetup(): Promise<{ secret: string; otpauthUrl: string }> {
+  return request("/api/auth/2fa/setup", { method: "POST", body: "{}" });
+}
+
+export async function api2faConfirm(code: string): Promise<{ backupCodes: string[] }> {
+  return request("/api/auth/2fa/confirm", { method: "POST", body: JSON.stringify({ code }) });
+}
+
+export async function api2faDisable(code: string): Promise<void> {
+  await request("/api/auth/2fa/disable", { method: "POST", body: JSON.stringify({ code }) });
 }
 
 export async function apiRegister(name: string, email: string, password: string): Promise<SessionUser> {

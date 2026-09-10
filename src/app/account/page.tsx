@@ -42,7 +42,7 @@ function loginInputClass(invalid: boolean): string {
 }
 
 export default function AccountPage() {
-  const { user, hydrated, authLoading, login, register, logout, pushToast } = useStore();
+  const { user, hydrated, authLoading, login, verify2fa, register, logout, pushToast } = useStore();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [serverError, setServerError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,6 +50,8 @@ export default function AccountPage() {
   const registerForm = useForm<RegisterInput>({ resolver: zodResolver(registerSchema), defaultValues: { name: "", email: "", password: "" } });
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [twofaCode, setTwofaCode] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -67,6 +69,28 @@ export default function AccountPage() {
       try {
         await login(values.email, values.password);
         pushToast("Đăng nhập thành công. Chào mừng đến Lumina Optics!", "success");
+      } catch (err) {
+        // Tài khoản bật 2FA → chuyển sang form nhập code (giữ challenge 5 phút)
+        if (err && typeof err === "object" && "twoFactorRequired" in err) {
+          setChallengeToken((err as unknown as { challengeToken: string }).challengeToken);
+          return;
+        }
+        setServerError(toAuthError(err).message);
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const doVerify2fa = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!challengeToken) return;
+      setBusy(true);
+      setServerError(null);
+      try {
+        await verify2fa(challengeToken, twofaCode);
+        setChallengeToken(null);
+        setTwofaCode("");
+        pushToast("Xác thực 2 bước thành công!", "success");
       } catch (err) {
         setServerError(toAuthError(err).message);
       } finally {
@@ -115,7 +139,32 @@ export default function AccountPage() {
             ))}
           </div>
 
-          {mode === "login" ? (
+          {challengeToken ? (
+            <form onSubmit={doVerify2fa} className="flex flex-col gap-space-sm">
+              <p className="rounded-lg bg-primary/10 p-space-sm font-body-sm text-body-sm text-on-surface-variant">
+                Tài khoản bật xác thực 2 bước — nhập mã 6 số từ app Authenticator (hoặc 1 mã dự phòng).
+              </p>
+              <div className="flex flex-col gap-space-2xs">
+                <label htmlFor="account-2fa" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mã xác thực</label>
+                <input
+                  id="account-2fa"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={twofaCode}
+                  onChange={(e) => setTwofaCode(e.target.value)}
+                  placeholder="123456"
+                  className={loginInputClass(false)}
+                />
+              </div>
+              <button type="submit" disabled={busy || !twofaCode} className="mt-space-xs flex items-center justify-center gap-space-xs rounded-lg bg-primary py-space-sm font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim disabled:opacity-60">
+                {busy && <Spinner className="border-on-primary border-t-transparent" />}
+                Xác thực
+              </button>
+              <button type="button" onClick={() => { setChallengeToken(null); setTwofaCode(""); }} className="self-end font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-primary">
+                ← Đăng nhập lại
+              </button>
+            </form>
+          ) : mode === "login" ? (
             <>
             <form onSubmit={loginForm.handleSubmit(doLogin)} noValidate className="flex flex-col gap-space-sm">
               <div className="flex flex-col gap-space-2xs">
@@ -309,6 +358,8 @@ export default function AccountPage() {
         )}
       </section>
 
+      <TwoFactorManager pushToast={pushToast} />
+
       <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg" aria-label="Dữ liệu cá nhân">
         <h2 className="font-headline-md text-headline-md text-on-surface">Dữ Liệu Của Tôi</h2>
         <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -340,6 +391,122 @@ export default function AccountPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function TwoFactorManager({ pushToast }: { pushToast: (m: string, t: "success" | "error" | "info") => void }) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [otpauth, setOtpauth] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    import("@/lib/api-client").then(({ api2faStatus }) =>
+      api2faStatus().then((s) => setEnabled(s.enabled)).catch(() => setEnabled(false)),
+    );
+  }, []);
+
+  const start = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { api2faSetup } = await import("@/lib/api-client");
+      const res = await api2faSetup();
+      setSecret(res.secret);
+      setOtpauth(res.otpauthUrl);
+    } catch {
+      setError("Không bắt đầu được thiết lập 2FA.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { api2faConfirm } = await import("@/lib/api-client");
+      const res = await api2faConfirm(code);
+      setBackupCodes(res.backupCodes);
+      setEnabled(true);
+      setSecret(null);
+      pushToast("Đã bật xác thực 2 bước.", "success");
+    } catch {
+      setError("Mã không đúng. Kiểm tra giờ trên điện thoại và thử lại.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { api2faDisable } = await import("@/lib/api-client");
+      await api2faDisable(code);
+      setEnabled(false);
+      setCode("");
+      pushToast("Đã tắt xác thực 2 bước.", "info");
+    } catch {
+      setError("Mã không đúng.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg" aria-label="Xác thực 2 bước">
+      <h2 className="font-headline-md text-headline-md text-on-surface">Xác Thực 2 Bước</h2>
+      {enabled === null ? (
+        <p className="font-body-sm text-body-sm text-outline">Đang kiểm tra…</p>
+      ) : backupCodes ? (
+        <div className="flex flex-col gap-space-sm">
+          <p className="rounded-lg bg-primary/10 p-space-sm font-body-sm text-body-sm text-on-surface-variant" role="alert">
+            Lưu 8 mã dự phòng ở nơi an toàn — mỗi mã dùng 1 lần khi mất điện thoại:
+          </p>
+          <ul className="grid grid-cols-2 gap-space-xs font-telemetry-data text-telemetry-data text-primary">
+            {backupCodes.map((c) => (
+              <li key={c} className="rounded-lg bg-surface-container-low p-space-xs text-center">{c}</li>
+            ))}
+          </ul>
+        </div>
+      ) : enabled ? (
+        <form onSubmit={disable} className="flex flex-wrap items-center gap-space-sm">
+          <p className="w-full font-body-sm text-body-sm text-on-surface-variant">2FA đang bật. Nhập mã hiện tại để tắt.</p>
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã 6 số" inputMode="numeric" aria-label="Mã 2FA để tắt" className="min-w-0 flex-1 rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary" />
+          <button type="submit" disabled={busy || !code} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-error disabled:opacity-60">
+            Tắt 2FA
+          </button>
+        </form>
+      ) : secret ? (
+        <form onSubmit={confirm} className="flex flex-col gap-space-sm">
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Quét app Authenticator (Google Authenticator / 1Password / Authy) bằng secret hoặc link:
+          </p>
+          <p className="break-all rounded-lg bg-surface-container-low p-space-sm font-telemetry-data text-telemetry-data text-primary">{secret}</p>
+          {otpauth && <a href={otpauth} className="font-body-sm text-body-sm text-primary underline">Mở trong app Authenticator</a>}
+          <div className="flex flex-wrap gap-space-sm">
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Mã 6 số từ app" inputMode="numeric" aria-label="Mã xác nhận 2FA" className="min-w-0 flex-1 rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary" />
+            <button type="submit" disabled={busy || !code} className="rounded-lg bg-primary px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary disabled:opacity-60">
+              Xác nhận bật
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-space-sm">
+          <p className="w-full font-body-sm text-body-sm text-on-surface-variant">Thêm lớp bảo vệ đăng nhập bằng mã 6 số đổi mỗi 30 giây.</p>
+          <button type="button" onClick={start} disabled={busy} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface transition-colors hover:bg-primary hover:text-on-primary disabled:opacity-60">
+            Bật 2FA
+          </button>
+        </div>
+      )}
+      {error && <p className="font-body-sm text-body-sm text-error" role="alert">{error}</p>}
+    </section>
   );
 }
 

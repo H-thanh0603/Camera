@@ -137,6 +137,7 @@ interface StoreContextValue {
   user: SessionUser | null;
   authLoading: boolean;
   login: (email: string, password: string) => Promise<SessionUser>;
+  verify2fa: (challengeToken: string, code: string) => Promise<SessionUser>;
   register: (name: string, email: string, password: string) => Promise<SessionUser>;
   logout: () => void;
   toasts: Toast[];
@@ -289,7 +290,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       user: state.user,
       authLoading,
       login: async (email, password) => {
-        const u = await apiLogin(email, password);
+        const result = await apiLogin(email, password);
+        if ("twoFactorRequired" in result) {
+          // Tài khoản bật 2FA — UI chuyển sang form nhập code (xem AccountPage).
+          throw { twoFactorRequired: true, challengeToken: result.challengeToken };
+        }
+        dispatch({ type: "auth/set", user: result.user });
+        return result.user;
+      },
+      verify2fa: async (challengeToken, code) => {
+        const { apiVerify2fa } = await import("@/lib/api-client");
+        const u = await apiVerify2fa(challengeToken, code);
         dispatch({ type: "auth/set", user: u });
         return u;
       },

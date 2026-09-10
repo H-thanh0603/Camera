@@ -17,6 +17,11 @@ const STATUS_CLASS: Record<string, string> = {
 };
 
 export default async function AdminDashboardPage() {
+  const { getSessionUser } = await import("@/lib/server/session");
+  const me = await getSessionUser();
+  const myTotp = me
+    ? await prisma.user.findUnique({ where: { id: me.id }, select: { totpEnabled: true } })
+    : null;
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
   const paidStatuses = ["paid", "processing", "shipped", "delivered"];
@@ -71,6 +76,13 @@ export default async function AdminDashboardPage() {
         <span className="section-telemetry">LUMINA OPS CENTER</span>
         <h1 className="font-headline-md text-headline-md text-on-surface">Admin Dashboard</h1>
       </header>
+
+      {myTotp && !myTotp.totpEnabled && (
+        <p className="rounded-xl border border-error/40 bg-error-container/20 p-space-md font-body-sm text-body-sm text-error" role="alert">
+          Tài khoản admin chưa bật xác thực 2 bước — bật ngay ở trang{" "}
+          <a href="/account" className="underline">Tài khoản → Xác thực 2 bước</a> trước khi tiếp tục quản trị.
+        </p>
+      )}
 
       <section className="grid grid-cols-2 gap-space-md lg:grid-cols-4" aria-label="Thống kê">
         {stats.map((s) => (

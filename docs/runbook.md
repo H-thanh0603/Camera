@@ -87,6 +87,15 @@
 - Audit log: `order.placed/cancelled/paid_via_webhook`, `coupon.*`,
   `auth.password_reset_*` — xem ở admin dashboard.
 
+## 6b. Khôi phục 2FA (mất điện thoại)
+
+- User thường: dùng 1 trong 8 mã dự phòng ở bước 2 (mỗi mã 1 lần).
+- Admin mất cả backup: admin khác vào `/admin` → thu hồi phiên
+  (`POST /api/admin/users/:id/revoke-sessions`), rồi reset trực tiếp DB:
+  `UPDATE "User" SET "totpEnabled"=false, "totpSecret"=NULL,
+  "totpBackupCodes"='[]' WHERE email='...';` — ghi audit tay (ai, khi nào,
+  ticket nào). Dashboard cảnh báo admin chưa bật 2FA.
+
 ## 7. Checklist bàn giao
 
 - [ ] Env production đủ + health báo đúng cờ

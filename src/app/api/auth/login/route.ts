@@ -2,11 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { verifyPassword } from "@/lib/server/password";
 import { createSession } from "@/lib/server/session";
+import { createTotpChallenge } from "@/lib/server/two-factor";
 import { loginSchema, zodFieldErrors } from "@/lib/schemas";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 
-/** POST /api/auth/login — xác thực + tạo phiên. */
+/** POST /api/auth/login — xác thực + tạo phiên (2FA: trả challenge bước 2). */
 
 // 10 lần/phút/IP — chống brute-force (Redis đa instance, fallback memory)
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
@@ -42,6 +43,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Tài khoản đã bị khóa. Liên hệ concierge để được hỗ trợ." }, { status: 403 });
   }
 
+  // 2FA bật: không tạo session vội — trả challenge 5 phút cho bước 2.
+  if (user.totpEnabled) {
+    const challengeToken = await createTotpChallenge(user.id);
+    return NextResponse.json({ twoFactorRequired: true, challengeToken });
+  }
   await createSession(user.id);
   return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email } });
 }
