@@ -47,6 +47,11 @@ await check("admin API chặn anonymous (403)", async () => {
   assert(r.status === 403, `status ${r.status}, mong đợi 403`);
 });
 
+await check("guest lookup thiếu token → 422", async () => {
+  const r = await get("/api/orders/lookup?number=LUM-TEST");
+  assert(r.status === 422, `status ${r.status}, mong đợi 422`);
+});
+
 await check("webhook thiếu chữ ký → 401/503", async () => {
   const r = await fetch(`${BASE}/api/payments/webhook`, {
     method: "POST",

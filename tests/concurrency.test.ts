@@ -83,20 +83,32 @@ describe("concurrency", () => {
     expect((await prisma.coupon.findUnique({ where: { code: "TST1" } }))?.usedCount).toBe(1);
   });
 
-  it("idempotency tuần tự: trùng key → cùng 1 đơn", { timeout: 30000 }, async () => {
+  it("idempotency tuần tự: trùng key + token → cùng 1 đơn", { timeout: 30000 }, async () => {
     await makeProduct(10);
     const key = `tst-${Date.now()}`;
-    const a = await placeOrderServer(draft(1, { idempotencyKey: key }));
-    const b = await placeOrderServer(draft(1, { idempotencyKey: key }));
+    const token = "a".repeat(32);
+    const a = await placeOrderServer(draft(1, { idempotencyKey: key, guestToken: token }));
+    const b = await placeOrderServer(draft(1, { idempotencyKey: key, guestToken: token }));
     expect(b.id).toBe(a.id);
     expect(await prisma.order.count({ where: { idempotencyKey: key } })).toBe(1);
+  });
+
+  it("idempotency: trùng key nhưng sai token → 403 (chống chiếm đơn)", { timeout: 30000 }, async () => {
+    await makeProduct(10);
+    const key = `tst-hijack-${Date.now()}`;
+    await placeOrderServer(draft(1, { idempotencyKey: key, guestToken: "b".repeat(32) }));
+    const { OrderForbidden } = await import("@/lib/server/order-mapper");
+    await expect(placeOrderServer(draft(1, { idempotencyKey: key, guestToken: "c".repeat(32) }))).rejects.toBeInstanceOf(
+      OrderForbidden,
+    );
   });
 
   it("idempotency song song: 5 request cùng key → 1 đơn duy nhất", { timeout: 60000 }, async () => {
     await makeProduct(10);
     const key = `tst-conc-${Date.now()}`;
+    const token = "d".repeat(32);
     const results = await Promise.allSettled(
-      Array.from({ length: 5 }, () => placeOrderServer(draft(1, { idempotencyKey: key }))),
+      Array.from({ length: 5 }, () => placeOrderServer(draft(1, { idempotencyKey: key, guestToken: token }))),
     );
     const ids = new Set(
       results.filter((r) => r.status === "fulfilled").map((r) => (r as PromiseFulfilledResult<{ id: string }>).value.id),

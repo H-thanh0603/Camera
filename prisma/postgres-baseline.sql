@@ -102,6 +102,7 @@ CREATE TABLE "Order" (
     "totals" JSONB NOT NULL,
     "totalAmount" INTEGER NOT NULL DEFAULT 0,
     "idempotencyKey" TEXT,
+    "guestTokenHash" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -257,6 +258,9 @@ CREATE UNIQUE INDEX "Order_number_key" ON "Order"("number");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Order_idempotencyKey_key" ON "Order"("idempotencyKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Order_guestTokenHash_key" ON "Order"("guestTokenHash");
 
 -- CreateIndex
 CREATE INDEX "Order_userId_idx" ON "Order"("userId");

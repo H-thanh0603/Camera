@@ -2,6 +2,7 @@ import type { CartTotals, ContactInfo, Order, OrderLine, Product, ShippingInfo }
 import { calculateTotals, maxQuantityOf, resolveVariant, unitPriceOf, unitCompareAtPriceOf } from "@/lib/services/cart-service";
 import { applyCouponToSubtotal, normalizeCouponCode } from "@/lib/services/coupon-service";
 import { dbGetProductById } from "./product-db";
+import { hashGuestToken, newGuestToken } from "./guest-token";
 import { getCouponByCode } from "./coupons";
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "node:crypto";
@@ -42,6 +43,13 @@ export interface PlaceOrderInput {
   /** Chống double-submit: key trùng → trả về đơn đã tạo thay vì tạo mới. */
   idempotencyKey?: string;
   couponCode?: string;
+  /**
+   * Token sở hữu đơn guest do CLIENT sinh 1 lần/intent (cùng vòng đời với
+   * idempotencyKey). Server chỉ lưu SHA-256. Retry cùng intent gửi lại token
+   * cũ để server đối chiếu — response mất mạng vẫn không bị khóa đơn.
+   * Bỏ trống → server tự sinh và trả về 1 lần.
+   */
+  guestToken?: string;
 }
 
 function orderNumber(): string {
@@ -121,18 +129,35 @@ export async function verifyAndPriceLines(
   return { finalLines, totals };
 }
 
+const GUEST_TOKEN_RE = /^[A-Za-z0-9_-]{32,128}$/;
+
 export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   const { contact, shipping, delivery, payment } = input;
 
-  // Idempotency: request trùng key (retry mạng, double-click) trả lại đơn cũ
+  if (input.guestToken && !GUEST_TOKEN_RE.test(input.guestToken)) {
+    throw new OrderValidationError("Token bảo mật đơn hàng không hợp lệ.");
+  }
+
+  // Idempotency: request trùng key (retry mạng, double-click) trả lại đơn cũ.
+  // Đơn guest: đối chiếu token chống chiếm đơn — token sai → 403, không lộ đơn.
   if (input.idempotencyKey) {
     const existing = await prisma.order.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
       include: { lines: true },
     });
     if (existing) {
-      const { dbOrderToDomain } = await import("./order-mapper");
-      return dbOrderToDomain(existing);
+      const { dbOrderToDomain, OrderForbidden } = await import("./order-mapper");
+      const { verifyGuestToken } = await import("./guest-token");
+      const row = existing as unknown as { userId?: string | null; guestTokenHash?: string | null };
+      if (!row.userId && row.guestTokenHash) {
+        if (!verifyGuestToken(input.guestToken ?? "", row.guestTokenHash)) {
+          throw new OrderForbidden("Token bảo mật đơn hàng không đúng.");
+        }
+      }
+      const order = dbOrderToDomain(existing);
+      // Trả lại token caller đã gửi để client persist (server không lưu raw).
+      if (!row.userId && input.guestToken) order.guestToken = input.guestToken;
+      return order;
     }
   }
 
@@ -175,6 +200,9 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
 
   const productById = (id: string) => finalProducts.find((p) => p.id === id)!;
   const user = await getSessionUser();
+  // Đơn guest: token client gửi (hoặc server sinh) — DB chỉ lưu hash.
+  const rawGuestToken = user ? undefined : (input.guestToken ?? newGuestToken());
+  const guestTokenHash = rawGuestToken ? hashGuestToken(rawGuestToken) : null;
 
   // Transaction: trừ kho nguyên tử + tạo đơn. Chống oversell khi 2 người
   // mua cùng lúc: updateMany có điều kiện stock >= qty, affected==0 → hết hàng.
@@ -234,6 +262,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         totals: totals as unknown as Prisma.InputJsonValue,
         totalAmount: totals.total,
         idempotencyKey: input.idempotencyKey ?? null,
+        guestTokenHash,
         lines: {
           create: finalLines.map((l) => ({
             productId: l.productId,
@@ -263,8 +292,17 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         include: { lines: true },
       });
       if (existing) {
-        const { dbOrderToDomain } = await import("./order-mapper");
-        return dbOrderToDomain(existing);
+        const { dbOrderToDomain, OrderForbidden } = await import("./order-mapper");
+        const { verifyGuestToken } = await import("./guest-token");
+        const row = existing as unknown as { userId?: string | null; guestTokenHash?: string | null };
+        if (!row.userId && row.guestTokenHash) {
+          if (!verifyGuestToken(input.guestToken ?? "", row.guestTokenHash)) {
+            throw new OrderForbidden("Token bảo mật đơn hàng không đúng.");
+          }
+        }
+        const order = dbOrderToDomain(existing);
+        if (!row.userId && input.guestToken) order.guestToken = input.guestToken;
+        return order;
       }
     }
     throw error;
@@ -310,5 +348,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
     payment: payment as Order["payment"],
     totals,
     lines: finalLines,
+    // Raw token trả đúng 1 lần — client lưu ngay, server không bao giờ trả lại.
+    ...(rawGuestToken ? { guestToken: rawGuestToken } : {}),
   };
 }

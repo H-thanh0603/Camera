@@ -131,6 +131,9 @@ model Order {
   totalAmount Int @default(0)
   // chống double-submit: client gửi key ngẫu nhiên 1 lần per intent
   idempotencyKey String? @unique
+  // Đơn khách vãng lai: chỉ ai giữ raw token (trả 1 lần lúc đặt hàng) mới
+  // được xem/hủy/thanh toán. DB chỉ lưu SHA-256 — lộ DB không đủ mạo danh.
+  guestTokenHash String? @unique
   lines      OrderLine[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt

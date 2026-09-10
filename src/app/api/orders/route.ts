@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { placeOrderServer, OrderValidationError } from "@/lib/server/place-order";
-import { getUserOrders } from "@/lib/server/order-mapper";
+import { getUserOrders, OrderForbidden } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof OrderValidationError) {
       return NextResponse.json({ error: error.message }, { status: 422 });
+    }
+    if (error instanceof OrderForbidden) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
     logger.error("order.place_failed", { error: String(error), requestId });
     return NextResponse.json({ error: "Không thể tạo đơn hàng. Vui lòng thử lại." }, { status: 500 });

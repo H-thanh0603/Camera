@@ -251,6 +251,11 @@ export interface Order {
   payment: PaymentMethod;
   lines: OrderLine[];
   totals: CartTotals;
+  /**
+   * Token sở hữu đơn khách vãng lai — server trả đúng 1 lần lúc đặt hàng,
+   * client lưu localStorage để xem/hủy/thanh toán. KHÔNG log token này.
+   */
+  guestToken?: string;
 }
 
 export const ORDER_STEP_ORDER: OrderStep[] = [

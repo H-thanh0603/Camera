@@ -1,5 +1,5 @@
 import type { CartSnapshot, ContactInfo, Order, ShippingInfo } from "@/lib/types";
-import { apiCancelOrder, apiListOrders, apiPlaceOrder } from "@/lib/api-client";
+import { apiCancelOrder, apiListOrders, apiPlaceOrder, newGuestToken } from "@/lib/api-client";
 
 /**
  * OrderService (client) — giao tiếp với /api/orders.
@@ -14,6 +14,11 @@ export interface PlaceOrderDraft {
   payment: "bank_transfer" | "cod" | "card_on_delivery";
   snapshot: CartSnapshot;
   couponCode?: string;
+  /**
+   * Token sở hữu đơn guest — checkout sinh 1 lần/intent (cùng idempotencyKey).
+   * Bỏ trống và là guest → api-client tự sinh.
+   */
+  guestToken?: string;
 }
 
 export async function placeOrder(draft: PlaceOrderDraft, idempotencyKey?: string): Promise<Order> {
@@ -28,6 +33,7 @@ export async function placeOrder(draft: PlaceOrderDraft, idempotencyKey?: string
       quantity: l.quantity,
     })),
     ...(draft.couponCode ? { couponCode: draft.couponCode } : {}),
+    guestToken: draft.guestToken ?? newGuestToken(),
   }, idempotencyKey);
 }
 

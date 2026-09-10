@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getOwnOrder } from "@/lib/server/order-mapper";
+import { getOwnOrder, OrderForbidden } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
 import { CancelConflict, completeCancel } from "@/lib/server/cancel-order";
 import { CANCELLABLE_STATUSES } from "@/lib/server/order-status";
@@ -21,7 +21,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
   const { id } = await params;
-  const order = await getOwnOrder(id);
+  let order;
+  try {
+    order = await getOwnOrder(id, request.headers.get("x-guest-token") ?? undefined);
+  } catch (error) {
+    if (error instanceof OrderForbidden) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+    throw error;
+  }
   if (!order) return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
   if (!CANCELLABLE_STATUSES.includes(order.status)) {
     return NextResponse.json({ error: "Đơn hàng đang giao không thể hủy." }, { status: 409 });

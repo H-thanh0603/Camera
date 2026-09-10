@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ContactInfo, Order, ShippingInfo } from "@/lib/types";
 import { placeOrder } from "@/lib/services/order-service";
-import { ApiError, apiPayDemo } from "@/lib/api-client";
+import { ApiError, apiPayDemo, newGuestToken } from "@/lib/api-client";
 import { track } from "@/lib/analytics";
 import { contactSchema, shippingSchema, type ContactInput, type ShippingInput } from "@/lib/schemas";
 import { formatVND, cn } from "@/lib/utils/format";
@@ -38,6 +38,10 @@ export default function CheckoutPage() {
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [paying, setPaying] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+  // Token sở hữu đơn guest: cùng vòng đời với idempotencyKey (1 intent).
+  // Sinh khi vào bước xác nhận, hủy khi lùi lại sửa — retry cùng intent
+  // gửi lại token cũ nên không bao giờ bị khóa đơn do mất response.
+  const [guestToken, setGuestToken] = useState<string | null>(null);
   const [checkoutTracked, setCheckoutTracked] = useState(false);
 
   const [contact, setContact] = useState<ContactInfo | null>(null);
@@ -67,8 +71,13 @@ export default function CheckoutPage() {
   // Mỗi intent đặt hàng có đúng 1 idempotency key: sinh khi vào bước xác nhận,
   // hủy khi lùi lại sửa — server dùng key này để trả lại đơn cũ nếu double-submit.
   useEffect(() => {
-    if (step === 4) setIdempotencyKey((k) => k ?? crypto.randomUUID());
-    else setIdempotencyKey(null);
+    if (step === 4) {
+      setIdempotencyKey((k) => k ?? crypto.randomUUID());
+      setGuestToken((t) => t ?? newGuestToken());
+    } else {
+      setIdempotencyKey(null);
+      setGuestToken(null);
+    }
   }, [step]);
 
   if (!hydrated) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
@@ -85,6 +94,12 @@ export default function CheckoutPage() {
             Mã đơn <strong className="font-telemetry-data text-primary">{placedOrder.number}</strong>. Concierge Lumina sẽ liên hệ xác nhận trong 30 phút.
             {placedOrder.payment === "bank_transfer" && " Vui lòng chuyển khoản theo hướng dẫn được gửi tới email của bạn."}
           </p>
+          {placedOrder.guestToken && (
+            <p className="rounded-lg bg-primary/10 p-space-sm font-body-sm text-body-sm text-on-surface-variant">
+              Bạn đặt hàng không cần tài khoản — trình duyệt này đã lưu khóa theo dõi đơn.
+              Đừng xóa dữ liệu trang trước khi nhận máy, hoặc liên hệ concierge kèm mã đơn để được hỗ trợ.
+            </p>
+          )}
           <div className="grid w-full grid-cols-2 gap-space-sm pt-space-sm font-body-sm text-body-sm">
             <div className="rounded-lg bg-surface-container-low p-space-sm text-left">
               <p className="text-outline">Trạng thái</p>
@@ -208,7 +223,16 @@ export default function CheckoutPage() {
     setSubmitError(null);
     try {
       const order = await placeOrder(
-        { contact, shipping, delivery, payment, snapshot: cartSnapshot, ...(coupon ? { couponCode: coupon.code } : {}) },
+        {
+          contact,
+          shipping,
+          delivery,
+          payment,
+          snapshot: cartSnapshot,
+          ...(coupon ? { couponCode: coupon.code } : {}),
+          // Guest mới cần token; user đã login thì server bỏ qua.
+          ...(!user && guestToken ? { guestToken } : {}),
+        },
         idempotencyKey ?? undefined,
       );
       clearCart();

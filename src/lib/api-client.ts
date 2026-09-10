@@ -70,6 +70,39 @@ export function toAuthError(err: unknown): AuthError {
 
 /* ---------- Orders ---------- */
 
+const GUEST_TOKENS_KEY = "lumina.guestTokens";
+
+function readGuestTokens(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(GUEST_TOKENS_KEY) ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/** Lưu token sở hữu đơn guest (trả 1 lần lúc đặt hàng) vào localStorage. */
+export function saveGuestToken(orderId: string, token: string): void {
+  try {
+    localStorage.setItem(GUEST_TOKENS_KEY, JSON.stringify({ ...readGuestTokens(), [orderId]: token }));
+  } catch {
+    // storage đầy/blocked → bỏ qua, user vẫn thấy đơn trong phiên này
+  }
+}
+
+function guestTokenOf(orderId: string): string | undefined {
+  try {
+    return readGuestTokens()[orderId];
+  } catch {
+    return undefined;
+  }
+}
+
+export function newGuestToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function apiPlaceOrder(
   draft: {
     contact: unknown;
@@ -78,26 +111,45 @@ export async function apiPlaceOrder(
     payment: string;
     lines: { productId: string; variantId?: string; quantity: number }[];
     couponCode?: string;
+    guestToken?: string;
   },
   idempotencyKey?: string,
 ): Promise<Order> {
-  return request<{ order: Order }>("/api/orders", {
+  const order = await request<{ order: Order }>("/api/orders", {
     method: "POST",
     body: JSON.stringify(draft),
     headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
   }).then((r) => r.order);
+  if (order.guestToken) saveGuestToken(order.id, order.guestToken);
+  return order;
 }
 
 export async function apiListOrders(): Promise<Order[]> {
   return request<{ orders: Order[] }>("/api/orders").then((r) => r.orders);
 }
 
+function guestHeaders(id: string): Record<string, string> {
+  const token = guestTokenOf(id);
+  return token ? { "x-guest-token": token } : {};
+}
+
 export async function apiCancelOrder(id: string): Promise<Order> {
-  return request<{ order: Order }>(`/api/orders/${id}/cancel`, { method: "POST" }).then((r) => r.order);
+  return request<{ order: Order }>(`/api/orders/${id}/cancel`, {
+    method: "POST",
+    headers: guestHeaders(id),
+  }).then((r) => r.order);
 }
 
 export async function apiPayDemo(id: string): Promise<Order> {
-  return request<{ order: Order }>(`/api/orders/${id}/pay-demo`, { method: "POST" }).then((r) => r.order);
+  return request<{ order: Order }>(`/api/orders/${id}/pay-demo`, {
+    method: "POST",
+    headers: guestHeaders(id),
+  }).then((r) => r.order);
+}
+
+export async function apiLookupGuestOrder(number: string, token: string): Promise<Order> {
+  const params = new URLSearchParams({ number, token });
+  return request<{ order: Order }>(`/api/orders/lookup?${params.toString()}`).then((r) => r.order);
 }
 
 /* ---------- Reviews ---------- */

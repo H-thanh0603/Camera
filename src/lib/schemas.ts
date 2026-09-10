@@ -65,6 +65,12 @@ export const placeOrderSchema = z.object({
   payment: z.enum(["bank_transfer", "cod", "card_on_delivery"]),
   lines: z.array(orderLineSchema).min(1, "Đơn hàng trống."),
   idempotencyKey: z.string().min(8).max(64).optional(),
+  guestToken: z
+    .string()
+    .min(32)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/, "Token bảo mật không hợp lệ.")
+    .optional(),
   couponCode: z
     .string()
     .trim()

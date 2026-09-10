@@ -64,11 +64,39 @@ export async function getUserOrders(userId: string): Promise<Order[]> {
   return orders.map(dbOrderToDomain);
 }
 
-export async function getOwnOrder(id: string): Promise<Order | null> {
+export class OrderForbidden extends Error {
+  constructor(message = "Bạn không có quyền xem đơn hàng này.") {
+    super(message);
+    this.name = "OrderForbidden";
+  }
+}
+
+export async function getOwnOrder(id: string, guestToken?: string): Promise<Order | null> {
   const user = await getSessionUser();
   const order = await prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
   if (!order) return null;
-  // Guest order: sở hữu bằng kiến thức id; order có chủ thì phải đúng chủ sở hữu
-  if (order.userId && order.userId !== user?.id) return null;
+  // Đơn có chủ: phải đúng chủ sở hữu (session). Kể cả admin cũng đi đường admin API.
+  if (order.userId) {
+    if (order.userId !== user?.id) throw new OrderForbidden();
+    return dbOrderToDomain(order);
+  }
+  // Đơn khách vãng lai: bắt buộc token khớp hash trong DB.
+  const { verifyGuestToken } = await import("./guest-token");
+  const row = order as unknown as { guestTokenHash?: string | null };
+  // Đơn guest cũ (trước migration guestToken) chưa có hash → khóa thao tác
+  // cho tới khi chủ đơn liên hệ concierge xác minh (fail-closed).
+  if (!row.guestTokenHash || !verifyGuestToken(guestToken ?? "", row.guestTokenHash)) {
+    throw new OrderForbidden();
+  }
+  return dbOrderToDomain(order);
+}
+
+/** Tra cứu đơn guest bằng mã đơn + token (trang theo dõi đơn không cần login). */
+export async function getGuestOrderByNumber(orderNumber: string, guestToken: string): Promise<Order | null> {
+  const { verifyGuestToken } = await import("./guest-token");
+  const order = await prisma.order.findUnique({ where: { number: orderNumber }, include: ORDER_INCLUDE });
+  if (!order || order.userId) return null;
+  const row = order as unknown as { guestTokenHash?: string | null };
+  if (!row.guestTokenHash || !verifyGuestToken(guestToken, row.guestTokenHash)) return null;
   return dbOrderToDomain(order);
 }
