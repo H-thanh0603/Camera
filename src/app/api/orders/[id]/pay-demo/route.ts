@@ -16,7 +16,9 @@ import { logger } from "@/lib/server/logger";
  * thành `paid` để demo luồng order tracking.
  *
  * SẢN XUẤT: thay bằng webhook của cổng thanh toán (VNPay/MoMo/Stripe) —
- * webhook verify chữ ký HMAC rồi mới chuyển trạng thái. Endpoint này bị xóa.
+ * webhook verify chữ ký HMAC rồi mới chuyển trạng thái. Endpoint này bị chặn
+ * 403 khi PAYMENT_DEMO_MODE=false và phải xóa hẳn trước khi mở traffic thật.
+ * Response kèm header Deprecation để scanner/CI phát hiện còn sót demo.
  */
 
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
@@ -46,7 +48,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Đơn hàng không ở trạng thái chờ thanh toán." }, { status: 409 });
   }
 
-  await prisma.order.update({ where: { id }, data: { status: "paid" } });
+  // Claim có điều kiện pending → paid: 2 request song song chỉ 1 bên thắng,
+  // bên thua nhận 409 thay vì ghi đè trạng thái.
+  const claimed = await prisma.order.updateMany({
+    where: { id, status: "pending" },
+    data: { status: "paid" },
+  });
+  if (claimed.count === 0) {
+    return NextResponse.json({ error: "Đơn hàng không ở trạng thái chờ thanh toán." }, { status: 409 });
+  }
   const user = await getSessionUser();
   logger.info("order.paid_demo", { orderId: id, userId: user?.id ?? "guest" });
   await logAudit(
@@ -56,5 +66,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     id,
     { number: order.number },
   );
-  return NextResponse.json({ order: { ...order, status: "paid" as const } });
+  const res = NextResponse.json({ order: { ...order, status: "paid" as const } });
+  res.headers.set("Deprecation", "true");
+  res.headers.set("Sunset", "Sat, 01 Nov 2026 00:00:00 GMT");
+  return res;
 }
