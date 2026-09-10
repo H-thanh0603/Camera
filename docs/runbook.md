@@ -37,11 +37,16 @@
 - Xóa nút demo: đã tự ẩn khi `NEXT_PUBLIC_PAYMENT_DEMO_MODE=false`;
   endpoint `/pay-demo` trả 403 khi demo tắt.
 
-## 3. Email (Resend)
+## 3. Email (Resend + outbox bền vững)
 
-- Chưa có `RESEND_API_KEY`: chế độ log — nội dung ghi ra logger, không gửi.
-- Có key: gửi thật qua `api.resend.com` — xác nhận đơn (fire-and-forget
-  trong `placeOrderServer`) + link reset mật khẩu (60 phút, dùng 1 lần).
+- Mọi mail (xác nhận đơn, reset password, reward, kit-share) ghi vào bảng
+  `EmailOutbox` TRONG tx nghiệp vụ — đơn commit thì mail không mất, kể cả
+  khi Resend lỗi hoặc thiếu Redis. Dispatch inline best-effort sau commit.
+- Worker `npm run worker:email` quét outbox DB (backoff tới 6h, giữ row dead
+  sau 5 lần fail) + Redis fast-lane nếu có. Chạy như service riêng hoặc cron
+  mỗi phút với `EMAIL_WORKER_MAX_JOBS`. Xem độ sâu ở `GET /api/admin/queue`.
+- Chưa có `RESEND_API_KEY`: chế độ log — nội dung ghi ra logger, job đánh
+  dấu sent (không retry vô ích). Có key: gửi thật qua `api.resend.com`.
 - Verify domain gửi trong dashboard Resend trước khi mở bán.
 
 ## 4. Backup / Restore

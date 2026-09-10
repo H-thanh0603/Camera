@@ -196,6 +196,22 @@ CREATE TABLE "SavedBattle" (
 );
 
 -- CreateTable
+CREATE TABLE "EmailOutbox" (
+    "id" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "to" TEXT NOT NULL,
+    "subject" TEXT NOT NULL,
+    "html" TEXT NOT NULL,
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "nextRunAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sentAt" TIMESTAMP(3),
+    "lastError" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "EmailOutbox_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "TradeInLead" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -300,6 +316,9 @@ CREATE UNIQUE INDEX "PaymentEvent_provider_eventId_key" ON "PaymentEvent"("provi
 
 -- CreateIndex
 CREATE INDEX "SavedBattle_userId_idx" ON "SavedBattle"("userId");
+
+-- CreateIndex
+CREATE INDEX "EmailOutbox_sentAt_nextRunAt_idx" ON "EmailOutbox"("sentAt", "nextRunAt");
 
 -- CreateIndex
 CREATE INDEX "TradeInLead_status_idx" ON "TradeInLead"("status");

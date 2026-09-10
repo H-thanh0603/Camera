@@ -33,16 +33,13 @@ export async function grantPhotoReviewReward(reviewId: string): Promise<string |
   }
   await prisma.review.update({ where: { id: reviewId }, data: { rewardCode: code } });
 
-  const { enqueueEmail, getQueueRedis } = await import("@/lib/server/email-queue");
-  const { sendEmail } = await import("@/lib/server/email");
-  const mail = {
+  const { queueOutboxEmail } = await import("@/lib/server/email-outbox");
+  queueOutboxEmail({
     kind: "review-reward",
     to: user.email,
     subject: "Cảm ơn review có ảnh — tặng bạn mã giảm 5%",
     html: `<div style="font-family:sans-serif;max-width:560px"><h2>Cảm ơn ${user.name}!</h2><p>Review có ảnh của bạn đã được duyệt. Mã giảm giá 5% (1 lần, HSD 30 ngày):</p><p style="font-size:24px;font-weight:bold;letter-spacing:2px">${code}</p></div>`,
-  };
-  const { queued } = await enqueueEmail(getQueueRedis(), mail);
-  if (!queued) await sendEmail(mail);
+  });
   return code;
 }
 

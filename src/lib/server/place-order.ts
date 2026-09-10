@@ -208,6 +208,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   // mua cùng lúc: updateMany có điều kiện stock >= qty, affected==0 → hết hàng.
   // Trùng idempotencyKey đồng thời (P2002): trả về đơn đã tạo thay vì 500.
   let dbOrder;
+  let outboxId: string | null = null;
   try {
     dbOrder = await prisma.$transaction(async (tx) => {
     for (const l of finalLines) {
@@ -249,7 +250,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       }
     }
 
-    return tx.order.create({
+    const created = await tx.order.create({
       data: {
         number: orderNumber(),
         userId: user?.id ?? null,
@@ -278,6 +279,19 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       },
       include: { lines: true },
     });
+    // Outbox mail ghi CÙNG tx đặt hàng — đơn commit thì mail không mất.
+    const { saveOutboxEmail } = await import("./email-outbox");
+    const { orderConfirmationHtml } = await import("./email");
+    outboxId = await saveOutboxEmail(
+      {
+        kind: "order-confirmation",
+        to: contact.email,
+        subject: `Xác nhận đơn hàng ${created.number} — Lumina Optics`,
+        html: orderConfirmationHtml(created.number, totals.total, contact.fullName),
+      },
+      tx,
+    );
+    return created;
   });
   } catch (error) {
     // Trùng key đồng thời: tx thua đã ROLLBACK toàn bộ (kể cả trừ kho) khi
@@ -321,20 +335,14 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
     coupon: appliedCoupon ?? null,
   });
 
-  // Email xác nhận — qua queue (retry/backoff), fallback inline nếu
-  // Redis chưa cấu hình. Không chặn response đặt hàng.
-  void (async () => {
-    const { enqueueEmail, getQueueRedis } = await import("./email-queue");
-    const { orderConfirmationHtml, sendEmail } = await import("./email");
-    const mail = {
-      kind: "order-confirmation",
-      to: contact.email,
-      subject: `Xác nhận đơn hàng ${dbOrder.number} — Lumina Optics`,
-      html: orderConfirmationHtml(dbOrder.number, totals.total, contact.fullName),
-    };
-    const { queued } = await enqueueEmail(getQueueRedis(), mail);
-    if (!queued) await sendEmail(mail);
-  })().catch(() => undefined);
+  // Dispatch mail xác nhận best-effort (không chặn response). Job đã nằm
+  // trong outbox cùng tx đặt hàng nên gửi fail vẫn còn worker quét lại.
+  if (outboxId) {
+    const id = outboxId;
+    void import("./email-outbox")
+      .then(({ dispatchOutboxSoon }) => dispatchOutboxSoon(id))
+      .catch(() => undefined);
+  }
 
   return {
     id: dbOrder.id,

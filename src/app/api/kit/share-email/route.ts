@@ -36,15 +36,12 @@ export async function POST(request: NextRequest) {
   const total = lines.reduce((s, l) => s + l.price * l.quantity, 0);
   const rowsHtml = lines.map((l) => `<tr><td>${l.name} × ${l.quantity}</td><td style="text-align:right">${formatVND(l.price * l.quantity)}</td></tr>`).join("");
 
-  const { enqueueEmail, getQueueRedis } = await import("@/lib/server/email-queue");
-  const { sendEmail } = await import("@/lib/server/email");
-  const mail = {
+  const { queueOutboxEmail } = await import("@/lib/server/email-outbox");
+  queueOutboxEmail({
     kind: "kit-share",
     to: user.email,
     subject: `Bộ kit của bạn tại Lumina Optics (${lines.length} món)`,
     html: `<div style="font-family:sans-serif;max-width:560px"><h2>Bộ kit bạn đang ráp</h2><table style="width:100%">${rowsHtml}</table><p><strong>Tổng: ${formatVND(total)}</strong></p><p>Kit được giữ trong giỏ — quay lại bất cứ lúc nào để thanh toán.</p></div>`,
-  };
-  const { queued } = await enqueueEmail(getQueueRedis(), mail);
-  if (!queued) await sendEmail(mail);
+  });
   return NextResponse.json({ ok: true, emailed: lines.length });
 }

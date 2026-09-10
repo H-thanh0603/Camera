@@ -236,6 +236,23 @@ model SavedBattle {  // Battle user đã lưu: share + xem lại sau.
   @@index([userId])
 }
 
+model EmailOutbox {  // Outbox bền vững: job mail ghi cùng tx nghiệp vụ.
+  // Worker + inline best-effort dispatch; fail → backoff, hết lượt → dead.
+  // Không cần Redis vẫn không mất mail (Redis chỉ là fast-lane tùy chọn).
+  id        String    @id @default(cuid())
+  kind      String
+  to        String
+  subject   String
+  html      String
+  attempts  Int       @default(0)
+  nextRunAt DateTime  @default(now())
+  sentAt    DateTime?
+  lastError String?
+  createdAt DateTime  @default(now())
+
+  @@index([sentAt, nextRunAt])
+}
+
 model TradeInLead {  // Lead thu cũ đổi mới: form public, admin gọi lại.
   id           String   @id @default(cuid())
   name         String
