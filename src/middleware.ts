@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEdgeRateLimiter } from "@/lib/edge-rate-limit";
 import { getClientIp } from "@/lib/server/client-ip";
+import { isSameOriginRequest } from "@/lib/csrf";
+
+/**
+ * Miễn CSRF: webhook verify HMAC riêng; metrics là telemetry vô hại
+ * (limiter riêng, không đổi trạng thái nghiệp vụ).
+ */
+const CSRF_EXEMPT = ["/api/payments/webhook", "/api/metrics"];
 
 /**
  * Middleware bảo mật biên.
@@ -35,6 +42,14 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/") && request.method !== "GET") {
+    // CSRF: chặn forged cross-site mutation bằng cookie nạn nhân.
+    // Client không phải browser (curl/script) phải gửi Origin khớp host.
+    if (!CSRF_EXEMPT.some((p) => pathname.startsWith(p)) && !isSameOriginRequest(request)) {
+      return NextResponse.json(
+        { error: "Yêu cầu bị chặn (CSRF). Gửi kèm Origin khớp với trang web." },
+        { status: 403 },
+      );
+    }
     // Telemetry (metrics) fire-and-forget với tần suất cao — không thuộc lớp cần bảo vệ
     if (!pathname.startsWith("/api/metrics") && !pathname.startsWith("/api/health")) {
       const result = await mutationLimiter.check(clientIp(request));

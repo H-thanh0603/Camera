@@ -53,6 +53,15 @@ await check("guest lookup thiếu token → 422", async () => {
   assert(r.status === 422, `status ${r.status}, mong đợi 422`);
 });
 
+await check("CSRF: POST không Origin → 403", async () => {
+  const r = await fetch(`${BASE}/api/coupons/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: "LUMINA10", subtotal: 10000000 }),
+  });
+  assert(r.status === 403, `status ${r.status}, mong đợi 403`);
+});
+
 await check("webhook thiếu chữ ký → 401/503", async () => {
   const r = await fetch(`${BASE}/api/payments/webhook`, {
     method: "POST",
