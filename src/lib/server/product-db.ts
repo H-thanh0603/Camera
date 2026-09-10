@@ -113,6 +113,23 @@ export async function dbGetProductById(id: string): Promise<Product | null> {
   return row ? dbProductToDomain(row) : null;
 }
 
+/**
+ * Resolve hàng loạt theo ids cho client cache (giỏ/wishlist/compare) —
+ * bounded (tối đa 50) thay vì tải toàn bộ catalogue. Không kèm reviews
+ * (trang giỏ không cần) để payload nhẹ.
+ */
+export async function dbGetProductsByIds(ids: string[]): Promise<Product[]> {
+  const unique = [...new Set(ids.filter(Boolean))].slice(0, 50);
+  if (unique.length === 0) return [];
+  const rows = await prisma.product.findMany({ where: { id: { in: unique } }, include: INCLUDE });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  // Giữ đúng thứ tự ids yêu cầu, bỏ id không tồn tại
+  return unique.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [dbProductToDomain(row)] : [];
+  });
+}
+
 export interface ProductSearchParams {
   q?: string;
   brand?: string;

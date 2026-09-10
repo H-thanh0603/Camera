@@ -11,20 +11,35 @@ import { products as seedProducts } from "@/lib/data/products";
 /**
  * ProductRepository (client-safe) — đọc catalogue từ một cache module.
  * Cache khởi tạo bằng seed snapshot (khớp SSR/hydration), sau đó được
- * StoreProvider làm mới từ GET /api/products/snapshot (dữ liệu DB mà
- * admin quản trị). Server pages KHÔNG dùng file này — chúng đọc DB trực
- * tiếp qua src/lib/server/product-db.ts.
+ * StoreProvider làm mới TỪNG PHẦN qua POST /api/products/resolve theo ids
+ * user đang giữ (dữ liệu DB mà admin quản trị). Server pages KHÔNG dùng
+ * file này — chúng đọc DB trực tiếp qua src/lib/server/product-db.ts.
  */
 
 let catalog: Product[] = seedProducts;
 let byId = new Map(catalog.map((p) => [p.id, p]));
 let bySlug = new Map(catalog.map((p) => [p.slug, p]));
 
-/** Thay thế catalogue cache (dùng sau khi fetch snapshot từ DB). */
+/** Thay thế catalogue cache (giữ tương thích — nên dùng mergeCatalogProducts). */
 export function setCatalogProducts(products: Product[]): void {
   catalog = products;
   byId = new Map(products.map((p) => [p.id, p]));
   bySlug = new Map(products.map((p) => [p.slug, p]));
+}
+
+/**
+ * Upsert từng sản phẩm tươi từ DB vào cache (sau POST /api/products/resolve).
+ * Seed ban đầu vẫn làm fallback cho catalogue duyệt tĩnh (kit, collection).
+ */
+export function mergeCatalogProducts(products: Product[]): void {
+  if (products.length === 0) return;
+  const fresh = new Map(products.map((p) => [p.id, p]));
+  catalog = catalog.map((p) => fresh.get(p.id) ?? p);
+  for (const p of products) {
+    if (!byId.has(p.id)) catalog = [...catalog, p];
+    byId.set(p.id, p);
+    bySlug.set(p.slug, p);
+  }
 }
 
 export function getCatalog(): Product[] {

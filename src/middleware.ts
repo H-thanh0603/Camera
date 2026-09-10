@@ -13,9 +13,9 @@ const CSRF_EXEMPT = ["/api/payments/webhook", "/api/metrics"];
  * Middleware bảo mật biên.
  *
  * Rate limiting áp cho các request GHI (POST/PATCH/DELETE) trên /api/* —
- * GET (auth/me, products/snapshot…) được gọi mỗi lần load trang nên không
- * tính. Endpoint nhạy cảm (login, register, orders, reviews) còn có limiter
- * riêng chặt hơn trong route handler.
+ * GET (auth/me…) được gọi mỗi lần load trang nên không tính. Endpoint nhạy
+ * cảm (login, register, orders, reviews, resolve) còn có limiter riêng chặt
+ * hơn trong route handler.
  *
  * Backend: Upstash Redis sliding-window khi có UPSTASH_* env (đa instance),
  * fallback in-memory fail-open khi chưa cấu hình.

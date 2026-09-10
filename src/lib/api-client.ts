@@ -152,6 +152,20 @@ export async function apiLookupGuestOrder(number: string, token: string): Promis
   return request<{ order: Order }>(`/api/orders/lookup?${params.toString()}`).then((r) => r.order);
 }
 
+/* ---------- Catalog resolve (bounded, thay snapshot full) ---------- */
+
+export async function apiResolveProducts(ids: string[]): Promise<import("@/lib/types").Product[]> {
+  const unique = [...new Set(ids.filter(Boolean))].slice(0, 50);
+  if (unique.length === 0) return [];
+  const { products } = await request<{ products: import("@/lib/types").Product[] }>("/api/products/resolve", {
+    method: "POST",
+    body: JSON.stringify({ ids: unique }),
+  });
+  const { mergeCatalogProducts } = await import("@/lib/repositories/product-repository");
+  mergeCatalogProducts(products);
+  return products;
+}
+
 /* ---------- Reviews ---------- */
 
 export async function apiSubmitReview(input: {

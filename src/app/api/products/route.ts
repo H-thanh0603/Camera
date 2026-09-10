@@ -8,8 +8,8 @@ import { productQuerySchema, zodFieldErrors } from "@/lib/schemas";
  *   &inStockOnly=1&sort=&page=&pageSize=
  * Trên Postgres + có q: pg_trgm (ILIKE + similarity>0.2, sort relevance
  * khi sort=featured). SQLite: contains cũ.
- * Giữ /api/products/snapshot cho client cache cũ (cart/wishlist resolve);
- * listing/search dùng endpoint này để không tải toàn bộ về client.
+ * Client cache (cart/wishlist/compare) làm mới qua POST /api/products/resolve
+ * theo ids — không còn endpoint full-catalog (snapshot đã xóa).
  */
 export async function GET(request: NextRequest) {
   const query = Object.fromEntries(request.nextUrl.searchParams.entries());

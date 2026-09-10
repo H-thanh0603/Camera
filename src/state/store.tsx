@@ -3,9 +3,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { CartLine, CartSnapshot, Product, SessionUser, WishlistEntry } from "@/lib/types";
 import { buildCartSnapshot, clampQuantity, mergeLine, resolveVariant, unitPriceOf } from "@/lib/services/cart-service";
-import { getProductById, setCatalogProducts } from "@/lib/repositories/product-repository";
+import { getProductById } from "@/lib/repositories/product-repository";
 import { loadJSON, saveJSON } from "@/lib/repositories/storage-repository";
-import { apiLogin, apiLogout, apiMe, apiRegister } from "@/lib/api-client";
+import { apiLogin, apiLogout, apiMe, apiRegister, apiResolveProducts } from "@/lib/api-client";
 import { track } from "@/lib/analytics";
 
 /* ================= Toast ================= */
@@ -175,15 +175,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const theme = savedTheme === "light" ? "light" : "dark";
     dispatch({ type: "hydrate", state: { theme } });
     applyThemeClass(theme);
-    dispatch({
-      type: "hydrate",
-      state: {
-        cart: loadJSON<CartLine[]>("cart", []),
-        wishlist: loadJSON<WishlistEntry[]>("wishlist", []),
-        compare: loadJSON<string[]>("compare", []),
-        recent: loadJSON<string[]>("recent", []),
-      },
-    });
+    const cart = loadJSON<CartLine[]>("cart", []);
+    const wishlist = loadJSON<WishlistEntry[]>("wishlist", []);
+    const compare = loadJSON<string[]>("compare", []);
+    const recent = loadJSON<string[]>("recent", []);
+    dispatch({ type: "hydrate", state: { cart, wishlist, compare, recent } });
     setHydrated(true);
     // Phiên đăng nhập nằm trong cookie httpOnly — xác thực qua server
     apiMe()
@@ -191,16 +187,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .catch(() => dispatch({ type: "auth/set", user: null }))
       .finally(() => setAuthLoading(false));
 
-    // Làm mới catalogue từ DB (giá/stock do admin quản trị) — seed chỉ là snapshot ban đầu
-    fetch("/api/products/snapshot")
-      .then((r) => r.json())
-      .then((data: { products?: import("@/lib/types").Product[] }) => {
-        if (Array.isArray(data.products) && data.products.length > 0) {
-          setCatalogProducts(data.products);
-          dispatch({ type: "catalog/refresh" });
-        }
-      })
-      .catch(() => undefined);
+    // Làm mới giá/stock ĐÚNG các SP user đang giữ (giỏ/wishlist/compare/recent)
+    // từ DB — bounded ~60 ids, không tải toàn bộ catalogue (scale nghìn SKU).
+    const ids = [
+      ...cart.map((l) => l.productId),
+      ...wishlist.map((w) => w.productId),
+      ...compare,
+      ...recent,
+    ];
+    if (ids.length > 0) {
+      apiResolveProducts(ids)
+        .then((products) => {
+          if (products.length > 0) dispatch({ type: "catalog/refresh" });
+        })
+        .catch(() => undefined);
+    }
   }, []);
 
   // Persist khi thay đổi (chỉ sau khi hydrate xong)

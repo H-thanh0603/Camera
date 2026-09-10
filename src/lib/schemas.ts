@@ -80,6 +80,11 @@ export const placeOrderSchema = z.object({
     .optional(),
 });
 
+/** Resolve giá/stock hàng loạt cho client cache — bounded 50 ids. */
+export const productResolveSchema = z.object({
+  ids: z.array(z.string().min(1).max(64)).min(1, "Thiếu danh sách sản phẩm.").max(50, "Tối đa 50 sản phẩm một lần."),
+});
+
 export const productQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   brand: z.string().trim().max(60).optional(),
