@@ -42,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       include: { variants: true },
     });
     revalidatePath("/", "layout");
-    revalidateTag(CATALOG_TAG);
+    revalidateTag(CATALOG_TAG, "max");
     await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) });
   } catch (e) {
@@ -81,7 +81,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     throw e;
   }
   revalidatePath("/", "layout");
-    revalidateTag(CATALOG_TAG);
+    revalidateTag(CATALOG_TAG, "max");
   await logAudit(await getSessionUser(), "product.delete", "product", id);
   return NextResponse.json({ ok: true });
 }

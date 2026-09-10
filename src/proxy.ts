@@ -10,7 +10,7 @@ import { isSameOriginRequest } from "@/lib/csrf";
 const CSRF_EXEMPT = ["/api/payments/webhook", "/api/metrics"];
 
 /**
- * Middleware bảo mật biên.
+ * Proxy biên (Next 16 gọi `proxy.ts` thay `middleware.ts`; runtime nodejs).
  *
  * Rate limiting áp cho các request GHI (POST/PATCH/DELETE) trên /api/* —
  * GET (auth/me…) được gọi mỗi lần load trang nên không tính. Endpoint nhạy
@@ -38,7 +38,7 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/") && request.method !== "GET") {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Product } from "@/lib/types";
 import { maxQuantityOf, resolveVariant, unitCompareAtPriceOf, unitPriceOf } from "@/lib/services/cart-service";
 import { discountPercent, formatVND, cn } from "@/lib/utils/format";
@@ -41,10 +41,8 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     track("view_item", { productId: product.id, price: product.price, category: product.category });
   }, [product.id, product.price, product.category, trackView]);
 
-  const displayImage = useMemo(() => {
-    if (variant?.image) return variant.image;
-    return product.images[activeImage] ?? product.thumbnail;
-  }, [variant, activeImage, product]);
+  // Index mảng O(1) — không useMemo để React Compiler tự tối ưu
+  const displayImage = variant?.image ?? product.images[activeImage] ?? product.thumbnail;
 
   const handleAddToCart = (buyNow = false) => {
     const ok = addToCart(product, variantId, quantity);
