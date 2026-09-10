@@ -119,6 +119,7 @@ export const productQuerySchema = z.object({
   maxPrice: z.coerce.number().int().min(0).optional(),
   minRating: z.coerce.number().min(0).max(5).optional(),
   inStockOnly: z.string().optional().transform((v) => v === "1" || v === "true"),
+  slim: z.string().optional().transform((v) => v === "1" || v === "true"),
   sort: z.enum(["featured", "newest", "price_asc", "price_desc", "rating_desc", "best_selling"]).default("featured"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(60).default(12),

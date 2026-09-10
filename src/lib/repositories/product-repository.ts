@@ -4,6 +4,7 @@ import type {
   Paginated,
   Product,
   ProductQuery,
+  SlimProduct,
   SortOption,
 } from "@/lib/types";
 import { products as seedProducts } from "@/lib/data/products";
@@ -29,16 +30,26 @@ export function setCatalogProducts(products: Product[]): void {
 
 /**
  * Upsert từng sản phẩm tươi từ DB vào cache (sau POST /api/products/resolve).
+ * Resolve trả SlimProduct — merge field-wise nên images/description/spec cũ
+ * (từ seed hoặc lần tải full trước) được giữ nguyên, giá/stock/rating tươi.
  * Seed ban đầu vẫn làm fallback cho catalogue duyệt tĩnh (kit, collection).
  */
-export function mergeCatalogProducts(products: Product[]): void {
+export function mergeCatalogProducts(products: (Product | SlimProduct)[]): void {
   if (products.length === 0) return;
   const fresh = new Map(products.map((p) => [p.id, p]));
-  catalog = catalog.map((p) => fresh.get(p.id) ?? p);
+  catalog = catalog.map((p) => {
+    const f = fresh.get(p.id);
+    return f ? ({ ...p, ...f }) : p;
+  });
   for (const p of products) {
-    if (!byId.has(p.id)) catalog = [...catalog, p];
-    byId.set(p.id, p);
-    bySlug.set(p.slug, p);
+    if (!byId.has(p.id)) {
+      // Id hoàn toàn mới (hiếm) — chỉ thêm khi là full Product
+      if ("images" in p && "description" in p) catalog = [...catalog, p];
+      continue;
+    }
+    const merged = { ...byId.get(p.id)!, ...p };
+    byId.set(p.id, merged);
+    bySlug.set(merged.slug, merged);
   }
 }
 

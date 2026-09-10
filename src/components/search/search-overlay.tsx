@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { POPULAR_SEARCHES } from "@/lib/services/search-service";
-import type { Product } from "@/lib/types";
+import type { SlimProduct } from "@/lib/types";
 import { formatVND } from "@/lib/utils/format";
 import { useDebounce } from "@/hooks/useDebounce";
 import { AppImage } from "@/components/ui/app-image";
@@ -21,7 +21,7 @@ export function SearchOverlay() {
   const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 250);
-  const [results, setResults] = useState<Product[]>([]);
+  const [results, setResults] = useState<SlimProduct[]>([]);
   const [resultTotal, setResultTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -31,9 +31,10 @@ export function SearchOverlay() {
     if (!q) { setResults([]); setResultTotal(0); return; }
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/products?q=${encodeURIComponent(q)}&pageSize=6`)
+    // slim=1: overlay chỉ cần id/slug/thumbnail/name/brand/price — cắt ~50% JSON
+    fetch(`/api/products?q=${encodeURIComponent(q)}&pageSize=6&slim=1`)
       .then((r) => r.json())
-      .then((data: { items?: Product[]; total?: number }) => {
+      .then((data: { items?: SlimProduct[]; total?: number }) => {
         if (cancelled) return;
         setResults(data.items ?? []);
         setResultTotal(data.total ?? 0);

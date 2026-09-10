@@ -1,4 +1,4 @@
-import type { Product } from "@/lib/types";
+import type { Product, SlimProduct } from "@/lib/types";
 import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { prisma } from "./prisma";
@@ -116,18 +116,17 @@ export async function dbGetProductById(id: string): Promise<Product | null> {
 
 /**
  * Resolve hàng loạt theo ids cho client cache (giỏ/wishlist/compare) —
- * bounded (tối đa 50) thay vì tải toàn bộ catalogue. Không kèm reviews
- * (trang giỏ không cần) để payload nhẹ.
+ * bounded (tối đa 50), luôn slim (bỏ images[]/description/specs) vì cache
+ * merge giữ lại trường nặng cũ. Giữ đúng thứ tự ids, bỏ id không tồn tại.
  */
-export async function dbGetProductsByIds(ids: string[]): Promise<Product[]> {
+export async function dbGetProductsByIds(ids: string[]): Promise<SlimProduct[]> {
   const unique = [...new Set(ids.filter(Boolean))].slice(0, 50);
   if (unique.length === 0) return [];
-  const rows = await prisma.product.findMany({ where: { id: { in: unique } }, include: INCLUDE });
+  const rows = await prisma.product.findMany({ where: { id: { in: unique } }, select: SLIM_SELECT });
   const byId = new Map(rows.map((r) => [r.id, r]));
-  // Giữ đúng thứ tự ids yêu cầu, bỏ id không tồn tại
   return unique.flatMap((id) => {
     const row = byId.get(id);
-    return row ? [dbProductToDomain(row)] : [];
+    return row ? [dbProductToSlim(row)] : [];
   });
 }
 
@@ -145,6 +144,72 @@ export interface ProductSearchParams {
   sort?: "featured" | "newest" | "price_asc" | "price_desc" | "rating_desc" | "best_selling";
   page?: number;
   pageSize?: number;
+  /** slim: bỏ trường nặng (images[], description, specs…) cho overlay/cache. */
+  slim?: boolean;
+}
+
+/** Cột slim — loại images/description/specs/highlights/inTheBox/compatibleWith. */
+const SLIM_SELECT = {
+  id: true,
+  sku: true,
+  slug: true,
+  name: true,
+  brand: true,
+  category: true,
+  subcategory: true,
+  description: false,
+  shortDescription: false,
+  price: true,
+  compareAtPrice: true,
+  currency: true,
+  stock: true,
+  availability: true,
+  thumbnail: true,
+  rating: true,
+  reviewCount: true,
+  tags: true,
+  badges: true,
+  monthlyFrom: true,
+  createdAt: true,
+  updatedAt: true,
+  variants: true,
+} as const;
+
+type SlimRow = Prisma.ProductGetPayload<{ select: typeof SLIM_SELECT }>;
+
+export function dbProductToSlim(row: SlimRow): SlimProduct {
+  return {
+    id: row.id,
+    sku: row.sku,
+    slug: row.slug,
+    name: row.name,
+    brand: row.brand,
+    category: row.category as SlimProduct["category"],
+    subcategory: row.subcategory,
+    price: row.price,
+    compareAtPrice: row.compareAtPrice ?? undefined,
+    currency: "VND",
+    stock: row.stock,
+    availability: row.availability as SlimProduct["availability"],
+    thumbnail: row.thumbnail as unknown as SlimProduct["thumbnail"],
+    rating: row.rating,
+    reviewCount: row.reviewCount,
+    tags: row.tags as unknown as SlimProduct["tags"],
+    badges: row.badges as unknown as SlimProduct["badges"],
+    monthlyFrom: row.monthlyFrom ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    variants: row.variants.map((v) => ({
+      id: v.id,
+      sku: v.sku,
+      name: v.name,
+      price: v.price,
+      compareAtPrice: v.compareAtPrice ?? undefined,
+      stock: v.stock,
+      availability: v.availability as NonNullable<SlimProduct["variants"]>[number]["availability"],
+      image: (v.image ?? undefined) as unknown as NonNullable<SlimProduct["variants"]>[number]["image"],
+    })),
+  };
 }
 
 /**
@@ -196,8 +261,22 @@ function buildProductWhere(params: Pick<ProductSearchParams, "q" | "brand" | "br
  * bản client — không có expression index nên dùng 2 cột có index).
  * Trên Postgres + có q: dùng pg_trgm (ILIKE + similarity, sort relevance).
  */
-export async function dbQueryProducts(params: ProductSearchParams): Promise<{
+export function dbQueryProducts(params: ProductSearchParams & { slim: true }): Promise<{
+  items: SlimProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}>;
+export function dbQueryProducts(params: ProductSearchParams): Promise<{
   items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}>;
+export async function dbQueryProducts(params: ProductSearchParams): Promise<{
+  items: Product[] | SlimProduct[];
   total: number;
   page: number;
   pageSize: number;
@@ -225,16 +304,20 @@ export async function dbQueryProducts(params: ProductSearchParams): Promise<{
 
   const [total, rows] = await Promise.all([
     prisma.product.count({ where }),
-    prisma.product.findMany({
-      where,
-      include: INCLUDE,
-      orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    }),
+    params.slim
+      ? prisma.product.findMany({ where, select: SLIM_SELECT, orderBy, skip: (page - 1) * pageSize, take: pageSize })
+      : prisma.product.findMany({
+          where,
+          include: INCLUDE,
+          orderBy,
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
   ]);
   return {
-    items: rows.map((row) => dbProductToDomain(row)),
+    items: params.slim
+      ? (rows as SlimRow[]).map((row) => dbProductToSlim(row))
+      : (rows as ProductRow[]).map((row) => dbProductToDomain(row)),
     total,
     page,
     pageSize,
@@ -251,7 +334,7 @@ async function dbQueryProductsPg(
   terms: string[],
   page: number,
   pageSize: number,
-): Promise<{ items: Product[]; total: number; page: number; pageSize: number; totalPages: number }> {
+): Promise<{ items: Product[] | SlimProduct[]; total: number; page: number; pageSize: number; totalPages: number }> {
   const where = buildWhereSql(params);
   const order = buildOrderSql(params.sort, terms);
   const skip = (page - 1) * pageSize;
@@ -261,9 +344,19 @@ async function dbQueryProductsPg(
   ]);
   const total = Number(countRows[0]?.count ?? BigInt(0));
   const ids = idRows.map((r) => r.id);
-  const rows = ids.length
-    ? await prisma.product.findMany({ where: { id: { in: ids } }, include: INCLUDE })
-    : [];
+  if (ids.length === 0) {
+    return { items: [], total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  }
+  if (params.slim) {
+    const rows = await prisma.product.findMany({ where: { id: { in: ids } }, select: SLIM_SELECT });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const items = ids.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [dbProductToSlim(row)] : [];
+    });
+    return { items, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  }
+  const rows = await prisma.product.findMany({ where: { id: { in: ids } }, include: INCLUDE });
   const byId = new Map(rows.map((r) => [r.id, r]));
   const items = ids.flatMap((id) => {
     const row = byId.get(id);
@@ -331,8 +424,22 @@ async function dbFacetsPg(params: ProductSearchParams): Promise<{
  */
 export const CATALOG_TAG = "catalog";
 
+export function cachedQueryProducts(params: ProductSearchParams & { slim: true }): Promise<{
+  items: SlimProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}>;
 export function cachedQueryProducts(params: ProductSearchParams): Promise<{
   items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}>;
+export function cachedQueryProducts(params: ProductSearchParams): Promise<{
+  items: Product[] | SlimProduct[];
   total: number;
   page: number;
   pageSize: number;

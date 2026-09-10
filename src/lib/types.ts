@@ -233,6 +233,20 @@ export type OrderStep =
   | "out_for_delivery"
   | "delivered";
 
+/**
+ * SlimProduct — payload gọn cho search overlay + resolve cache (giỏ/wishlist).
+ * Bỏ trường nặng ít dùng ở card/overlay: images[], description, specs,
+ * highlights, inTheBox, compatibleWith, reviews. Merge vào cache full bằng
+ * field-merge (giữ images/spec cũ) — xem mergeCatalogProducts.
+ */
+export type SlimProduct = Pick<
+  Product,
+  | "id" | "sku" | "slug" | "name" | "brand" | "category" | "subcategory"
+  | "price" | "compareAtPrice" | "currency" | "stock" | "availability"
+  | "thumbnail" | "rating" | "reviewCount" | "tags" | "badges"
+  | "monthlyFrom" | "createdAt" | "updatedAt" | "variants"
+>;
+
 export interface OrderLine {
   productId: string;
   variantId?: string;

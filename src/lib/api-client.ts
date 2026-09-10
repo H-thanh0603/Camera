@@ -185,10 +185,10 @@ export async function apiLookupGuestOrder(number: string, token: string): Promis
 
 /* ---------- Catalog resolve (bounded, thay snapshot full) ---------- */
 
-export async function apiResolveProducts(ids: string[]): Promise<import("@/lib/types").Product[]> {
+export async function apiResolveProducts(ids: string[]): Promise<import("@/lib/types").SlimProduct[]> {
   const unique = [...new Set(ids.filter(Boolean))].slice(0, 50);
   if (unique.length === 0) return [];
-  const { products } = await request<{ products: import("@/lib/types").Product[] }>("/api/products/resolve", {
+  const { products } = await request<{ products: import("@/lib/types").SlimProduct[] }>("/api/products/resolve", {
     method: "POST",
     body: JSON.stringify({ ids: unique }),
   });

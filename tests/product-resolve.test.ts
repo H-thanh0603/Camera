@@ -12,7 +12,7 @@ describe("productResolveSchema", () => {
   });
 });
 
-describe("dbGetProductsByIds", () => {
+describe("dbGetProductsByIds (slim)", () => {
   it("trả đúng thứ tự, bỏ id lạ, mảng rỗng → []", async () => {
     const one = await dbGetProductsByIds([]);
     expect(one).toEqual([]);
@@ -25,6 +25,17 @@ describe("dbGetProductsByIds", () => {
     const ids = rows.map((r) => r.id).reverse();
     const res = await dbGetProductsByIds([...ids, "nope-x"]);
     expect(res.map((p) => p.id)).toEqual(ids);
+  });
+  it("slim: đủ price/variants/thumbnail, không có images/description/specs", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+    const rows = await prisma.product.findMany({ select: { id: true }, take: 1 });
+    const [p] = await dbGetProductsByIds(rows.map((r) => r.id));
+    expect(p?.price).toBeGreaterThan(0);
+    expect(Array.isArray(p?.variants)).toBe(true);
+    expect(p?.thumbnail.url).toBeTruthy();
+    expect(p).not.toHaveProperty("images");
+    expect(p).not.toHaveProperty("description");
+    expect(p).not.toHaveProperty("specifications");
   });
 });
 
