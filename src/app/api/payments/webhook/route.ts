@@ -26,8 +26,10 @@ export async function POST(request: NextRequest) {
   try {
     env = getEnv();
   } catch (error) {
+    // Env chưa sẵn sàng (thiếu secret, demo bật nhầm ở prod…) → 503
+    // fail-closed thay vì 500: báo monitor đừng đổ traffic vào.
     logger.error("payment.webhook_env_invalid", { error: String(error) });
-    return NextResponse.json({ error: "Cấu hình thanh toán chưa hợp lệ." }, { status: 500 });
+    return NextResponse.json({ error: "Kênh thanh toán chưa sẵn sàng." }, { status: 503 });
   }
   if (!env.PAYMENT_WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Kênh thanh toán chưa được cấu hình." }, { status: 503 });

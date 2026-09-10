@@ -55,10 +55,11 @@ export function reads() {
 }
 
 export function coupon() {
+  // Origin khớp host — CSRF middleware chặn POST không Origin (giả lập browser)
   const r = http.post(
     `${BASE}/api/coupons/validate`,
     JSON.stringify({ code: "LUMINA10", subtotal: 10_000_000 }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { "Content-Type": "application/json", Origin: BASE } },
   );
   check(r, { "coupon 200": (x) => x.status === 200 });
   sleep(2); // ~30 req/phút — dưới mutation limit 60/phút

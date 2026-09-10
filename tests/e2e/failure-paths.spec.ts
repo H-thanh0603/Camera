@@ -63,15 +63,31 @@ test.describe("Failure paths — 404 / validation / auth", () => {
     await expect(page.getByRole("alert").filter({ hasText: /sai|không đúng|không hợp lệ/i })).toBeVisible({ timeout: 10_000 });
   });
 
+  test("CSRF — POST không Origin/Referer → 403", async ({ request }) => {
+    const res = await request.post("/api/coupons/validate", {
+      data: { code: "LUMINA10", subtotal: 10000000 },
+      failOnStatusCode: false,
+    });
+    expect(res.status()).toBe(403);
+  });
+
   test("rate limit — login sai liên tiếp bị chặn 429 (limit 10/phút)", async ({ request }) => {
+    // Client test (như curl) phải gửi Origin khớp host — ngược lại CSRF
+    // middleware chặn 403 trước khi tới limiter (đúng hành vi browser).
+    // X-Forwarded-For IP riêng để bucket limiter của test này không đốt
+    // quota 127.0.0.1 mà các spec đăng nhập UI dùng chung.
+    const origin = `http://localhost:${process.env.E2E_PORT ?? 3000}`;
+    const headers = { origin, "x-forwarded-for": "198.51.100.77" };
     for (let i = 0; i < 11; i++) {
       await request.post("/api/auth/login", {
         data: { email: "admin@lumina.vn", password: "wrong" },
+        headers,
         failOnStatusCode: false,
       });
     }
     const res = await request.post("/api/auth/login", {
       data: { email: "admin@lumina.vn", password: "wrong" },
+      headers,
       failOnStatusCode: false,
     });
     expect(res.status()).toBe(429);

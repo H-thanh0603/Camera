@@ -50,3 +50,18 @@ trên máy dev, SQLite local — số tuyệt đối chỉ để so sánh tươn
 - Phát hiện khi đo: POST `/api/coupons/validate` ở 50 VUs trả 429 hàng loạt —
   **đúng thiết kế** (middleware giới hạn 60 req GHI/phút/IP), không phải lỗi.
   Đo lại trên staging đa instance + Upstash trước khi mở bán.
+
+## Đo lại sau P0+P1 (2026-09-10)
+
+Production build mới (CSRF, guestToken, outbox, resolve thay snapshot),
+k6 cùng kịch bản vào `next start` port 3100, SQLite local:
+
+- 9382 requests / 60s (peak 50 VUs đọc + 1 VU coupon): **0 failed (0.00%)**,
+  p90 14.7ms, **p95 18.8ms**, p99 30.5ms. Thresholds k6 xanh hết.
+- Phát hiện khi đo: k6 POST không `Origin` bị CSRF middleware chặn 403 —
+  **đúng thiết kế** (browser luôn gửi Origin). Đã thêm `Origin: BASE` vào
+  `scripts/load-test.js` + ghi chú runbook cho client không phải browser.
+- E2E Playwright full suite (build mới, DB cô lập `.test.db`): **29/29 pass**.
+  Phát hiện khi đo: test spam login đốt quota limiter 10/phút/IP dùng chung
+  127.0.0.1 → spec chạy sau login 429. Fix: test rate-limit dùng
+  `X-Forwarded-For` IP riêng (bucket độc lập), không chạm quota UI login.

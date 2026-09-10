@@ -56,7 +56,12 @@
 - Restore Postgres: `psql $DATABASE_URL < backups/lumina-....sql`.
 - Drill restore 1 lần/tháng trên staging.
 
-## 5. Rate limit / Đa instance
+## 5. Rate limit / CSRF / Đa instance
+
+- CSRF: mọi POST/PATCH/DELETE `/api/*` (trừ webhook HMAC + metrics) yêu cầu
+  `Origin` (hoặc `Referer`) khớp host. Script/curl gọi API phải thêm
+  `-H "Origin: https://shop.lumina.vn"`, nếu không nhận 403.
+
 
 - Có `UPSTASH_*`: sliding-window Redis dùng chung mọi instance.
 - Chưa có: fallback in-memory fail-open + warn (1 instance ok, đa instance yếu).

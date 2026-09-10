@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 const ADMIN = { email: "admin@lumina.vn", password: "admin-lumina-2026" };
+// Origin khớp host — giả lập browser (thiếu là CSRF middleware chặn 403).
+const ORIGIN = `http://localhost:${process.env.E2E_PORT ?? 3000}`;
 
 test.describe("Admin upload ảnh", () => {
   test("chưa đăng nhập → 403", async ({ request }) => {
     const res = await request.post("/api/admin/upload", {
       multipart: { file: { name: "a.png", mimeType: "image/png", buffer: Buffer.from([1, 2, 3]) } },
+      headers: { origin: ORIGIN },
     });
     expect(res.status()).toBe(403);
   });
@@ -23,6 +26,7 @@ test.describe("Admin upload ảnh", () => {
         file: { name: "thumb.png", mimeType: "image/png", buffer: Buffer.from([137, 80, 78, 71]) },
         scope: "tmp",
       },
+      headers: { origin: ORIGIN },
     });
     // Không có R2_* env ở CI/dev → 503, luồng paste-URL vẫn dùng được
     expect(res.status()).toBe(503);
@@ -42,6 +46,7 @@ test.describe("Admin upload ảnh", () => {
       multipart: {
         file: { name: "evil.pdf", mimeType: "application/pdf", buffer: Buffer.from([1, 2, 3]) },
       },
+      headers: { origin: ORIGIN },
     });
     // 422 khi R2 đã cấu hình; 503 khi chưa (validate sau guard storage)
     expect([422, 503]).toContain(res.status());
