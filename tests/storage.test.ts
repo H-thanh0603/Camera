@@ -5,7 +5,9 @@ import {
   buildImageKey,
   getStorageConfig,
   isStorageConfigured,
+  sniffImageMime,
   uploadImage,
+  validateImageBytes,
   validateUploadFile,
 } from "@/lib/server/storage";
 
@@ -40,6 +42,36 @@ describe("buildImageKey", () => {
   });
   test("uuid duy nhất mỗi lần gọi", () => {
     expect(buildImageKey("a", "image/webp")).not.toBe(buildImageKey("a", "image/webp"));
+  });
+});
+
+describe("sniffImageMime (magic bytes)", () => {
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+  const GIF = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+  const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
+  const AVIF = new Uint8Array([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x61, 0x76, 0x69, 0x66]);
+  const SVG = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg">');
+  const EXE = new Uint8Array([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00]);
+
+  test("nhận diện JPEG/PNG/GIF/WebP/AVIF", () => {
+    expect(sniffImageMime(JPEG)).toBe("image/jpeg");
+    expect(sniffImageMime(PNG)).toBe("image/png");
+    expect(sniffImageMime(GIF)).toBe("image/gif");
+    expect(sniffImageMime(WEBP)).toBe("image/webp");
+    expect(sniffImageMime(AVIF)).toBe("image/avif");
+  });
+  test("từ chối SVG/EXE/giả mạo", () => {
+    expect(sniffImageMime(SVG)).toBeNull();
+    expect(sniffImageMime(EXE)).toBeNull();
+    expect(sniffImageMime(new Uint8Array([]))).toBeNull();
+  });
+  test("validateImageBytes: khớp thì pass, lệch mime thì 422", () => {
+    expect(validateImageBytes(PNG, "image/png")).toEqual({ mime: "image/png" });
+    const mismatch = validateImageBytes(PNG, "image/jpeg");
+    expect("error" in mismatch && mismatch.error).toContain("không khớp");
+    const fake = validateImageBytes(SVG, "image/png");
+    expect("error" in fake).toBe(true);
   });
 });
 

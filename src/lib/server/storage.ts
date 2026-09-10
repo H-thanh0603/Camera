@@ -61,6 +61,56 @@ export function validateUploadFile(mime: string | null, size: number): string | 
   return null;
 }
 
+/**
+ * Sniff magic bytes — `File.type` do client tự khai nên không tin được
+ * (SVG/EXE đổi tên .png vẫn qua). Trả mime thật hoặc null khi không nhận diện.
+ * Đọc tối đa 32 byte đầu, không load cả file.
+ */
+export function sniffImageMime(bytes: Uint8Array): string | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return "image/gif";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  // AVIF/HEIF: ....ftyp + major brand avif/avis/mif1/msf1/heic/heix
+  if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    const brand = String.fromCharCode(bytes[8]!, bytes[9]!, bytes[10]!, bytes[11]!);
+    if (brand === "avif" || brand === "avis") return "image/avif";
+    return null; // HEIC không trong allowlist → từ chối
+  }
+  return null;
+}
+
+/**
+ * Đối chiếu nội dung thật với mime khai báo. Trả { mime } đã xác minh
+ * (dùng mime này khi upload — không dùng `file.type`), hoặc lỗi tiếng Việt.
+ */
+export function validateImageBytes(bytes: Uint8Array, claimedMime: string | null): { mime: string } | { error: string } {
+  const sniffed = sniffImageMime(bytes);
+  if (!sniffed) {
+    return { error: "File không phải ảnh hợp lệ (định dạng không nhận diện được)." };
+  }
+  if (claimedMime && claimedMime !== sniffed) {
+    return { error: `File thực tế là ${sniffed}, không khớp định dạng khai báo.` };
+  }
+  return { mime: sniffed };
+}
+
 const MIME_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",

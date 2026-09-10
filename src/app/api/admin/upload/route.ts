@@ -7,6 +7,7 @@ import {
   StorageNotConfigured,
   isStorageConfigured,
   uploadImage,
+  validateImageBytes,
   validateUploadFile,
 } from "@/lib/server/storage";
 
@@ -41,7 +42,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const { url, key } = await uploadImage(bytes, file.type, scope);
+    const verified = validateImageBytes(bytes, file.type || null);
+    if ("error" in verified) return NextResponse.json({ error: verified.error }, { status: 422 });
+    const { url, key } = await uploadImage(bytes, verified.mime, scope);
     const user = await getSessionUser();
     await logAudit(
       user ? { id: user.id, name: user.name, email: user.email } : null,
