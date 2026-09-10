@@ -124,8 +124,18 @@ jobs:
       - name: Switch provider to postgresql (CI only, không commit)
         run: sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma && npx prisma validate
 
-      - name: Push schema to ephemeral Postgres
-        run: npx prisma db push
+      - name: Apply committed baseline (khóa drift baseline)
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d lumina -v ON_ERROR_STOP=1 -f prisma/postgres-baseline.sql
+
+      - name: Baseline drift check (schema vs baseline)
+        run: |
+          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script > /tmp/drift.sql
+          if grep -qE "CREATE TABLE|ALTER TABLE|CREATE (UNIQUE )?INDEX" /tmp/drift.sql; then
+            echo "BASELINE DRIFT: prisma/postgres-baseline.sql lệch khỏi schema. Regenerate baseline."
+            cat /tmp/drift.sql
+            exit 1
+          fi
+          echo "baseline in sync"
 
       - name: Seed on Postgres
         run: npx prisma db seed

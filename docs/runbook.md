@@ -11,15 +11,16 @@
    - App **từ chối khởi động** nếu production mà demo payment còn bật
      (`src/lib/server/env.ts` throw) — kiểm tra bằng `GET /api/health`
      (`paymentDemoMode` phải `false`).
-3. Schema lần đầu trên Postgres: history migrations là SQLite-only nên
-   **không** `migrate deploy`. Đổi `provider = "postgresql"` trong
-    `prisma/schema.prisma`, chạy `npx prisma db push && npx prisma db seed`
-    (đã chứng minh trên Postgres 18 + seed 18 SP/3 coupon, EXPLAIN dùng
-    `Order_status_idx` + `Review_productId_approved_idx`; CI job
-    `postgres-check` khóa lại mỗi push).
-    Sau push: `psql "$DATABASE_URL" -f prisma/postgres-extensions.sql`
-    (pg_trgm + 4 GIN index cho fuzzy search — idempotent), rồi verify
-    `DATABASE_URL=... npx tsx scripts/smoke-trigram.ts`.
+3. Schema lần đầu trên Postgres (đã drill 2026-09-10, xem
+   `docs/backup-drill-log.md`): history migrations là SQLite-only nên
+   **không** `migrate deploy` / **không** `db push` trực tiếp lên prod.
+   Chạy `DATABASE_URL=... ADMIN_PASSWORD=... node scripts/db-pg-init.mjs --seed`
+   (apply `prisma/postgres-baseline.sql` đã verify + `postgres-extensions.sql`
+   + seed 18 SP/3 coupon; EXPLAIN dùng `Order_status_idx`, trigram hoạt động;
+   CI job `postgres-check` khóa lại mỗi push). Verify thêm
+   `DATABASE_URL=... npx tsx scripts/smoke-trigram.ts`.
+   Từ sau lần này, mọi đổi schema phải là migration mới có review —
+   cấm `db push` lên prod.
 4. Gắn uptime monitor vào `GET /api/health` (200 = ok; 503 = DB down).
    Response còn báo `paymentWebhook/email/sentry/redis` đã cấu hình hay chưa.
 

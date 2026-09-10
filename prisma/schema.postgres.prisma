@@ -1,18 +1,17 @@
 // Prisma schema — SQLite cho dev/demo, Postgres cho production.
-// Schema chỉ dùng kiểu portable (String/Int/Json/DateTime/Boolean/Float).
-// Deploy Postgres: KHÔNG migrate deploy / db push trực tiếp.
-// Chạy `node scripts/db-pg-init.mjs --seed` (apply prisma/postgres-baseline.sql
-// đã verify + extensions). Mọi đổi schema sau đó phải là migration mới.
-// Baseline Postgres: prisma/schema.postgres.prisma + prisma/postgres-baseline.sql
-// (drill 2026-09-10, xem docs/backup-drill-log.md; CI khóa drift mỗi push).
-// Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
+// Schema chỉ dùng kiểu portable (String/Int/Json/DateTime/Boolean/Float)
+// nên chuyển provider không đổi gì khác.
+// Deploy Postgres (Supabase/Neon):
+//   1. provider = "postgresql", DATABASE_URL="postgresql://...?sslmode=require"
+//   2. npx prisma migrate deploy && npx prisma db seed
+//   3. Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
