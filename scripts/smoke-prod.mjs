@@ -33,6 +33,7 @@ await check("production không bật demo payment", async () => {
   const r = await get("/api/health");
   if (String(process.env.REQUIRE_PROD_FLAGS ?? "") === "true") {
     assert(r.body.paymentDemoMode === false, "demo payment đang bật!");
+    assert(r.body.ready === true, "health.ready=false (thiếu webhook secret hoặc redis)!");
   }
 });
 

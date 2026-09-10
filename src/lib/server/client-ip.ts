@@ -15,17 +15,22 @@ function firstHeader(headers: Headers, name: string): string | null {
 }
 
 export function getClientIp(headers: Headers): string {
-  const cf = firstHeader(headers, "cf-connecting-ip");
-  if (cf) return cf;
-  const real = firstHeader(headers, "x-real-ip");
-  if (real) return real;
+  // Header do proxy đảm bảo CHỈ tin khi operator xác nhận có proxy
+  // (TRUST_PROXY_COUNT>0) hoặc platform tự đảm bảo (Vercel). Self-host trần:
+  // attacker tự đặt header này nên phải bỏ qua.
+  const behindProxy = Number(process.env.TRUST_PROXY_COUNT ?? 0) > 0 || Boolean(process.env.VERCEL);
+  if (behindProxy) {
+    const cf = firstHeader(headers, "cf-connecting-ip");
+    if (cf) return cf;
+    const real = firstHeader(headers, "x-real-ip");
+    if (real) return real;
+  }
 
   const xff = headers.get("x-forwarded-for");
   if (xff) {
     const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
     if (parts.length > 0) {
-      const trusted = Number(process.env.TRUST_PROXY_COUNT ?? 0);
-      if (trusted > 0) return parts[parts.length - 1]!;
+      if (behindProxy) return parts[parts.length - 1]!;
       return parts[0]!;
     }
   }

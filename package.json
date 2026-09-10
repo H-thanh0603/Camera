@@ -19,6 +19,7 @@
     "reminder:sensor": "tsx scripts/sensor-reminder.ts",
     "payment:reconcile": "tsx scripts/payment-reconcile.ts",
     "db:pg:init": "node scripts/db-pg-init.mjs --seed",
+    "check:prod-env": "tsx scripts/check-prod-env.ts",
     "test:load": "k6 run scripts/load-test.js",
     "prepare": "husky",
     "check:bundle": "node scripts/check-bundle.mjs"

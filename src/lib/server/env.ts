@@ -26,6 +26,7 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   R2_BUCKET: z.string().min(1).optional(),
   R2_PUBLIC_URL: z.string().url().optional(),
+  TRUST_PROXY_COUNT: z.string().regex(/^\d+$/).optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -48,6 +49,28 @@ export function getEnv(): AppEnv {
   }
   if (env.NODE_ENV === "production" && !env.ADMIN_PASSWORD) {
     throw new Error("ADMIN_PASSWORD là bắt buộc ở production.");
+  }
+  if (env.NODE_ENV === "production" && !env.PAYMENT_WEBHOOK_SECRET) {
+    throw new Error(
+      "PAYMENT_WEBHOOK_SECRET là bắt buộc ở production — không có secret thì webhook 503, shop chết thanh toán.",
+    );
+  }
+  // Redis rate-limit: đa instance mà thiếu Redis là bypass hết limiter.
+  const redisUrl = env.UPSTASH_REDIS_REST_URL;
+  const redisToken = env.UPSTASH_REDIS_REST_TOKEN;
+  if ((redisUrl && !redisToken) || (!redisUrl && redisToken)) {
+    throw new Error("UPSTASH_REDIS_REST_URL và UPSTASH_REDIS_REST_TOKEN phải đi cùng nhau.");
+  }
+  if (env.NODE_ENV === "production" && !redisUrl) {
+    throw new Error(
+      "UPSTASH_REDIS_REST_URL/TOKEN là bắt buộc ở production — fallback memory fail-open không chịu được đa instance.",
+    );
+  }
+  // Client IP đáng tin: production phải sau proxy (TRUST_PROXY_COUNT>0)
+  // hoặc chạy trên Vercel (platform tự đảm bảo x-real-ip). Self-host trần
+  // mà không trust proxy → IP spoof được, limiter vô dụng.
+  if (env.NODE_ENV === "production" && !(Number(env.TRUST_PROXY_COUNT ?? 0) > 0 || process.env.VERCEL)) {
+    throw new Error("Production yêu cầu TRUST_PROXY_COUNT>0 (sau LB/proxy) hoặc deploy trên Vercel.");
   }
   cached = env;
   return cached;

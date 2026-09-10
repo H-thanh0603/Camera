@@ -31,6 +31,12 @@ export async function GET() {
       email: Boolean(process.env.RESEND_API_KEY),
       sentry: Boolean(process.env.SENTRY_DSN),
       redis: isRedisConfigured() ? "upstash" : "memory",
+      // Sẵn sàng nhận traffic production: demo tắt + webhook + redis.
+      // (Chi tiết thiếu gì xem log khởi động từ getEnv() — không lộ ở đây.)
+      ready:
+        process.env.PAYMENT_DEMO_MODE !== "true" &&
+        Boolean(process.env.PAYMENT_WEBHOOK_SECRET) &&
+        isRedisConfigured(),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
