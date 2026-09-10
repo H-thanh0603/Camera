@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CATALOG_TAG } from "@/lib/server/product-db";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
@@ -41,6 +42,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       include: { variants: true },
     });
     revalidatePath("/", "layout");
+    revalidateTag(CATALOG_TAG);
     await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) });
   } catch (e) {
@@ -79,6 +81,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     throw e;
   }
   revalidatePath("/", "layout");
+    revalidateTag(CATALOG_TAG);
   await logAudit(await getSessionUser(), "product.delete", "product", id);
   return NextResponse.json({ ok: true });
 }

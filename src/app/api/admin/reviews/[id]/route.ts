@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CATALOG_TAG } from "@/lib/server/product-db";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
@@ -39,6 +40,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     rewardCode = await grantPhotoReviewReward(review.id);
   }
   revalidatePath("/", "layout");
+    revalidateTag(CATALOG_TAG);
   await logAudit(await getSessionUser(), body.approved ? "review.approve" : "review.unapprove", "review", id, { productId: review.productId });
   return NextResponse.json({ ok: true, rewardCode });
 }
@@ -54,6 +56,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   await prisma.review.delete({ where: { id } });
   await recalcProductRating(review.productId);
   revalidatePath("/", "layout");
+    revalidateTag(CATALOG_TAG);
   await logAudit(await getSessionUser(), "review.delete", "review", id, { productId: review.productId });
   return NextResponse.json({ ok: true });
 }

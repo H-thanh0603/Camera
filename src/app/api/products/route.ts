@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { dbQueryProducts } from "@/lib/server/product-db";
+import { cachedQueryProducts } from "@/lib/server/product-db";
 import { productQuerySchema, zodFieldErrors } from "@/lib/schemas";
 
 /**
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       { status: 422 },
     );
   }
-  const result = await dbQueryProducts(parsed.data);
+  const result = await cachedQueryProducts(parsed.data);
   return NextResponse.json(result, {
     headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
   });

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { CATALOG_TAG } from "@/lib/server/product-db";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     revalidatePath("/", "layout");
+    revalidateTag(CATALOG_TAG);
     await logAudit(await getSessionUser(), "product.created", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) }, { status: 201 });
   } catch (e) {

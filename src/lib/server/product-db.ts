@@ -1,5 +1,6 @@
 import type { Product } from "@/lib/types";
 import { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { prisma } from "./prisma";
 import {
   buildOrderSql,
@@ -321,6 +322,40 @@ async function dbFacetsPg(params: ProductSearchParams): Promise<{
     })),
     priceRange: { min: Number(aggRows[0]?.min ?? 0), max: Number(aggRows[0]?.max ?? 0) },
   };
+}
+
+/**
+ * Wrapper cache cho listing/facets (60s, tag "catalog").
+ * dbQueryProducts/dbFacets gốc giữ nguyên cho test + path cần tươi tuyệt đối.
+ * Admin ghi (sản phẩm/review) gọi revalidateTag("catalog") để rớt cache ngay.
+ */
+export const CATALOG_TAG = "catalog";
+
+export function cachedQueryProducts(params: ProductSearchParams): Promise<{
+  items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}> {
+  const normalized = { ...params, page: params.page ?? 1, pageSize: params.pageSize ?? 12 };
+  return unstable_cache(() => dbQueryProducts(params), ["products", JSON.stringify(normalized)], {
+    revalidate: 60,
+    tags: [CATALOG_TAG],
+  })();
+}
+
+export function cachedFacets(
+  params: Pick<ProductSearchParams, "q" | "minPrice" | "maxPrice" | "minRating" | "inStockOnly" | "tag">,
+): Promise<{
+  brands: { value: string; count: number }[];
+  categories: { value: import("@/lib/types").Category; count: number }[];
+  priceRange: { min: number; max: number };
+}> {
+  return unstable_cache(() => dbFacets(params), ["facets", JSON.stringify(params)], {
+    revalidate: 60,
+    tags: [CATALOG_TAG],
+  })();
 }
 
 /**

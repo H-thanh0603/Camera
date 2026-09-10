@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ProductCard } from "@/components/product/product-card";
-import { dbQueryProducts } from "@/lib/server/product-db";
+import { cachedQueryProducts } from "@/lib/server/product-db";
 
-/** Section 5 — Curated Bestsellers & Precision Vault: dữ liệu từ DB. */
+/** Section 5 — Curated Bestsellers & Precision Vault: dữ liệu từ DB (cache 60s). */
 export async function VaultBestsellers() {
-  const { items: bestsellers } = await dbQueryProducts({ sort: "best_selling", pageSize: 3 });
+  const { items: bestsellers } = await cachedQueryProducts({ sort: "best_selling", pageSize: 3 });
 
   return (
     <section className="relative w-full bg-surface py-space-4xl">

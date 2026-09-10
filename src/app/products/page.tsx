@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { dbFacets, dbQueryProducts } from "@/lib/server/product-db";
+import { cachedFacets, cachedQueryProducts } from "@/lib/server/product-db";
 import type { Category } from "@/lib/types";
 import { ProductCard } from "@/components/product/product-card";
 import { EmptyState, CardSkeletonGrid } from "@/components/ui/states";
@@ -35,10 +35,11 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     pageSize: 9,
   };
 
-  // Server-side: chỉ tải 1 trang + facets aggregate (chịu catalogue lớn)
+  // Server-side: chỉ tải 1 trang + facets aggregate (chịu catalogue lớn).
+  // Cache 60s/tag catalog — admin ghi rớt cache ngay, không chờ hết TTL.
   const [result, facets] = await Promise.all([
-    dbQueryProducts(query),
-    dbFacets({
+    cachedQueryProducts(query),
+    cachedFacets({
       q: parsed.search,
       minPrice: parsed.minPrice,
       maxPrice: parsed.maxPrice,
