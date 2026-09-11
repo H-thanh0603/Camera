@@ -1,12 +1,15 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildTxnRef,
+  buildVnpayRefundParams,
   createVnpayPaymentUrl,
   formatVnpayDate,
   parseTxnRef,
   parseVnpayIpn,
   signVnpayParams,
   sortVnpayParams,
+  verifyVnpayRefundResponse,
   verifyVnpaySignature,
   VNPAY_SANDBOX_URL,
 } from "@/lib/server/vnpay";
@@ -130,5 +133,52 @@ describe("parseVnpayIpn", () => {
   it("thiếu TxnRef / amount rác → 04", () => {
     expect(parseVnpayIpn(signedQuery({ vnp_TxnRef: undefined }), SECRET)).toMatchObject({ ok: false, code: "04" });
     expect(parseVnpayIpn(signedQuery({ vnp_Amount: "abc" }), SECRET)).toMatchObject({ ok: false, code: "04" });
+  });
+});
+
+describe("vnpay refund", () => {
+  const input = {
+    txnRef: "LUM-1__mabc",
+    amountVnd: 185_000_000,
+    transactionNo: "14567890",
+    transactionDate: "20260911120000",
+    createBy: "admin@lumina.vn",
+    ipAddr: "127.0.0.1",
+  };
+
+  it("dựng params refund type 02 + amount x100", () => {
+    const { params } = buildVnpayRefundParams(CONFIG, input, new Date("2026-09-11T05:00:00.000Z"), "req123");
+    expect(params.vnp_Command).toBe("refund");
+    expect(params.vnp_TransactionType).toBe("02");
+    expect(params.vnp_Amount).toBe("18500000000");
+    expect(params.vnp_RequestId).toBe("req123");
+    expect(params.vnp_CreateDate).toBe("20260911120000");
+  });
+
+  it("từ chối amount 0 và thiếu mã gốc", () => {
+    expect(() => buildVnpayRefundParams(CONFIG, { ...input, amountVnd: 0 })).toThrow();
+    expect(() => buildVnpayRefundParams(CONFIG, { ...input, transactionNo: "" })).toThrow();
+  });
+
+  it("verify response refund: đúng thì pass, sửa amount thì fail", () => {
+    // Dựng response mẫu rồi ký đúng pipe-format 12 trường của VNPay
+    const resp: Record<string, string> = {
+      vnp_ResponseId: "r1",
+      vnp_Command: "refund",
+      vnp_ResponseCode: "00",
+      vnp_Message: "Success",
+      vnp_TmnCode: CONFIG.tmnCode,
+      vnp_TxnRef: input.txnRef,
+      vnp_Amount: "18500000000",
+      vnp_BankCode: "NCB",
+      vnp_PayDate: "20260911120500",
+      vnp_TransactionNo: input.transactionNo,
+      vnp_TransactionType: "02",
+      vnp_TransactionStatus: "00",
+    };
+    const order = ["vnp_ResponseId","vnp_Command","vnp_ResponseCode","vnp_Message","vnp_TmnCode","vnp_TxnRef","vnp_Amount","vnp_BankCode","vnp_PayDate","vnp_TransactionNo","vnp_TransactionType","vnp_TransactionStatus"];
+    const signed = { ...resp, vnp_SecureHash: createHmac("sha512", SECRET).update(order.map((k) => resp[k]).join("|"), "utf-8").digest("hex") };
+    expect(verifyVnpayRefundResponse(signed, SECRET)).toBe(true);
+    expect(verifyVnpayRefundResponse({ ...signed, vnp_Amount: "1" }, SECRET)).toBe(false);
   });
 });

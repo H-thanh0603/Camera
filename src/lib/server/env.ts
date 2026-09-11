@@ -18,6 +18,7 @@ const envSchema = z.object({
   VNPAY_TMN_CODE: z.string().min(1).optional(),
   VNPAY_HASH_SECRET: z.string().min(8).optional(),
   VNPAY_PAY_URL: z.string().url().default("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"),
+  VNPAY_API_URL: z.string().url().default("https://sandbox.vnpayment.vn/merchant_webapi/api/transaction"),
   VNPAY_RETURN_URL: z.string().url().optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),

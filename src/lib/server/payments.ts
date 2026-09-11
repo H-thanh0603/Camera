@@ -47,7 +47,10 @@ export interface WebhookOutcome {
  * tiền với totals server đã tính, chuyển pending → paid bằng claim có điều
  * kiện. Webhook "failed" giữ nguyên pending để khách thanh toán lại.
  */
-export async function handlePaymentWebhook(input: PaymentWebhookInput): Promise<WebhookOutcome> {
+export async function handlePaymentWebhook(
+  input: PaymentWebhookInput,
+  meta?: Record<string, string>,
+): Promise<WebhookOutcome> {
   const skew = Math.abs(Date.now() / 1000 - input.timestamp);
   if (skew > WEBHOOK_MAX_SKEW_SECONDS) {
     throw new PaymentWebhookError("Webhook đã hết hạn (timestamp lệch quá 5 phút).", 400);
@@ -61,6 +64,7 @@ export async function handlePaymentWebhook(input: PaymentWebhookInput): Promise<
         eventId: input.eventId,
         orderNumber: input.orderNumber,
         status: input.status,
+        meta: (meta ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       },
     });
   } catch (e) {

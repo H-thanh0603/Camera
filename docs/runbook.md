@@ -57,6 +57,12 @@
 - Browser return: `GET /api/payments/vnpay-return` verify rồi redirect về
   `/account?pay=vnpay&order=&result=` (banner `VnpayNotice`). Trạng thái
   chuẩn vẫn do IPN quyết định — return URL chỉ để hiển thị.
+- Hoàn tiền: `POST /api/admin/orders/:id/refund` (full-amount, chỉ đơn `paid`
+  + VNPay + có IPN thành công — lấy `transactionNo`/`payDate` từ
+  `PaymentEvent.meta`). Ký pipe-format 15 trường, gọi merchant API, verify
+  response 12 trường; RspCode 00 mới claim `paid → refunded`. Thiếu keys → 503.
+  Sandbox test được khi có keys; prod đổi `VNPAY_PAY_URL` + `VNPAY_API_URL`
+  sang domain `www.vnpayment.vn`.
 - Endpoint generic `POST /api/payments/webhook` (HMAC-SHA256 + secret riêng)
   giữ lại dự phòng cho cổng khác; thiếu secret → 503 fail-closed.
 - Lấy keys: VNPay Merchant Admin → Terminal (`VNPAY_TMN_CODE`) + Hash Secret

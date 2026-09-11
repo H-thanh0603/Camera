@@ -39,16 +39,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ RspCode: code, Message: parsed.message });
   }
   try {
-    // Tách hậu tố retry để ra mã đơn gốc; eventId giữ full ref (dedupe từng lần thử)
+    // Tách hậu tố retry để ra mã đơn gốc; eventId giữ full ref (dedupe từng lần thử).
+    // Meta transactionNo/payDate lưu lại cho refund sau này.
     const orderNumber = parseTxnRef(parsed.txnRef);
-    const outcome = await handlePaymentWebhook({
-      provider: "vnpay",
-      eventId: `${parsed.txnRef}:${parsed.transactionNo || parsed.responseCode}`,
-      orderNumber,
-      amount: parsed.amountVnd,
-      status: parsed.responseCode === "00" ? "paid" : "failed",
-      timestamp: Math.floor(Date.now() / 1000),
-    });
+    const outcome = await handlePaymentWebhook(
+      {
+        provider: "vnpay",
+        eventId: `${parsed.txnRef}:${parsed.transactionNo || parsed.responseCode}`,
+        orderNumber,
+        amount: parsed.amountVnd,
+        status: parsed.responseCode === "00" ? "paid" : "failed",
+        timestamp: Math.floor(Date.now() / 1000),
+      },
+      {
+        transactionNo: parsed.transactionNo,
+        payDate: query.vnp_PayDate ?? "",
+        txnRef: parsed.txnRef,
+      },
+    );
     // Đơn đã ở trạng thái cuối (không còn pending) → báo VNPay dừng retry
     if (outcome.deduped && outcome.status !== "pending") {
       return NextResponse.json({ RspCode: "02", Message: "Order already confirmed" });

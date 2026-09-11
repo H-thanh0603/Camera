@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
  * VNPay adapter — tạo URL thanh toán + verify chữ ký return/IPN.
@@ -9,6 +9,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  */
 
 export const VNPAY_SANDBOX_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+export const VNPAY_SANDBOX_API_URL = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
 export const VNPAY_VERSION = "2.1.0";
 
 /**
@@ -157,4 +158,131 @@ export function parseVnpayIpn(
     transactionNo: query.vnp_TransactionNo ?? "",
     responseCode: query.vnp_ResponseCode ?? "",
   };
+}
+
+/* ---------------- Refund (hoàn tiền qua merchant API) ---------------- */
+
+export interface VnpayRefundInput {
+  /** Full TxnRef gốc đã gửi VNPay (gồm hậu tố retry). */
+  txnRef: string;
+  amountVnd: number;
+  orderInfo?: string;
+  /** Mã giao dịch VNPay gốc (vnp_TransactionNo của IPN thành công). */
+  transactionNo: string;
+  /** Ngày thanh toán gốc yyyyMMddHHmmss (vnp_PayDate của IPN). */
+  transactionDate: string;
+  /** Người tạo lệnh hoàn (email admin). */
+  createBy: string;
+  ipAddr: string;
+}
+
+export interface VnpayRefundParams {
+  params: Record<string, string>;
+  secureHash: string;
+}
+
+/**
+ * Dựng params refund full-amount (vnp_TransactionType=02).
+ * Chuỗi ký: 15 trường nối "|" KHÔNG url-encode (khác pay URL) — đúng doc VNPay.
+ */
+export function buildVnpayRefundParams(
+  config: VnpayConfig,
+  input: VnpayRefundInput,
+  now = new Date(),
+  requestId = randomBytes(6).toString("hex"),
+): VnpayRefundParams {
+  if (!Number.isInteger(input.amountVnd) || input.amountVnd <= 0) {
+    throw new Error("Số tiền hoàn phải là số nguyên dương (VND).");
+  }
+  if (!input.transactionNo || !input.transactionDate) {
+    throw new Error("Thiếu mã/ngày giao dịch gốc của VNPay.");
+  }
+  const params: Record<string, string> = {
+    vnp_RequestId: requestId,
+    vnp_Version: VNPAY_VERSION,
+    vnp_Command: "refund",
+    vnp_TmnCode: config.tmnCode,
+    vnp_TransactionType: "02",
+    vnp_TxnRef: input.txnRef,
+    vnp_Amount: String(input.amountVnd * 100),
+    vnp_OrderInfo: input.orderInfo ?? `Hoan tien don hang ${input.txnRef}`,
+    vnp_TransactionNo: input.transactionNo,
+    vnp_TransactionDate: input.transactionDate,
+    vnp_CreateBy: input.createBy,
+    vnp_CreateDate: formatVnpayDate(now),
+    vnp_IpAddr: input.ipAddr,
+    vnp_OrderType: "other",
+  };
+  const signData = [
+    params.vnp_RequestId,
+    params.vnp_Version,
+    params.vnp_Command,
+    params.vnp_TmnCode,
+    params.vnp_TransactionType,
+    params.vnp_TxnRef,
+    params.vnp_Amount,
+    params.vnp_OrderInfo,
+    params.vnp_TransactionNo,
+    params.vnp_TransactionDate,
+    params.vnp_CreateBy,
+    params.vnp_CreateDate,
+    params.vnp_IpAddr,
+    params.vnp_OrderType,
+  ].join("|");
+  const secureHash = createHmac("sha512", config.hashSecret).update(signData, "utf-8").digest("hex");
+  return { params, secureHash };
+}
+
+export interface VnpayRefundResult {
+  responseCode: string;
+  message: string;
+  transactionStatus: string;
+}
+
+/** Verify chữ ký response refund (pipe-format 12 trường theo doc VNPay). */
+export function verifyVnpayRefundResponse(
+  resp: Record<string, string | undefined>,
+  secret: string,
+): boolean {
+  const received = resp.vnp_SecureHash;
+  if (!received || !secret) return false;
+  const pick = (k: string) => resp[k] ?? "";
+  const signData = [
+    pick("vnp_ResponseId"),
+    pick("vnp_Command"),
+    pick("vnp_ResponseCode"),
+    pick("vnp_Message"),
+    pick("vnp_TmnCode"),
+    pick("vnp_TxnRef"),
+    pick("vnp_Amount"),
+    pick("vnp_BankCode"),
+    pick("vnp_PayDate"),
+    pick("vnp_TransactionNo"),
+    pick("vnp_TransactionType"),
+    pick("vnp_TransactionStatus"),
+  ].join("|");
+  const expected = createHmac("sha512", secret).update(signData, "utf-8").digest("hex");
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(received.trim().toLowerCase(), "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Gọi merchant API refund (GET query-string như sample VNPay), timeout 15s. */
+export async function callVnpayRefund(
+  apiUrl: string,
+  refund: VnpayRefundParams,
+): Promise<Record<string, string>> {
+  const qs = new URLSearchParams({ ...refund.params, vnp_SecureHash: refund.secureHash }).toString();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(`${apiUrl}?${qs}`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`VNPay refund HTTP ${res.status}`);
+    const data = (await res.json()) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(data)) out[k] = String(v ?? "");
+    return out;
+  } finally {
+    clearTimeout(timer);
+  }
 }

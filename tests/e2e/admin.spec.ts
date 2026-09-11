@@ -145,4 +145,14 @@ test.describe("Admin panel", () => {
     await expect(page.getByText(/Đã ghi phiếu/)).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("cell", { name: "Nhập NCC test E2E" }).first()).toBeVisible();
   });
+
+  test("admin: refund VNPay 503 khi chưa cấu hình keys", async ({ page }) => {
+    await adminLogin(page);
+    // Keys check trước cả order lookup → fail-closed (page.request chia sẻ session admin)
+    const origin = new URL(page.url()).origin;
+    const res = await page.request.post("/api/admin/orders/no-such-order/refund", {
+      headers: { Origin: origin },
+    });
+    expect(res.status()).toBe(503);
+  });
 });

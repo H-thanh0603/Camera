@@ -86,6 +86,25 @@ export function OrdersAdmin() {
     },
   });
 
+  const refundVnpay = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/orders/${id}/refund`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Hoàn tiền thất bại.");
+      }
+    },
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<{ orders: Order[]; total: number; totalPages: number }>(
+        ["admin", "orders", page, filter],
+        (prev) =>
+          prev
+            ? { ...prev, orders: prev.orders.map((o) => (o.id === id ? { ...o, status: "refunded" as OrderStatus } : o)) }
+            : prev,
+      );
+    },
+  });
+
   return (
     <div className="flex flex-col gap-space-lg">
       <header className="flex flex-col gap-space-2xs">
@@ -145,6 +164,22 @@ export function OrdersAdmin() {
                       <option key={s} value={s}>{STATUS_LABEL[s]}</option>
                     ))}
                   </select>
+                  {o.status === "paid" && o.payment === "vnpay" && (
+                    <button
+                      type="button"
+                      disabled={refundVnpay.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Hoàn tiền VNPay ${formatVND(o.totals.total)} cho đơn ${o.number}? Tiền về tài khoản khách qua VNPay.`)) {
+                          refundVnpay.mutate(o.id, {
+                            onError: (err) => window.alert(err.message),
+                          });
+                        }
+                      }}
+                      className="rounded-lg bg-error-container/30 px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-error transition-colors hover:bg-error-container/50 disabled:opacity-40"
+                    >
+                      {refundVnpay.isPending ? "Đang hoàn…" : "Hoàn tiền VNPay"}
+                    </button>
+                  )}
                   {changeStatus.isPending && <Spinner className="border-primary border-t-transparent" />}
                 </div>
               </div>

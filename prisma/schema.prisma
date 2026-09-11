@@ -244,6 +244,8 @@ model PaymentEvent {  // Dedupe webhook cổng thanh toán: (provider, eventId) 
   eventId     String
   orderNumber String
   status      String
+  // Meta riêng cổng (vd VNPay: transactionNo/payDate) — refund cần tra cứu
+  meta        Json?
   createdAt   DateTime @default(now())
 
   @@unique([provider, eventId])

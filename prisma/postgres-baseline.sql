@@ -197,6 +197,7 @@ CREATE TABLE "PaymentEvent" (
     "eventId" TEXT NOT NULL,
     "orderNumber" TEXT NOT NULL,
     "status" TEXT NOT NULL,
+    "meta" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PaymentEvent_pkey" PRIMARY KEY ("id")
