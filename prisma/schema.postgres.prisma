@@ -290,3 +290,19 @@ model TradeInLead {  // Lead thu cũ đổi mới: form public, admin gọi lạ
 
   @@index([status])
 }
+
+model StockMovement {  // Sổ kho: mọi biến động tồn đều ghi dòng (đơn hàng, hủy, nhập tay).
+  id           String   @id @default(cuid())
+  productId    String
+  variantId    String?
+  type         String   // in | out | adjust
+  quantity     Int      // delta có dấu (+nhập, -xuất)
+  balanceAfter Int?     // tồn sau biến động (null khi không đọc lại được)
+  reason       String   @default("")
+  refOrderId   String?
+  createdBy    String?
+  createdAt    DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}

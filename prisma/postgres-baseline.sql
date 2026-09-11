@@ -245,6 +245,21 @@ CREATE TABLE "TradeInLead" (
     CONSTRAINT "TradeInLead_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "StockMovement" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "variantId" TEXT,
+    "type" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "balanceAfter" INTEGER,
+    "reason" TEXT NOT NULL DEFAULT '',
+    "refOrderId" TEXT,
+    "createdBy" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "StockMovement_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -346,6 +361,12 @@ CREATE INDEX "EmailOutbox_sentAt_nextRunAt_idx" ON "EmailOutbox"("sentAt", "next
 
 -- CreateIndex
 CREATE INDEX "TradeInLead_status_idx" ON "TradeInLead"("status");
+
+-- CreateIndex
+CREATE INDEX "StockMovement_productId_idx" ON "StockMovement"("productId");
+
+-- CreateIndex
+CREATE INDEX "StockMovement_createdAt_idx" ON "StockMovement"("createdAt");
 
 -- AddForeignKey
 ALTER TABLE "TotpChallenge" ADD CONSTRAINT "TotpChallenge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
