@@ -125,4 +125,13 @@ test.describe("Admin panel", () => {
     await page.goto("/checkout");
     await expect(page.getByText("Kênh Dành Cho Khách Mua Hàng")).toBeVisible({ timeout: 10_000 });
   });
+
+  test("admin: console shell — sidebar, active state, lối về cửa hàng", async ({ page }) => {
+    await adminLogin(page);
+    await page.goto("/admin/products");
+    const nav = page.getByRole("navigation", { name: "Điều hướng admin" });
+    await expect(nav.getByRole("link", { name: /Sản phẩm/ })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: /Đơn hàng/ })).not.toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Về cửa hàng" })).toBeVisible();
+  });
 });
