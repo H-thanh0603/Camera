@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEnv } from "@/lib/server/env";
 import { handlePaymentWebhook, PaymentWebhookError } from "@/lib/server/payments";
-import { parseVnpayIpn } from "@/lib/server/vnpay";
+import { parseTxnRef, parseVnpayIpn } from "@/lib/server/vnpay";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
@@ -39,10 +39,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ RspCode: code, Message: parsed.message });
   }
   try {
+    // Tách hậu tố retry để ra mã đơn gốc; eventId giữ full ref (dedupe từng lần thử)
+    const orderNumber = parseTxnRef(parsed.txnRef);
     const outcome = await handlePaymentWebhook({
       provider: "vnpay",
       eventId: `${parsed.txnRef}:${parsed.transactionNo || parsed.responseCode}`,
-      orderNumber: parsed.txnRef,
+      orderNumber,
       amount: parsed.amountVnd,
       status: parsed.responseCode === "00" ? "paid" : "failed",
       timestamp: Math.floor(Date.now() / 1000),

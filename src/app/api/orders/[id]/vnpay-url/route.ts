@@ -3,7 +3,7 @@ import { getOwnOrder, OrderForbidden } from "@/lib/server/order-mapper";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { getEnv } from "@/lib/server/env";
-import { createVnpayPaymentUrl } from "@/lib/server/vnpay";
+import { buildTxnRef, createVnpayPaymentUrl } from "@/lib/server/vnpay";
 import { logger } from "@/lib/server/logger";
 
 /**
@@ -64,8 +64,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Tổng đơn hàng chưa hợp lệ." }, { status: 422 });
   }
   try {
+    // TxnRef duy nhất mỗi lần bấm (cho phép thanh toán lại sau failed)
     const url = createVnpayPaymentUrl(config, {
-      orderNumber: order.number,
+      orderNumber: buildTxnRef(order.number),
       amountVnd: total,
       ipAddr: getClientIp(request.headers),
     });

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEnv } from "@/lib/server/env";
-import { verifyVnpaySignature } from "@/lib/server/vnpay";
+import { parseTxnRef, verifyVnpaySignature } from "@/lib/server/vnpay";
 
 /**
  * GET /api/payments/vnpay-return — user redirect về từ VNPay sau thanh toán.
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   request.nextUrl.searchParams.forEach((value, key) => {
     query[key] = value;
   });
-  const order = query.vnp_TxnRef ?? "";
+  const order = parseTxnRef(query.vnp_TxnRef ?? "");
   let result = "invalid";
   try {
     const secret = getEnv().VNPAY_HASH_SECRET;

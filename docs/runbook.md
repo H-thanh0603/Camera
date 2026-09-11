@@ -45,7 +45,9 @@
 ## 2. Cổng thanh toán (VNPay — đã thay pay-demo từ 2026-09-11)
 
 - Checkout phương thức `vnpay` → `POST /api/orders/:id/vnpay-url` trả URL
-  sandbox/prod (`vnp_TxnRef` = mã đơn `LUM-...`, amount = totals.total).
+  sandbox/prod (`vnp_TxnRef` = mã đơn + hậu tố `__base36time` duy nhất mỗi lần
+  bấm — cho phép thanh toán lại sau failed; IPN tách hậu tố để ra mã đơn gốc,
+  amount = totals.total).
 - IPN server-to-server: `GET /api/payments/vnpay-ipn` verify HMAC-SHA512
   (đúng sample VNPay: sort + encodeURIComponent, `%20` → `+`), map về
   `PaymentWebhookInput` rồi tái dùng `handlePaymentWebhook` (dedupe theo

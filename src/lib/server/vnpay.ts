@@ -11,6 +11,20 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const VNPAY_SANDBOX_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
 export const VNPAY_VERSION = "2.1.0";
 
+/**
+ * vnp_TxnRef duy nhất mỗi lần bấm thanh toán: VNPay từ chối mã trùng khi
+ * thanh toán lại. Hậu tố `__base36time` (mã đơn LUM-... không bao giờ chứa
+ * "__" nên tách ngược an toàn). Ref cũ không hậu tố vẫn parse được.
+ */
+export function buildTxnRef(orderNumber: string, nowMs = Date.now()): string {
+  return `${orderNumber}__${nowMs.toString(36)}`;
+}
+
+export function parseTxnRef(txnRef: string): string {
+  const idx = txnRef.indexOf("__");
+  return idx === -1 ? txnRef : txnRef.slice(0, idx);
+}
+
 export interface VnpayConfig {
   tmnCode: string;
   hashSecret: string;

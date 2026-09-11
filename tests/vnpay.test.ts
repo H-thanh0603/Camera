@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildTxnRef,
   createVnpayPaymentUrl,
   formatVnpayDate,
+  parseTxnRef,
   parseVnpayIpn,
   signVnpayParams,
   sortVnpayParams,
@@ -88,6 +90,16 @@ describe("vnpay signature", () => {
   it("orderInfo có dấu cách encode đúng chuẩn VNPay (+ thay %20)", () => {
     const sorted = sortVnpayParams({ vnp_OrderInfo: "Thanh toan don hang LUM-1" });
     expect(sorted.vnp_OrderInfo).toBe("Thanh+toan+don+hang+LUM-1");
+  });
+});
+
+describe("vnpay txnRef retry", () => {
+  it("build suffix duy nhất + parse ngược ra mã đơn", () => {
+    const ref1 = buildTxnRef("LUM-ABC123", 1000);
+    const ref2 = buildTxnRef("LUM-ABC123", 2000);
+    expect(ref1).not.toBe(ref2);
+    expect(parseTxnRef(ref1)).toBe("LUM-ABC123");
+    expect(parseTxnRef("LUM-ABC123")).toBe("LUM-ABC123"); // ref cũ tương thích
   });
 });
 
