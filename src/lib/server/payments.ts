@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { PaymentWebhookInput } from "@/lib/schemas";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import { logAudit } from "./audit";

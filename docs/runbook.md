@@ -11,8 +11,8 @@
    - App **từ chối khởi động** nếu production mà demo payment còn bật
      (`src/lib/server/env.ts` throw) — kiểm tra bằng `GET /api/health`
      (`paymentDemoMode` phải `false`).
-3. Schema lần đầu trên Postgres (đã drill 2026-09-10, xem
-   `docs/backup-drill-log.md`): history migrations là SQLite-only nên
+3. Schema lần đầu trên Postgres (đã drill 2026-09-10 và 2026-09-11 Prisma 7,
+   xem `docs/backup-drill-log.md`): history migrations là SQLite-only nên
    **không** `migrate deploy` / **không** `db push` trực tiếp lên prod.
    Chạy `DATABASE_URL=... ADMIN_PASSWORD=... node scripts/db-pg-init.mjs --seed`
    (apply `prisma/postgres-baseline.sql` đã verify + `postgres-extensions.sql`
@@ -21,6 +21,10 @@
    `DATABASE_URL=... npx tsx scripts/smoke-trigram.ts`.
    Từ sau lần này, mọi đổi schema phải là migration mới có review —
    cấm `db push` lên prod.
+   Prisma 7 notes: CLI đọc URL từ `prisma.config.ts` (cần `dotenv`);
+   `db push`/`migrate dev` không tự generate/seed nữa — chạy `prisma generate`
+   + `prisma db seed` tường minh sau đó. Pool PG qua driver (`connectionTimeout` 5s
+   trong `src/lib/server/prisma.ts`); Supabase/Neon dùng pooled URL.
 4. Gắn uptime monitor vào `GET /api/health` (200 = ok; 503 = DB down).
    Response còn báo `paymentWebhook/email/sentry/redis` đã cấu hình hay chưa.
 

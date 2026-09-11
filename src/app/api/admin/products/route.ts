@@ -7,7 +7,7 @@ import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { dbProductToDomain } from "@/lib/server/product-db";
 import { validateProductPayload, validateVariants, sanitizeProductJson, buildTagString } from "@/lib/server/product-validation";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 
 /**
  * GET  /api/admin/products — danh sách sản phẩm (mọi trạng thái).

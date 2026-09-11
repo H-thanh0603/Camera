@@ -9,13 +9,14 @@ luxury aesthetic, telemetry HUD, typography Syne / Hanken Grotesk / JetBrains Mo
 ## Chạy dự án
 
 ```bash
-npm install              # tự động `prisma generate` (postinstall)
+npm install              # tự động `prisma generate` (postinstall, client vào src/generated)
 npx prisma migrate deploy  # tạo SQLite DB (prisma/dev.db)
+npx prisma db seed       # seed catalogue + admin (v7 không tự seed)
 npm run dev              # dev server
 npm run build && npm run start   # production
-npx vitest run           # 57 unit tests
-npx playwright test      # 9 E2E tests (cần `npm run build` trước)
-npm run db:reset         # xóa sạch DB về trạng thái ban đầu
+npx vitest run           # 143 unit tests
+npx playwright test      # 29 E2E tests (cần `npm run build` trước)
+npm run db:reset         # migrate reset + seed lại từ đầu
 ```
 
 Env (xem `.env.example`): `DATABASE_URL` (SQLite dev / Postgres production),
@@ -77,7 +78,7 @@ tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filt
 - Dashboard (đơn, doanh thu, sản phẩm, review chờ duyệt), CRUD sản phẩm (viết DB +
   `revalidatePath` — catalogue hiển thị lại gần như tức thì), đổi trạng thái đơn,
   duyệt/xóa review (tự tính lại rating sản phẩm).
-- Catalogue sản phẩm nằm trong DB: client refresh qua `/api/products/snapshot`.
+- Catalogue sản phẩm nằm trong DB: client làm mới theo ids qua `POST /api/products/resolve` (bounded 50, slim payload); listing/search dùng `GET /api/products` phân trang server-side.
 
 ### Backend hiện trạng
 

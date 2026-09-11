@@ -10,6 +10,8 @@ describe("email outbox", () => {
   it("gửi thành công → đánh dấu sent", async () => {
     await cleanup();
     const id = await saveOutboxEmail({ kind: "test", to: "outbox-test-a@t.vn", subject: "s", html: "<p>x</p>" });
+    // Đưa job về quá khứ để dispatchDueOutbox (lte: now) tìm thấy
+    await prisma.emailOutbox.update({ where: { id }, data: { nextRunAt: new Date(0) } });
     const res = await dispatchDueOutbox(10, async () => ({ sent: true }));
     expect(res.sent).toBeGreaterThanOrEqual(1);
     const row = await prisma.emailOutbox.findUnique({ where: { id } });
@@ -21,7 +23,7 @@ describe("email outbox", () => {
     await cleanup();
     const id = await saveOutboxEmail({ kind: "test", to: "outbox-test-b@t.vn", subject: "s", html: "<p>x</p>" });
     for (let i = 0; i < OUTBOX_MAX_ATTEMPTS; i++) {
-      // Đưa job về tới hạn ngay để test không phải chờ backoff thật
+      // Đưa về quá khứ để mô phỏng tới hạn retry ngay (không chờ backoff thật)
       await prisma.emailOutbox.update({ where: { id }, data: { nextRunAt: new Date(0) } });
       await dispatchDueOutbox(10, async () => ({ sent: false }));
     }

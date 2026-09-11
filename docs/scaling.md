@@ -30,8 +30,9 @@ Số dưới đây là trần kiến trúc, không phải benchmark.
 
 - Dùng **pooler transaction mode** (PgBouncer/Neon pooled URL) cho
   `DATABASE_URL`; migration/seed chạy bằng direct URL.
-- Prisma: `connection_limit` nhỏ (5–10/instance) — serverless scale instance
-  nhanh hơn scale connection. Không tăng bừa: mỗi connection là RAM trên PG.
+- Prisma 7 dùng pool của driver (`PrismaPg` trong `src/lib/server/prisma.ts`,
+  timeout 5s): giữ pool nhỏ, scale instance thay vì scale connection.
+  Không tăng bừa: mỗi connection là RAM trên PG.
 - PITR bật từ ngày đầu (Supabase/Neon đều có) + giữ cron `db:backup` off-site
   (`BACKUP_HOOK`) — PITR không thay backup chống xóa nhầm toàn cụm.
 - Đọc nặng (admin dashboard aggregate, export) tách sang **read replica** khi

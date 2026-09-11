@@ -5,7 +5,7 @@ import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { dbGetProductById } from "@/lib/server/product-db";
 import { reviewSchema, zodFieldErrors } from "@/lib/schemas";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 
 /**
  * POST /api/reviews — gửi đánh giá.

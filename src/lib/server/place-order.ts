@@ -4,7 +4,7 @@ import { applyCouponToSubtotal, normalizeCouponCode } from "@/lib/services/coupo
 import { dbGetProductById } from "./product-db";
 import { hashGuestToken, newGuestToken } from "./guest-token";
 import { getCouponByCode } from "./coupons";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "./prisma";
 import { getSessionUser } from "./session";

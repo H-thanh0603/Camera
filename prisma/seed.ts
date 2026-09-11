@@ -6,12 +6,11 @@
  * Đăng nhập admin: admin@lumina.vn / ADMIN_PASSWORD (mặc định admin-lumina-2026)
  */
 
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "../src/generated/prisma/client";
 import { scrypt, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { products } from "../src/lib/data/products";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/lib/server/prisma";
 const scryptAsync = promisify(scrypt) as (p: string | Buffer, s: string | Buffer, k: number) => Promise<Buffer>;
 
 async function hashPassword(password: string): Promise<string> {

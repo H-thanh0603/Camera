@@ -52,3 +52,6 @@ prisma/dev.db-journal
 
 # video goc ngoai repo
 /video.mp4
+
+# Prisma 7 client sinh ra (postinstall `prisma generate` tạo lại)
+src/generated/

@@ -1,7 +1,7 @@
 /**
  * Dọn rác DB (tách khỏi /api/health để health read-only).
  * Chạy bằng cron mỗi giờ — xem scripts/backup.cron.example.
- * Dùng: DATABASE_URL=... node scripts/db-sweep.mjs
+ * Dùng: DATABASE_URL=... npx tsx scripts/db-sweep.ts
  *
  * - Session + reset-token hết hạn (auth).
  * - TotpChallenge đã dùng/hết hạn (2FA, 5 phút TTL — không để phình).
@@ -9,11 +9,9 @@
  * - EmailOutbox dead (hết lượt) >90 ngày (giữ lâu để operator xử lý tay).
  * KHÔNG dọn: orders/reviews/audit/payment events (kế toán + pháp lý).
  */
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/server/prisma";
 
-const prisma = new PrismaClient();
-
-const daysAgo = (days) => new Date(Date.now() - days * 24 * 3600_000);
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 3600_000);
 // Đồng bộ tay với OUTBOX_MAX_ATTEMPTS trong src/lib/server/email-outbox.ts
 const OUTBOX_MAX_ATTEMPTS = 5;
 

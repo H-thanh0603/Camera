@@ -7,12 +7,13 @@
 //   3. Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
+  // URL cấu hình ở prisma.config.ts (root).
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {

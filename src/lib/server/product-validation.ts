@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 
 /**
  * Validate payload sản phẩm dùng chung cho POST (tạo) và PUT (sửa) admin.

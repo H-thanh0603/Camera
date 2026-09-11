@@ -30,6 +30,20 @@
 - Phát hiện khi drill: Prisma không parse URL socket `host=/tmp`
   (empty host) — dùng TCP `127.0.0.1:55433` cho seed.
 
+## 2026-09-11 — drill Prisma 7 (adapter-pg + tx + backup/restore)
+
+- Cluster Postgres 18.6 tạm (port 55438), DB `v7`.
+- Baseline + extensions apply sạch. Generate client PG, seed qua adapter:
+  Product 18, Coupon 3, User 1.
+- Transaction trừ kho + tạo đơn + outbox qua `PrismaPg` adapter: commit OK,
+  đơn đọc lại được. `EXPLAIN` dùng `Order_status_idx`.
+- Backup `pg_dump` → restore DB mới: Product 18, Coupon 3. Khớp.
+- Phát hiện khi drill: DateTime SQLite lẫn kiểu sau upgrade (engine v6 ghi
+  INTEGER millis, adapter better-sqlite3 v7 ghi TEXT ISO) → ORDER BY ngày
+  sai trong dev. Đã chuẩn hóa dev.db một lần (INTEGER → TEXT ISO).
+  DB mới (`migrate reset`/seed tươi) và Postgres không bị. Dev.db cũ từ v6
+  chưa chuẩn hóa sẽ gặp lỗi tương tự — chạy `npm run db:reset` để làm mới.
+
 ## RPO / RTO (small-prod)
 
 - RPO ≤ 24h (backup đêm 2h + trước mỗi deploy).

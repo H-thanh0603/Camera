@@ -1,7 +1,7 @@
 # Backup DB mỗi đêm lúc 2h + trước deploy (systemd timer thay thế cũng được)
 0 2 * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" BACKUP_ENCRYPTION_KEY="$BACKUP_ENCRYPTION_KEY" BACKUP_HOOK="rclone copyto $FILE remote:lumina-backups/$(basename $FILE)" node scripts/db-backup.mjs --encrypt >> /var/log/lumina-backup.log 2>&1
 # Dọn session + reset-token hết hạn mỗi giờ (tách khỏi /api/health)
-0 * * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" node scripts/db-sweep.mjs >> /var/log/lumina-sweep.log 2>&1
+0 * * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" npx tsx scripts/db-sweep.ts >> /var/log/lumina-sweep.log 2>&1
 # Nhắc vệ sinh sensor (đơn body > 6 tháng, mỗi đơn 1 lần) mỗi sáng
 0 8 * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" npx tsx scripts/sensor-reminder.ts >> /var/log/lumina-sensor.log 2>&1
 # Đối soát đơn pending kẹt (webhook fail) mỗi 15 phút; expire đơn >120p về cancelled + hoàn kho

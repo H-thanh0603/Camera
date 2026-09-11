@@ -6,7 +6,7 @@
  * Dùng: npx tsx scripts/payment-reconcile.ts [--stale 30] [--expire] [--expire-minutes 120]
  * Cron gợi ý: mỗi 15 phút (xem scripts/backup.cron.example).
  */
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/server/prisma";
 
 const args = process.argv.slice(2);
 const val = (flag: string): string | undefined => {
@@ -16,8 +16,6 @@ const val = (flag: string): string | undefined => {
 const STALE_MINUTES = Number(val("--stale")) || 30;
 const EXPIRE_MINUTES = Number(val("--expire-minutes")) || 120;
 const SHOULD_EXPIRE = args.includes("--expire");
-
-const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
   const staleCutoff = new Date(Date.now() - STALE_MINUTES * 60_000);

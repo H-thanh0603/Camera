@@ -113,9 +113,9 @@ export async function finishGoogleLogin(code: string, state: string): Promise<{ 
         data: { email, name, passwordHash: "oauth:google", role: "customer" },
       });
       isNewUser = true;
-    } catch (e) {
+    } catch (e: unknown) {
       // Đua tạo cùng email (P2002) → đọc lại thay vì 500
-      const { Prisma } = await import("@prisma/client");
+      const { Prisma } = await import("@/generated/prisma/client");
       if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") throw e;
       user = await prisma.user.findUnique({ where: { email } });
       if (!user) throw new OAuthError("Không tạo được tài khoản. Vui lòng thử lại.");
