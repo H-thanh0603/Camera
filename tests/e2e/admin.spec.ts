@@ -60,6 +60,39 @@ test.describe("Admin panel", () => {
     await expect(page.getByText("Đã xóa sản phẩm.")).toBeVisible({ timeout: 10_000 });
   });
 
+  test("admin: SP giảm giá có hạn → PDP có priceValidUntil → xóa", async ({ page }) => {
+    await adminLogin(page);
+
+    const slug = `test-sale-${Date.now()}`;
+    await page.goto("/admin/products");
+    await page.getByRole("button", { name: "+ Thêm mới" }).click();
+    await page.getByLabel("Tên", { exact: true }).fill("Máy Ảnh KM Test E2E");
+    await page.getByLabel("Slug", { exact: true }).fill(slug);
+    await page.getByLabel("SKU", { exact: true }).fill(`E2E-SALE-${Date.now()}`);
+    await page.getByLabel("Giá (₫)", { exact: true }).fill("80000000");
+    await page.getByLabel("Giá trước giảm (₫)", { exact: true }).fill("100000000");
+    await page.getByLabel("KM đến ngày", { exact: true }).fill("2026-12-31T23:59");
+    await page.getByLabel("Mô tả ngắn", { exact: true }).fill("SP khuyến mãi test từ E2E admin suite.");
+    await page.getByLabel("Mô tả đầy đủ", { exact: true }).fill("Mô tả đầy đủ cho SP khuyến mãi test E2E.");
+    await page.getByRole("button", { name: "Lưu sản phẩm" }).click();
+
+    await expect(page.getByText("Đã tạo sản phẩm mới.")).toBeVisible({ timeout: 10_000 });
+
+    // Offer JSON-LD có priceValidUntil vì vừa có giá sale vừa có hạn KM tương lai.
+    // (assert trên HTML thô: text-engine của locator không thấy nội dung <script>)
+    await page.goto(`/products/${slug}`);
+    await expect
+      .poll(async () => (await page.content()).includes("priceValidUntil"), { timeout: 15_000 })
+      .toBe(true);
+
+    // Xóa
+    await page.goto("/admin/products");
+    const row = page.getByRole("row").filter({ hasText: "Máy Ảnh KM Test E2E" });
+    page.once("dialog", (dialog) => dialog.accept());
+    await row.getByRole("button", { name: "Xóa" }).click();
+    await expect(page.getByText("Đã xóa sản phẩm.")).toBeVisible({ timeout: 10_000 });
+  });
+
   test("admin: đổi trạng thái đơn hàng trong quản trị đơn", async ({ page }) => {
     await adminLogin(page);
     await page.goto("/admin/orders");
