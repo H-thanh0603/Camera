@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Product } from "@/lib/types";
 import { maxQuantityOf, resolveVariant, unitCompareAtPriceOf, unitPriceOf } from "@/lib/services/cart-service";
 import { discountPercent, formatVND, cn } from "@/lib/utils/format";
+import { isSaleActive, saleDaysLeft } from "@/lib/utils/sale";
 import { AVAILABILITY_CLASS, AVAILABILITY_LABEL, canPurchase } from "@/lib/utils/availability";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { useStore } from "@/state/store";
@@ -28,7 +29,6 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
   const variant = resolveVariant(product, variantId);
   const price = unitPriceOf(product, variant);
   const compareAt = unitCompareAtPriceOf(product, variant);
-  const discount = discountPercent(price, compareAt);
   const maxQuantity = maxQuantityOf(product, variant);
   const effectiveMax = Math.max(1, Math.min(maxQuantity, 10));
   const availability = variant?.availability ?? product.availability;
@@ -41,26 +41,30 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     track("view_item", { productId: product.id, price: product.price, category: product.category });
   }, [product.id, product.price, product.category, trackView]);
 
-  // Countdown KM: tính trong effect (tránh impure Date.now trong render)
-  const [saleCountdown, setSaleCountdown] = useState<string | null>(null);
-  useEffect(() => {
-    if (!(compareAt && compareAt > price && product.saleEndsAt)) {
-      setSaleCountdown(null);
-      return;
-    }
-    const end = new Date(product.saleEndsAt);
-    if (Number.isNaN(end.getTime())) {
-      setSaleCountdown(null);
-      return;
-    }
-    const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
-    if (daysLeft <= 0) {
-      setSaleCountdown(null);
-      return;
-    }
-    const dateStr = end.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    setSaleCountdown(`Ưu đãi kết thúc ${dateStr} • còn ${daysLeft} ngày`);
-  }, [compareAt, price, product.saleEndsAt]);
+  // KM hiển thị: nowIso chụp 1 lần/mount (tránh impure call trong render,
+  // pattern đã qua react-hooks/purity) — hết hạn thì ẩn mọi visual sale.
+  const [nowIso] = useState(() => new Date().toISOString());
+  const saleActive = isSaleActive(
+    { compareAtPrice: compareAt, saleEndsAt: product.saleEndsAt },
+    price,
+    nowIso,
+  );
+  const saleCountdown = (() => {
+    if (!saleActive || !product.saleEndsAt) return null;
+    const days = saleDaysLeft(
+      { compareAtPrice: compareAt, saleEndsAt: product.saleEndsAt },
+      price,
+      new Date(nowIso).getTime(),
+    );
+    if (days === null) return null;
+    const dateStr = new Date(product.saleEndsAt).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    return `Ưu đãi kết thúc ${dateStr} • còn ${days} ngày`;
+  })();
+  const discount = saleActive ? discountPercent(price, compareAt) : null;
 
   // Index mảng O(1) — không useMemo để React Compiler tự tối ưu
   const displayImage = variant?.image ?? product.images[activeImage] ?? product.thumbnail;
@@ -136,7 +140,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
           <div className="flex flex-col gap-space-2xs rounded-xl bg-surface-container p-space-md">
             <div className="flex items-baseline gap-space-sm">
               <span className="font-telemetry-data text-[28px] font-bold text-primary">{formatVND(price)}</span>
-              {compareAt && compareAt > price && (
+              {saleActive && compareAt && (
                 <span className="font-telemetry-data text-telemetry-data text-outline line-through">{formatVND(compareAt)}</span>
               )}
             </div>

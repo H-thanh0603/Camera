@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Product } from "@/lib/types";
 import { discountPercent, formatVND } from "@/lib/utils/format";
+import { isSaleActive } from "@/lib/utils/sale";
 import { AVAILABILITY_CLASS, AVAILABILITY_LABEL } from "@/lib/utils/availability";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { useStore } from "@/state/store";
@@ -17,7 +18,11 @@ import { AppFillImage } from "@/components/ui/app-image";
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const { addToCart, toggleWishlist, isWishlisted, toggleCompare, isCompared, setCartDrawerOpen } = useStore();
   const [hovered, setHovered] = useState(false);
-  const discount = discountPercent(product.price, product.compareAtPrice);
+  // Ẩn visual KM khi saleEndsAt đã qua (tránh treo biển giảm giá sai)
+  const [nowIso] = useState(() => new Date().toISOString());
+  const discount = isSaleActive(product, product.price, nowIso)
+    ? discountPercent(product.price, product.compareAtPrice)
+    : null;
   const secondaryImage = product.images[1];
 
   const ctaLabel =
