@@ -155,4 +155,14 @@ test.describe("Admin panel", () => {
     });
     expect(res.status()).toBe(503);
   });
+
+  test("admin: xuất CSV đơn hàng đúng định dạng", async ({ page }) => {
+    await adminLogin(page);
+    const res = await page.request.get("/api/admin/orders/export?status=all");
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toContain("text/csv");
+    const text = await res.text();
+    expect(text).toContain("Mã đơn");
+    expect(text.split("\n").length).toBeGreaterThan(1);
+  });
 });

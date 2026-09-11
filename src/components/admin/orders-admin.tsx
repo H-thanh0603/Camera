@@ -107,9 +107,18 @@ export function OrdersAdmin() {
 
   return (
     <div className="flex flex-col gap-space-lg">
-      <header className="flex flex-col gap-space-2xs">
-        <span className="section-telemetry">ORDER OPS</span>
-        <h1 className="font-headline-md text-headline-md text-on-surface">Quản Trị Đơn Hàng</h1>
+      <header className="flex flex-wrap items-center justify-between gap-space-sm">
+        <div className="flex flex-col gap-space-2xs">
+          <span className="section-telemetry">ORDER OPS</span>
+          <h1 className="font-headline-md text-headline-md text-on-surface">Quản Trị Đơn Hàng</h1>
+        </div>
+        <a
+          href={`/api/admin/orders/export?status=${filter}`}
+          download
+          className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-primary hover:text-on-primary"
+        >
+          Xuất CSV
+        </a>
       </header>
 
       <div className="flex flex-wrap gap-space-xs" role="tablist" aria-label="Lọc đơn theo trạng thái">
