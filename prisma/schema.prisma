@@ -63,6 +63,8 @@ model Product {
   shortDescription String
   price            Int
   compareAtPrice   Int?
+  // Ngày kết thúc KM — Offer priceValidUntil chỉ emit khi có giá sale + ngày tương lai
+  saleEndsAt       DateTime?
   currency         String           @default("VND")
   stock            Int              @default(0)
   availability     String           @default("in_stock")

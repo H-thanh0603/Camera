@@ -42,6 +42,7 @@ CREATE TABLE "Product" (
     "shortDescription" TEXT NOT NULL,
     "price" INTEGER NOT NULL,
     "compareAtPrice" INTEGER,
+    "saleEndsAt" TIMESTAMP(3),
     "currency" TEXT NOT NULL DEFAULT 'VND',
     "stock" INTEGER NOT NULL DEFAULT 0,
     "availability" TEXT NOT NULL DEFAULT 'in_stock',
