@@ -41,6 +41,27 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
     track("view_item", { productId: product.id, price: product.price, category: product.category });
   }, [product.id, product.price, product.category, trackView]);
 
+  // Countdown KM: tính trong effect (tránh impure Date.now trong render)
+  const [saleCountdown, setSaleCountdown] = useState<string | null>(null);
+  useEffect(() => {
+    if (!(compareAt && compareAt > price && product.saleEndsAt)) {
+      setSaleCountdown(null);
+      return;
+    }
+    const end = new Date(product.saleEndsAt);
+    if (Number.isNaN(end.getTime())) {
+      setSaleCountdown(null);
+      return;
+    }
+    const daysLeft = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
+    if (daysLeft <= 0) {
+      setSaleCountdown(null);
+      return;
+    }
+    const dateStr = end.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+    setSaleCountdown(`Ưu đãi kết thúc ${dateStr} • còn ${daysLeft} ngày`);
+  }, [compareAt, price, product.saleEndsAt]);
+
   // Index mảng O(1) — không useMemo để React Compiler tự tối ưu
   const displayImage = variant?.image ?? product.images[activeImage] ?? product.thumbnail;
 
@@ -121,6 +142,11 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
             </div>
             {product.monthlyFrom && (
               <span className="font-telemetry-xs text-telemetry-xs text-outline">Trả góp 0% từ {formatVND(product.monthlyFrom)}/tháng qua thẻ tín dụng VIP</span>
+            )}
+            {saleCountdown && (
+              <span className="font-telemetry-xs text-telemetry-xs font-bold uppercase text-primary" role="status">
+                {saleCountdown}
+              </span>
             )}
             <span className="font-telemetry-xs text-telemetry-xs uppercase text-on-surface-variant">SKU: {sku}</span>
           </div>
