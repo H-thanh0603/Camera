@@ -3,9 +3,11 @@ import {
   SIMILARITY_THRESHOLD,
   buildOrderSql,
   buildRelevanceSql,
+  buildSearchText,
   buildTrigramTermSql,
   buildWhereSql,
   isPostgresDialect,
+  normalizeVi,
   splitTerms,
 } from "@/lib/server/product-search-pg";
 import { dbQueryProducts } from "@/lib/server/product-db";
@@ -30,15 +32,28 @@ describe("splitTerms", () => {
   });
 });
 
+describe("normalizeVi", () => {
+  test("bỏ dấu + đ→d + lowercase", () => {
+    expect(normalizeVi("Máy Ảnh")).toBe("may anh");
+    expect(normalizeVi("Ống Kính ĐIỆN ẢNH")).toBe("ong kinh dien anh");
+    expect(normalizeVi("  Sony  Alpha ")).toBe("sony alpha");
+  });
+});
+
+describe("buildSearchText", () => {
+  test("gộp + chuẩn hóa các trường", () => {
+    expect(
+      buildSearchText({ name: "Máy Ảnh X", brand: "Lumina", subcategory: "Mirrorless", sku: "LUM-1", tags: ["Flagship"] }),
+    ).toBe("may anh x lumina mirrorless lum 1 flagship");
+  });
+});
+
 describe("buildTrigramTermSql", () => {
-  test("OR trên 4 cột với ILIKE + similarity", () => {
+  test("1 cột gộp searchText với ILIKE + similarity", () => {
     const sql = buildTrigramTermSql("lumia");
     expect(sql.sql).toContain("ILIKE");
     expect(sql.sql).toContain("similarity");
-    expect(sql.sql).toContain('"name"');
-    expect(sql.sql).toContain('"brand"');
-    expect(sql.sql).toContain('"subcategory"');
-    expect(sql.sql).toContain('"tagString"');
+    expect(sql.sql).toContain('"searchText"');
     // Ngưỡng similarity đi qua param (an toàn), không inline
     expect(sql.values).toContain(SIMILARITY_THRESHOLD);
   });
@@ -97,5 +112,11 @@ describe("SQLite regression (dialect file → nhánh contains cũ)", () => {
     expect(r2.total).toBe(4);
     const r3 = await dbQueryProducts({ tag: "cine", pageSize: 60 });
     expect(r3.total).toBe(2);
+  });
+  test("không dấu = có dấu: 'may anh' ≡ 'máy ảnh'", async () => {
+    const accented = await dbQueryProducts({ q: "máy ảnh", pageSize: 60 });
+    const plain = await dbQueryProducts({ q: "may anh", pageSize: 60 });
+    expect(accented.total).toBeGreaterThan(0);
+    expect(plain.total).toBe(accented.total);
   });
 });

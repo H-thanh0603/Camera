@@ -239,15 +239,9 @@ function buildProductWhere(params: Pick<ProductSearchParams, "q" | "brand" | "br
     and.push({ tagString: { contains: `|${params.tag.trim().toLowerCase()}|` } });
   }
   if (params.q) {
-    for (const term of params.q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
-      and.push({
-        OR: [
-          { name: { contains: term } },
-          { brand: { contains: term } },
-          { subcategory: { contains: term } },
-          { tagString: { contains: term } },
-        ],
-      });
+    // Mỗi term chuẩn hóa không dấu, khớp 1 cột gộp searchText (portable SQLite/PG)
+    for (const term of splitTerms(params.q)) {
+      and.push({ searchText: { contains: term } });
     }
   }
   if (and.length) {

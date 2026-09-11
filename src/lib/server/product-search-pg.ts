@@ -9,15 +9,45 @@ import type { ProductSearchParams } from "./product-db";
 
 export const SIMILARITY_THRESHOLD = 0.2;
 
-/** Cột tham gia trigram search — khớp 4 cột của bản SQLite contains. */
-const TRIGRAM_COLUMNS = ["name", "brand", "subcategory", "tagString"] as const;
+/**
+ * Chuẩn hóa tiếng Việt cho tìm kiếm không dấu: "Máy Ảnh" → "may anh".
+ * Client gõ không dấu vẫn trúng tên có dấu (và ngược lại).
+ */
+export function normalizeVi(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9\s|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Văn bản tìm kiếm gộp (đã chuẩn hóa) — lưu cột searchText, query 1 cột. */
+export function buildSearchText(input: {
+  name?: unknown;
+  brand?: unknown;
+  subcategory?: unknown;
+  sku?: unknown;
+  tags?: unknown;
+}): string {
+  const tags = Array.isArray(input.tags) ? input.tags.filter((t): t is string => typeof t === "string") : [];
+  return normalizeVi(
+    [input.name, input.brand, input.subcategory, input.sku, ...tags].filter(Boolean).join(" "),
+  );
+}
+
+/** Cột tham gia trigram search — 1 cột gộp đã chuẩn hóa (thay 4 cột cũ). */
+const TRIGRAM_COLUMNS = ["searchText"] as const;
 
 export function isPostgresDialect(url: string | undefined = process.env.DATABASE_URL): boolean {
   return (url ?? "").startsWith("postgres");
 }
 
 export function splitTerms(q: string | undefined): string[] {
-  return (q ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const normalized = normalizeVi(q ?? "");
+  return normalized ? normalized.split(" ").filter(Boolean) : [];
 }
 
 function columnRef(col: string): Prisma.Sql {

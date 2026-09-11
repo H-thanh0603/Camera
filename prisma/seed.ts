@@ -11,6 +11,7 @@ import { scrypt, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { products } from "../src/lib/data/products";
 import { articles } from "../src/lib/data/articles";
+import { buildSearchText } from "../src/lib/server/product-search-pg";
 import { prisma } from "../src/lib/server/prisma";
 const scryptAsync = promisify(scrypt) as (p: string | Buffer, s: string | Buffer, k: number) => Promise<Buffer>;
 
@@ -28,12 +29,14 @@ async function main() {
     // rating/reviewCount của seed là nền BẤT BIẾN cho aggregate (chống drift)
     const seedFields = { seedCount: p.reviewCount, seedTotal: p.rating * p.reviewCount };
     const tagString = `|${p.tags.map((t) => t.trim().toLowerCase()).join("|")}|`;
+    const searchText = buildSearchText({ name: p.name, brand: p.brand, subcategory: p.subcategory, sku: p.sku, tags: p.tags });
     await prisma.product.upsert({
       where: { id: p.id },
       update: {
         ...rest,
         ...seedFields,
         tagString,
+        searchText,
         images: images as unknown as object,
         thumbnail: thumbnail as unknown as object,
         specifications: specifications as object,
@@ -47,6 +50,7 @@ async function main() {
         ...rest,
         ...seedFields,
         tagString,
+        searchText,
         images: images as unknown as object,
         thumbnail: thumbnail as unknown as object,
         specifications: specifications as object,

@@ -1,4 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
+import { buildSearchText } from "./product-search-pg";
 
 /**
  * Validate payload sản phẩm dùng chung cho POST (tạo) và PUT (sửa) admin.
@@ -43,6 +44,13 @@ export function validateProductPayload(body: Record<string, unknown>): Validated
     price,
     compareAtPrice: body.compareAtPrice ? Number(body.compareAtPrice) : null,
     saleEndsAt: saleEndsAt ?? null,
+    searchText: buildSearchText({
+      name: body.name,
+      brand: body.brand,
+      subcategory: body.subcategory,
+      sku: body.sku,
+      tags: body.tags,
+    }),
     stock: Number.isInteger(Number(body.stock)) ? Number(body.stock) : 0,
     availability: AVAILABILITY.includes(String(body.availability)) ? String(body.availability) : "in_stock",
     rating: Math.min(5, Math.max(0, Number(body.rating) || 0)),

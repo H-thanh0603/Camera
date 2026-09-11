@@ -26,6 +26,11 @@ test.describe("Catalog & filter URL", () => {
     await page.goto("/products?sort=price_asc");
     await expect(page.getByText("thiết bị phù hợp")).toBeVisible();
   });
+
+  test("tìm không dấu ra như có dấu: q=may+anh", async ({ page }) => {
+    await page.goto("/products?q=may+anh");
+    await expect(page.getByText("thiết bị phù hợp")).toBeVisible({ timeout: 10_000 });
+  });
 });
 
 test.describe("Catalog API machine-readable", () => {

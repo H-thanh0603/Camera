@@ -55,6 +55,7 @@ CREATE TABLE "Product" (
     "seedTotal" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "tags" JSONB NOT NULL,
     "tagString" TEXT NOT NULL DEFAULT '|',
+    "searchText" TEXT NOT NULL DEFAULT '',
     "badges" JSONB NOT NULL,
     "monthlyFrom" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

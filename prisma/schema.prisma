@@ -81,6 +81,8 @@ model Product {
   // Chuỗi tag phi chuẩn hóa "|flagship|cine|" để filter LIKE portable
   // (SQLite + Postgres) — thay thế cho query JSON array
   tagString        String   @default("|")
+  // Văn bản tìm kiếm gộp đã chuẩn hóa không dấu (name/brand/subcategory/sku/tags)
+  searchText       String   @default("")
   badges           Json
   monthlyFrom      Int?
   createdAt        DateTime         @default(now())
