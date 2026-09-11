@@ -84,6 +84,31 @@ export default function CheckoutPage() {
 
   if (!hydrated) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
 
+  // Tài khoản admin không mua sắm: chặn ngay đầu checkout (API vẫn cho phép
+  // để test nội bộ — UI là rào chính, server guard khi cần sẽ bổ sung sau).
+  if (user?.role === "admin") {
+    return (
+      <div className="container-page py-space-3xl">
+        <div className="mx-auto flex max-w-xl flex-col items-center gap-space-md rounded-xl bg-surface-container p-space-2xl text-center shadow-xl">
+          <span className="material-symbols-outlined text-[36px] text-primary" aria-hidden="true">admin_panel_settings</span>
+          <h1 className="font-headline-md text-headline-md text-on-surface">Kênh Dành Cho Khách Mua Hàng</h1>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            Bạn đang đăng nhập tài khoản <strong>admin</strong>. Đăng xuất và dùng tài khoản khách để
+            trải nghiệm luồng mua hàng, hoặc vào quản trị để xử lý đơn.
+          </p>
+          <div className="flex gap-space-sm">
+            <Link href="/admin/orders" className="rounded-lg bg-primary px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+              Quản trị đơn hàng
+            </Link>
+            <Link href="/products" className="rounded-lg bg-surface-container-high px-space-lg py-space-xs font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest">
+              Xem catalogue
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (placedOrder) {
     return (
       <div className="container-page flex flex-col gap-space-lg py-space-3xl">

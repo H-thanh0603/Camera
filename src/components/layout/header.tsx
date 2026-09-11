@@ -90,15 +90,17 @@ export function Header() {
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setCartDrawerOpen(true)}
-            className="relative p-space-2xs text-on-surface-variant transition-colors hover:text-on-surface"
-            aria-label={`Giỏ hàng${cartCount ? ` — ${cartCount} sản phẩm` : " trống"}`}
-          >
-            <span className="material-symbols-outlined text-[20px]" aria-hidden="true">shopping_bag</span>
-            <Badge value={cartCount} tone="container" />
-          </button>
+          {user?.role !== "admin" && (
+            <button
+              type="button"
+              onClick={() => setCartDrawerOpen(true)}
+              className="relative p-space-2xs text-on-surface-variant transition-colors hover:text-on-surface"
+              aria-label={`Giỏ hàng${cartCount ? ` — ${cartCount} sản phẩm` : " trống"}`}
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">shopping_bag</span>
+              <Badge value={cartCount} tone="container" />
+            </button>
+          )}
 
           <Link
             href="/account"

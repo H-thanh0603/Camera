@@ -16,7 +16,7 @@ import { AppFillImage } from "@/components/ui/app-image";
  * Component chỉ nhận data, không chứa business logic.
  */
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
-  const { addToCart, toggleWishlist, isWishlisted, toggleCompare, isCompared, setCartDrawerOpen } = useStore();
+  const { addToCart, toggleWishlist, isWishlisted, toggleCompare, isCompared, setCartDrawerOpen, user } = useStore();
   const [hovered, setHovered] = useState(false);
   // Ẩn visual KM khi saleEndsAt đã qua (tránh treo biển giảm giá sai)
   const [nowIso] = useState(() => new Date().toISOString());
@@ -130,29 +130,39 @@ export function ProductCard({ product, priority = false }: { product: Product; p
             )}
           </div>
           <div className="grid grid-cols-2 gap-space-xs">
-            <button
-              type="button"
-              onClick={() => {
-                if (product.availability === "contact") {
-                  setCartDrawerOpen(false);
-                  window.location.href = `mailto:concierge@luminaoptics.vn?subject=Báo giá ${product.sku}`;
-                  return;
-                }
-                addToCart(product);
-              }}
-              disabled={product.availability === "out_of_stock"}
-              className={cn(
-                "flex items-center justify-center gap-1 rounded-lg px-space-sm py-space-xs font-headline-sm text-telemetry-data uppercase transition-colors",
-                product.availability === "out_of_stock"
-                  ? "cursor-not-allowed bg-surface-container-high text-outline"
-                  : "bg-primary text-on-primary hover:bg-primary-fixed-dim",
-              )}
-            >
-              <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-                {product.availability === "contact" ? "support_agent" : product.availability === "pre_order" ? "schedule" : "shopping_bag"}
-              </span>
-              <span>{product.availability === "out_of_stock" ? "Tạm Hết" : ctaLabel}</span>
-            </button>
+            {user?.role === "admin" ? (
+              <Link
+                href="/admin/products"
+                className="flex items-center justify-center gap-1 rounded-lg bg-surface-container-high px-space-sm py-space-xs font-headline-sm text-telemetry-data uppercase text-on-surface-variant transition-colors hover:bg-surface-container-highest"
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">settings</span>
+                <span>Quản trị</span>
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  if (product.availability === "contact") {
+                    setCartDrawerOpen(false);
+                    window.location.href = `mailto:concierge@luminaoptics.vn?subject=Báo giá ${product.sku}`;
+                    return;
+                  }
+                  addToCart(product);
+                }}
+                disabled={product.availability === "out_of_stock"}
+                className={cn(
+                  "flex items-center justify-center gap-1 rounded-lg px-space-sm py-space-xs font-headline-sm text-telemetry-data uppercase transition-colors",
+                  product.availability === "out_of_stock"
+                    ? "cursor-not-allowed bg-surface-container-high text-outline"
+                    : "bg-primary text-on-primary hover:bg-primary-fixed-dim",
+                )}
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                  {product.availability === "contact" ? "support_agent" : product.availability === "pre_order" ? "schedule" : "shopping_bag"}
+                </span>
+                <span>{product.availability === "out_of_stock" ? "Tạm Hết" : ctaLabel}</span>
+              </button>
+            )}
             <Link
               href={`/products/${product.slug}`}
               className="flex items-center justify-center rounded-lg bg-surface-container-high px-space-sm py-space-xs font-headline-sm text-telemetry-data uppercase text-on-surface transition-colors hover:bg-surface-container-highest"

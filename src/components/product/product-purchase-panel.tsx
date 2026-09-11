@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Product } from "@/lib/types";
@@ -19,7 +20,8 @@ import { AppFillImage, AppImage } from "@/components/ui/app-image";
  */
 export function ProductPurchasePanel({ product }: { product: Product }) {
   const router = useRouter();
-  const { addToCart, toggleWishlist, isWishlisted, toggleCompare, isCompared, trackView } = useStore();
+  const { addToCart, toggleWishlist, isWishlisted, toggleCompare, isCompared, trackView, user } = useStore();
+  const isAdmin = user?.role === "admin";
 
   const [activeImage, setActiveImage] = useState(0);
   const [variantId, setVariantId] = useState<string | undefined>(product.variants?.[0]?.id);
@@ -188,7 +190,14 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
             </fieldset>
           )}
 
-          {/* Quantity + CTA (desktop) */}
+          {/* Quantity + CTA (desktop) — admin không mua sắm, chỉ xem/sửa catalogue */}
+          {isAdmin ? (
+            <p className="rounded-xl bg-surface-container p-space-md font-body-sm text-body-sm text-on-surface-variant" role="note">
+              Bạn đang đăng nhập tài khoản <strong>admin</strong> — dùng tài khoản khách để mua hàng,
+              hoặc vào <Link href="/admin/products" className="text-primary underline">quản trị sản phẩm</Link> để
+              sửa giá/tồn kho.
+            </p>
+          ) : (
           <div className="hidden flex-col gap-space-sm lg:flex">
             <div className="flex items-center gap-space-md">
               <div className="flex items-center gap-space-xs">
@@ -273,6 +282,7 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
               </button>
             </div>
           </div>
+          )}
 
           <ul className="flex flex-col gap-space-2xs rounded-xl bg-surface-container-low p-space-md font-body-sm text-body-sm text-on-surface-variant">
             <li className="flex items-center gap-space-xs"><span className="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">verified_user</span> Bảo hành 5 năm tận nơi, vệ sinh sensor trọn đời</li>
@@ -308,29 +318,33 @@ export function ProductPurchasePanel({ product }: { product: Product }) {
           >
             <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{isWishlisted(product.id) ? "favorite" : "favorite_border"}</span>
           </button>
-          <button
-            type="button"
-            onClick={() => handleAddToCart(false)}
-            disabled={!purchasable}
-            className={cn(
-              "flex items-center gap-space-2xs rounded-lg px-space-md py-space-xs font-headline-sm text-telemetry-data uppercase transition-colors",
-              purchasable ? "bg-primary text-on-primary" : "bg-surface-container-high text-outline",
-            )}
-          >
-            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_bag</span>
-            Thêm giỏ
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAddToCart(true)}
-            disabled={!purchasable}
-            className={cn(
-              "rounded-lg px-space-md py-space-xs font-headline-sm text-telemetry-data uppercase transition-colors",
-              purchasable ? "bg-primary-container text-on-primary-container" : "bg-surface-container-high text-outline",
-            )}
-          >
-            Mua ngay
-          </button>
+          {!isAdmin && (
+            <button
+              type="button"
+              onClick={() => handleAddToCart(false)}
+              disabled={!purchasable}
+              className={cn(
+                "flex items-center gap-space-2xs rounded-lg px-space-md py-space-xs font-headline-sm text-telemetry-data uppercase transition-colors",
+                purchasable ? "bg-primary text-on-primary" : "bg-surface-container-high text-outline",
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_bag</span>
+              Thêm giỏ
+            </button>
+          )}
+          {!isAdmin && (
+            <button
+              type="button"
+              onClick={() => handleAddToCart(true)}
+              disabled={!purchasable}
+              className={cn(
+                "rounded-lg px-space-md py-space-xs font-headline-sm text-telemetry-data uppercase transition-colors",
+                purchasable ? "bg-primary-container text-on-primary-container" : "bg-surface-container-high text-outline",
+              )}
+            >
+              Mua ngay
+            </button>
+          )}
         </div>
       </div>
     </>

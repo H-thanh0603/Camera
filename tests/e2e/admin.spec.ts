@@ -107,4 +107,22 @@ test.describe("Admin panel", () => {
       await expect(selects.first()).toHaveValue("paid");
     }
   });
+
+  test("admin: ẩn UI mua sắm — không giỏ hàng, không CTA, checkout bị chặn", async ({ page }) => {
+    await adminLogin(page);
+
+    // Header không có nút giỏ hàng
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("button", { name: /Giỏ hàng/ })).toHaveCount(0);
+
+    // PDP không có CTA mua, có ghi chú admin
+    await page.goto("/products/lumina-x1-monolith");
+    await expect(page.getByRole("button", { name: /Thêm Vào Giỏ|Mua Ngay/ })).toHaveCount(0);
+    await expect(page.getByText(/đăng nhập tài khoản.*admin/)).toBeVisible();
+
+    // Checkout chặn bằng màn hình riêng
+    await page.goto("/checkout");
+    await expect(page.getByText("Kênh Dành Cho Khách Mua Hàng")).toBeVisible({ timeout: 10_000 });
+  });
 });
