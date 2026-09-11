@@ -54,6 +54,19 @@
 - Seed PG: Product 18, Coupon 3; 2 SP giảm giá có `saleEndsAt`
   (24-70mm, filter kit → 2026-12-31). Sẵn sàng cho Supabase deploy.
 
+## 2026-09-11 — deploy Supabase thật (project lumina-optics, Singapore)
+
+- Tạo project qua CLI: ref `qaiftjevyctfrwlkefsr`, region ap-southeast-1.
+- Baseline + extensions apply qua pooler (6543) sạch.
+- Seed qua pooler: Product 18, Coupon 3, User 1 (admin@lumina.vn).
+  2 SP giảm giá có `saleEndsAt` 2026-12-31.
+- Lưu ý môi trường: Node driver trong sandbox này verify TLS strict
+  (P1011 self-signed chain) → seed dùng `sslmode=no-verify` qua pooler.
+  Production (Vercel) dùng URL pooler chuẩn `sslmode=require` — CA đầy đủ,
+  không đổi code app vì quirk của sandbox.
+- DATABASE_URL pooler (dùng cho Vercel env):
+  `postgresql://postgres.qaiftjevyctfrwlkefsr:[DB_PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require`
+
 ## RPO / RTO (small-prod)
 
 - RPO ≤ 24h (backup đêm 2h + trước mỗi deploy).
