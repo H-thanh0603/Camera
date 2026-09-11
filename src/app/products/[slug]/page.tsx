@@ -35,6 +35,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       images: [{ url: product.thumbnail.url, alt: product.thumbnail.alt }],
       type: "website",
     },
+    twitter: {
+      card: "summary_large_image",
+      title: product.name,
+      description: product.shortDescription,
+      images: [product.thumbnail.url],
+    },
   };
 }
 
@@ -91,14 +97,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
     },
     offers: {
       "@type": "Offer",
+      url: `${siteUrl}/products/${product.slug}`,
       priceCurrency: product.currency,
       price: product.price,
+      itemCondition: "https://schema.org/NewCondition",
       availability:
         product.availability === "in_stock" || product.availability === "low_stock"
           ? "https://schema.org/InStock"
           : product.availability === "pre_order"
             ? "https://schema.org/PreOrder"
             : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: "LUMINA Optics", url: siteUrl },
         },
       },
       {
