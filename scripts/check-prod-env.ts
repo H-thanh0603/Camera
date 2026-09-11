@@ -37,10 +37,11 @@ try {
     proxy: Number(env.TRUST_PROXY_COUNT ?? 0) > 0 || Boolean(process.env.VERCEL),
     email: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM),
     sentry: Boolean(env.SENTRY_DSN),
+    r2: Boolean(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET && env.R2_PUBLIC_URL),
   };
-   
+  
   console.log(JSON.stringify({ event: "prod_env.ok", checks }, null, 2));
-  const optional = (["email", "sentry"] as const).filter((k) => !checks[k]);
+  const optional = (["email", "sentry", "r2"] as const).filter((k) => !checks[k]);
   if (optional.length > 0) {
      
     console.warn(`CẢNH BÁO (không chặn): thiếu optional: ${optional.join(", ")}`);

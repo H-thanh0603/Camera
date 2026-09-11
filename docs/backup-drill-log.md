@@ -44,6 +44,16 @@
   DB mới (`migrate reset`/seed tươi) và Postgres không bị. Dev.db cũ từ v6
   chưa chuẩn hóa sẽ gặp lỗi tương tự — chạy `npm run db:reset` để làm mới.
 
+## 2026-09-11 — verify baseline saleEndsAt (local PG 18, chuẩn bị Supabase)
+
+- Cluster Postgres 18 tạm (port 5439), DB `lumina`.
+- Baseline (`postgres-baseline.sql` đã thêm `"saleEndsAt" TIMESTAMP(3)`) +
+  extensions apply sạch.
+- Drift check kiểu CI (baseline live vs `schema.prisma` sed postgresql):
+  `migrate diff` không còn CREATE/ALTER/INDEX → baseline đồng bộ.
+- Seed PG: Product 18, Coupon 3; 2 SP giảm giá có `saleEndsAt`
+  (24-70mm, filter kit → 2026-12-31). Sẵn sàng cho Supabase deploy.
+
 ## RPO / RTO (small-prod)
 
 - RPO ≤ 24h (backup đêm 2h + trước mỗi deploy).

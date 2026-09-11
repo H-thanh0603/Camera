@@ -24,6 +24,21 @@
    `db push`/`migrate dev` không tự generate/seed nữa — chạy `prisma generate`
    + `prisma db seed` tường minh sau đó. Pool PG qua driver (`connectionTimeout` 5s
    trong `src/lib/server/prisma.ts`); Supabase/Neon dùng pooled URL.
+
+### 1b. Checklist Supabase (khi bạn tạo project)
+
+1. Dashboard → Database → Connection string (Transaction pooler, port 6543)
+   + `?sslmode=require` → `DATABASE_URL`. Pool thẳng IPv4, hợp serverless.
+2. Chạy `DATABASE_URL=... ADMIN_PASSWORD=... node scripts/db-pg-init.mjs --seed`
+   từ máy dev (script tự chặn SQLite, bắt ADMIN_PASSWORD ≥ 12).
+   Baseline đã gồm `saleEndsAt`; extensions bật `pg_trgm` (trusted trên Supabase).
+3. Verify: `SELECT count(*) FROM "Product"` = 18; cột `"saleEndsAt"` tồn tại;
+   `GET /api/health` → `ready: true`, `paymentVnpay: true` (sau khi gắn VNPay keys).
+4. Vercel: add env prod (`DATABASE_URL` pooled, `ADMIN_PASSWORD`,
+   `VNPAY_*`, `RESEND_*`, `SENTRY_DSN`, `UPSTASH_*`, `R2_*`,
+   `TRUST_PROXY_COUNT` không cần vì Vercel tự đảm bảo IP), redeploy.
+5. Sau deploy: `BASE_URL=https://<domain> REQUIRE_PROD_FLAGS=true npm run smoke:prod`
+   và `NODE_ENV=production npx tsx scripts/check-prod-env.ts` trong CI.
 4. Gắn uptime monitor vào `GET /api/health` (200 = ok; 503 = DB down).
    Response còn báo `paymentWebhook/email/sentry/redis` đã cấu hình hay chưa.
 
