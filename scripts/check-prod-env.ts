@@ -30,8 +30,8 @@ loadDotEnv();
 try {
   const env = getEnv();
   const checks = {
-    demoOff: env.PAYMENT_DEMO_MODE === "false",
     adminPassword: Boolean(env.ADMIN_PASSWORD),
+    vnpay: Boolean(env.VNPAY_TMN_CODE && env.VNPAY_HASH_SECRET),
     webhookSecret: Boolean(env.PAYMENT_WEBHOOK_SECRET),
     redis: Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN),
     proxy: Number(env.TRUST_PROXY_COUNT ?? 0) > 0 || Boolean(process.env.VERCEL),

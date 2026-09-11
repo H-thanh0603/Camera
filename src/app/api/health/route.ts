@@ -26,16 +26,15 @@ export async function GET() {
         heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
       },
       env: process.env.NODE_ENV ?? "development",
-      paymentDemoMode: process.env.PAYMENT_DEMO_MODE === "true",
+      paymentVnpay: Boolean(process.env.VNPAY_TMN_CODE && process.env.VNPAY_HASH_SECRET),
       paymentWebhook: Boolean(process.env.PAYMENT_WEBHOOK_SECRET),
       email: Boolean(process.env.RESEND_API_KEY),
       sentry: Boolean(process.env.SENTRY_DSN),
       redis: isRedisConfigured() ? "upstash" : "memory",
-      // Sẵn sàng nhận traffic production: demo tắt + webhook + redis.
+      // Sẵn sàng nhận traffic production: VNPay keys + redis.
       // (Chi tiết thiếu gì xem log khởi động từ getEnv() — không lộ ở đây.)
       ready:
-        process.env.PAYMENT_DEMO_MODE !== "true" &&
-        Boolean(process.env.PAYMENT_WEBHOOK_SECRET) &&
+        Boolean(process.env.VNPAY_TMN_CODE && process.env.VNPAY_HASH_SECRET) &&
         isRedisConfigured(),
       timestamp: new Date().toISOString(),
     });

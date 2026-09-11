@@ -10,7 +10,6 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL là bắt buộc."),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PAYMENT_DEMO_MODE: z.enum(["true", "false"]).default("true"),
   ADMIN_PASSWORD: z.string().min(12, "ADMIN_PASSWORD production tối thiểu 12 ký tự.").optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
   // Phase 1 production:
@@ -50,12 +49,6 @@ export function getEnv(): AppEnv {
     throw new Error(`Biến môi trường không hợp lệ: ${details}`);
   }
   const env = parsed.data;
-  // Production không bao giờ được bật demo payment (nhận tiền giả).
-  if (env.NODE_ENV === "production" && env.PAYMENT_DEMO_MODE === "true") {
-    throw new Error(
-      "PAYMENT_DEMO_MODE=true bị cấm ở production — tắt demo và cấu hình VNPAY_TMN_CODE + VNPAY_HASH_SECRET.",
-    );
-  }
   if (env.NODE_ENV === "production" && !env.ADMIN_PASSWORD) {
     throw new Error("ADMIN_PASSWORD là bắt buộc ở production.");
   }

@@ -6,9 +6,9 @@ import { logger } from "./logger";
 import { logAudit } from "./audit";
 
 /**
- * Payment server — webhook có verify chữ ký, thay thế pay-demo ở production.
- * Luồng: cổng thanh toán (VNPay/MoMo/Stripe) → adapter map về
- * PaymentWebhookInput → POST /api/payments/webhook kèm chữ ký HMAC.
+ * Payment server — webhook generic có verify chữ ký (dự phòng / cổng khác).
+ * Luồng chính: VNPay (lib/server/vnpay.ts) → IPN map về
+ * PaymentWebhookInput → handlePaymentWebhook bên dưới.
  */
 
 export const WEBHOOK_MAX_SKEW_SECONDS = 300;

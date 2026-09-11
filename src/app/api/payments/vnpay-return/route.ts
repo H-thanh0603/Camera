@@ -8,8 +8,12 @@ import { verifyVnpaySignature } from "@/lib/server/vnpay";
  * IPN server-to-server quyết định — return URL chỉ để hiển thị).
  */
 export async function GET(request: NextRequest) {
-  const siteUrl =
-    getEnv().NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn";
+  let siteUrl = "https://luminaoptics.vn";
+  try {
+    siteUrl = getEnv().NEXT_PUBLIC_SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? siteUrl;
+  } catch {
+    // Env chưa sẵn sàng → vẫn redirect về site mặc định với result=invalid
+  }
   const query: Record<string, string | undefined> = {};
   request.nextUrl.searchParams.forEach((value, key) => {
     query[key] = value;

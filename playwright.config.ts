@@ -36,8 +36,6 @@ export default defineConfig({
     env: {
       PORT: String(E2E_PORT),
       DATABASE_URL: "file:../tests/e2e/.test.db",
-      PAYMENT_DEMO_MODE: "true",
-      NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true",
       NEXT_PUBLIC_ORDER_FAILURE_RATE: "0",
       NEXT_PUBLIC_REVIEW_FAILURE_RATE: "0",
     },

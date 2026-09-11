@@ -1,5 +1,16 @@
 import { expect, test } from "@playwright/test";
 
+test.describe("VNPay fail-closed", () => {
+  test("vnpay-url 503 khi chưa cấu hình keys", async ({ request, baseURL }) => {
+    // E2E không có VNPAY_TMN_CODE/HASH_SECRET → fail-closed trước cả auth/order lookup.
+    // Gửi Origin như browser để qua CSRF guard.
+    const res = await request.post("/api/orders/no-such-order/vnpay-url", {
+      headers: { Origin: baseURL ?? "http://localhost:3000" },
+    });
+    expect(res.status()).toBe(503);
+  });
+});
+
 test.describe("PDP → Cart → Checkout", () => {
   test("thêm variant vào giỏ, đổi số lượng, tổng đúng", async ({ page }) => {
     await page.goto("/products/lumina-x1-monolith");

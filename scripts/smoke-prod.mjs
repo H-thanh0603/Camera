@@ -29,11 +29,11 @@ await check("health 200 + db up", async () => {
   assert(r.body.db === "up", "db down");
 });
 
-await check("production không bật demo payment", async () => {
+await check("production có VNPay + ready", async () => {
   const r = await get("/api/health");
   if (String(process.env.REQUIRE_PROD_FLAGS ?? "") === "true") {
-    assert(r.body.paymentDemoMode === false, "demo payment đang bật!");
-    assert(r.body.ready === true, "health.ready=false (thiếu webhook secret hoặc redis)!");
+    assert(r.body.paymentVnpay === true, "thiếu VNPAY_TMN_CODE/HASH_SECRET!");
+    assert(r.body.ready === true, "health.ready=false (thiếu VNPay keys hoặc redis)!");
   }
 });
 

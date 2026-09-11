@@ -32,7 +32,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
     );
   }
-  const config = vnpayConfig();
+  let config: ReturnType<typeof vnpayConfig>;
+  try {
+    config = vnpayConfig();
+  } catch (error) {
+    logger.error("payment.vnpay_env_invalid", { error: String(error) });
+    return NextResponse.json({ error: "Kênh VNPay chưa được cấu hình." }, { status: 503 });
+  }
   if (!config) {
     return NextResponse.json({ error: "Kênh VNPay chưa được cấu hình." }, { status: 503 });
   }

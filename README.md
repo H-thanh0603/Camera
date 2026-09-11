@@ -20,8 +20,8 @@ npm run db:reset         # migrate reset + seed lại từ đầu
 ```
 
 Env (xem `.env.example`): `DATABASE_URL` (SQLite dev / Postgres production),
-`NEXT_PUBLIC_SITE_URL`, `PAYMENT_DEMO_MODE` + `NEXT_PUBLIC_PAYMENT_DEMO_MODE`
-(bật nút "mô phỏng đã thanh toán" — tắt ở production thật).
+`NEXT_PUBLIC_SITE_URL`, VNPay (`VNPAY_TMN_CODE` + `VNPAY_HASH_SECRET` —
+sandbox mặc định, thiếu keys thì `vnpay-url` 503).
 
 ## Kiến trúc
 
@@ -44,7 +44,7 @@ src/
     server/               # Server-only: Prisma, scrypt password, session, đặt hàng + verify
     api-client.ts         # Cầu nối UI → API routes, xử lý lỗi thống nhất
     utils/                # format VND, validation, URL params, rate-limit
-  app/api/                # auth (register/login/logout/me), orders (+cancel, pay-demo), reviews
+  app/api/                # auth (register/login/logout/me), orders (+cancel, vnpay-url), payments (vnpay-ipn/return), reviews
   state/store.tsx         # Global state (cart/wishlist/compare/auth/recent/toast) + persistence
 tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filter, order verification, luồng mua thật
 ```
@@ -89,8 +89,10 @@ tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filt
   rate limit login/register. Không còn thông tin user trong localStorage.
 - **Đặt hàng**: client chỉ gửi productId/variantId/quantity — **server tự lấy giá,
   kẹp stock và tính lại toàn bộ totals** trước khi ghi DB.
-- **Payment**: abstraction qua endpoint; `pay-demo` chỉ chạy khi `PAYMENT_DEMO_MODE=true`
-  (đồ án). Production: thay bằng webhook VNPay/MoMo/Stripe verify chữ ký HMAC.
+- **Payment (VNPay)**: checkout `vnpay` → `vnpay-url` tạo link (TxnRef = mã đơn);
+  IPN verify HMAC-SHA512 đúng sample VNPay → tái dùng `handlePaymentWebhook`
+  (dedupe + đối soát tiền + claim `pending → paid`, RspCode đúng spec).
+  Không keys → 503 fail-closed. `pay-demo` đã xóa hẳn từ 2026-09-11.
 - **Reviews**: ghi DB với `approved=false`, hiển thị công khai sau kiểm duyệt.
 
 ### Nguyên tắc
@@ -108,8 +110,8 @@ tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filt
 
 ## Việc cần làm tiếp theo (production)
 
-1. Deploy: Vercel + Postgres (Supabase/Neon) — đổi `provider` + `DATABASE_URL`, chạy `prisma migrate deploy`.
-2. Payment thật: webhook VNPay/MoMo/Stripe thay `pay-demo`, xóa endpoint demo.
+1. Deploy: Vercel + Postgres (Supabase/Neon) — `node scripts/db-pg-init.mjs --seed` (baseline đã gồm `saleEndsAt`), xem `docs/runbook.md`.
+2. VNPay keys thật: Merchant Admin → `VNPAY_TMN_CODE` + `VNPAY_HASH_SECRET`, prod đổi `VNPAY_PAY_URL` sang `https://www.vnpayment.vn/...`.
 3. Email (xác nhận đơn, reset password), ảnh CDN + `next/image`, Sentry.
 4. Snapshot API → phân trang server-side khi catalogue lên hàng nghìn SP.
-5. Checklist khi có tài khoản: Auth.js (social login), Sentry, Resend, Upstash Redis, VNPay/MoMo, next-intl.
+5. Checklist khi có tài khoản: Auth.js (social login), Sentry, Resend, Upstash Redis, next-intl.
