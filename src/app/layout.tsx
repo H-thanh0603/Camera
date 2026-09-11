@@ -30,6 +30,33 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn";
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: "LUMINA Optics",
+        url: siteUrl,
+        description:
+          "Không gian trưng bày và phân phối máy ảnh flagship, medium format, ống kính cine và phụ kiện cao cấp.",
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        url: siteUrl,
+        name: "LUMINA Optics",
+        publisher: { "@id": `${siteUrl}/#organization` },
+        inLanguage: "vi-VN",
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${siteUrl}/products?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
   return (
     <html lang="vi" className={`dark ${syne.variable} ${hanken.variable} ${jetbrains.variable}`}>
       <head>
@@ -48,6 +75,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://lh3.googleusercontent.com" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd).replace(/</g, "\u003c") }}
+        />
       </head>
       <body className="bg-background font-body-md text-on-surface antialiased">
         <a

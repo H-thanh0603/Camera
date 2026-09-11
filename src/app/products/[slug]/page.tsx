@@ -72,12 +72,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
     dbSimilarProducts(product, 3),
   ]);
 
-  // Product structured data (SEO)
+  // Product + Breadcrumb structured data (SEO)
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn";
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.name,
-    sku: product.sku,
+    "@graph": [
+      {
+        "@type": "Product",
+        name: product.name,
+        sku: product.sku,
     brand: { "@type": "Brand", name: product.brand },
     description: product.shortDescription,
     image: product.images.map((i) => i.url),
@@ -96,7 +99,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
           : product.availability === "pre_order"
             ? "https://schema.org/PreOrder"
             : "https://schema.org/OutOfStock",
-    },
+        },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Trang chủ", item: siteUrl },
+          { "@type": "ListItem", position: 2, name: "Kho thiết bị", item: `${siteUrl}/products` },
+          { "@type": "ListItem", position: 3, name: product.name, item: `${siteUrl}/products/${product.slug}` },
+        ],
+      },
+    ],
   };
 
   return (
