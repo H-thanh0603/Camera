@@ -166,6 +166,23 @@ test.describe("Admin panel", () => {
     expect(text.split("\n").length).toBeGreaterThan(1);
   });
 
+  test("admin: CSV dry-run validate đúng/sai", async ({ page }) => {
+    await adminLogin(page);
+    const origin = new URL(page.url()).origin;
+    const good = await page.request.post("/api/admin/products/import", {
+      headers: { Origin: origin },
+      data: { csv: "slug,name,brand,category,price,stock\ntest-csv-1,Máy Test CSV,Lumina,camera,1000000,3", dryRun: true },
+    });
+    expect(good.status()).toBe(200);
+    expect((await good.json()).valid).toBe(1);
+    const bad = await page.request.post("/api/admin/products/import", {
+      headers: { Origin: origin },
+      data: { csv: "slug,name,brand,category,price\nBad Slug,Máy X,Lumina,camera,100", dryRun: true },
+    });
+    expect(bad.status()).toBe(200);
+    expect((await bad.json()).issues.length).toBeGreaterThan(0);
+  });
+
   test("admin: bật banner site → trang chủ hiện, tắt → ẩn", async ({ page }) => {
     await adminLogin(page);
     await page.goto("/admin/content");
