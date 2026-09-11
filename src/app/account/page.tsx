@@ -228,9 +228,16 @@ export default function AccountPage() {
           <span className="section-telemetry">MY LUMINA ACCOUNT</span>
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Xin chào, {user.name}</h1>
         </div>
-        <button type="button" onClick={logout} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface transition-colors hover:text-error">
-          Đăng xuất
-        </button>
+        <div className="flex items-center gap-space-sm">
+          {user.role === "admin" && (
+            <Link href="/admin" className="rounded-lg bg-primary px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
+              Quản trị hệ thống
+            </Link>
+          )}
+          <button type="button" onClick={logout} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface transition-colors hover:text-error">
+            Đăng xuất
+          </button>
+        </div>
       </header>
 
       <section className="grid grid-cols-2 gap-space-md sm:grid-cols-4" aria-label="Tổng quan tài khoản">

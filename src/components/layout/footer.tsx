@@ -86,6 +86,7 @@ export function Footer() {
             <Link href="/legal/privacy" className="font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-primary">Bảo mật</Link>
             <Link href="/legal/terms" className="font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-primary">Điều khoản</Link>
             <Link href="/legal/returns" className="font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-primary">Đổi trả</Link>
+            <Link href="/admin" className="font-telemetry-xs text-telemetry-xs uppercase text-outline transition-colors hover:text-primary">Quản trị</Link>
             <span className="font-body-sm text-body-sm text-outline">© 2024–2026 LUMINA OPTICS. TOÀN BỘ QUYỀN ĐƯỢC BẢO LƯU. KIẾN TẠO CHO ĐIỆN ẢNH ĐỈNH CAO.</span>
           </div>
         </div>

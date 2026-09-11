@@ -88,5 +88,5 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
     return null;
   }
-  return { id: session.user.id, name: session.user.name, email: session.user.email };
+  return { id: session.user.id, name: session.user.name, email: session.user.email, role: session.user.role };
 }

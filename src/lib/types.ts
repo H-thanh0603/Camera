@@ -305,6 +305,8 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
+  /** Quyền (có từ getSessionUser; object dựng tay có thể thiếu → coi như non-admin). */
+  role?: string;
 }
 
 /* ---------- Camera Finder ---------- */
