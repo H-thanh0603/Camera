@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { articles } from "@/lib/data/articles";
+import { dbPublishedArticles } from "@/lib/server/article-db";
 import { formatDate } from "@/lib/utils/format";
 import { AppFillImage } from "@/components/ui/app-image";
 
@@ -9,8 +9,17 @@ export const metadata: Metadata = {
   description: "Tạp chí điện ảnh và nhiếp ảnh của Lumina Optics: hướng dẫn chọn máy, đánh giá ống kính, kiến thức quang học chuyên sâu.",
 };
 
-export default function JournalPage() {
+export default async function JournalPage() {
+  const articles = await dbPublishedArticles();
   const [featured, ...rest] = articles;
+  if (!featured) {
+    return (
+      <div className="container-page flex flex-col gap-space-xl py-space-xl">
+        <h1 className="font-headline-lg text-headline-lg text-on-surface">Lumina Journal</h1>
+        <p className="font-body-md text-body-md text-on-surface-variant">Chưa có bài viết nào.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container-page flex flex-col gap-space-xl py-space-xl">

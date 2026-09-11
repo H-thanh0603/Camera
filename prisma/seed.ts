@@ -10,6 +10,7 @@ import { Prisma } from "../src/generated/prisma/client";
 import { scrypt, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { products } from "../src/lib/data/products";
+import { articles } from "../src/lib/data/articles";
 import { prisma } from "../src/lib/server/prisma";
 const scryptAsync = promisify(scrypt) as (p: string | Buffer, s: string | Buffer, k: number) => Promise<Buffer>;
 
@@ -103,6 +104,56 @@ async function main() {
     });
   }
   console.log(`Seeded ${coupons.length} coupons.`);
+
+  // Journal từ file seed → DB (admin sửa tiếp trên UI, public đọc published)
+  for (const a of articles) {
+    await prisma.article.upsert({
+      where: { slug: a.slug },
+      update: {
+        title: a.title,
+        category: a.category,
+        excerpt: a.excerpt,
+        author: a.author,
+        date: new Date(a.date),
+        readingTimeMinutes: a.readingTimeMinutes,
+        heroImage: a.heroImage,
+        heroAlt: a.heroAlt,
+        body: a.body as unknown as object,
+        relatedSlugs: a.relatedProductSlugs as unknown as object,
+        published: true,
+      },
+      create: {
+        slug: a.slug,
+        title: a.title,
+        category: a.category,
+        excerpt: a.excerpt,
+        author: a.author,
+        date: new Date(a.date),
+        readingTimeMinutes: a.readingTimeMinutes,
+        heroImage: a.heroImage,
+        heroAlt: a.heroAlt,
+        body: a.body as unknown as object,
+        relatedSlugs: a.relatedProductSlugs as unknown as object,
+        published: true,
+      },
+    });
+  }
+  console.log(`Seeded ${articles.length} articles.`);
+
+  // Cấu hình site mặc định (banner tắt — admin bật trên UI khi cần)
+  const settings: Record<string, string> = {
+    "announcement.enabled": "false",
+    "announcement.text": "ƯU ĐÃI CUỐI NĂM — GIẢM ĐẾN 15% LENS & PHỤ KIỆN ĐẾN 31/12",
+    "announcement.link": "/products?tag=sale",
+  };
+  for (const [key, value] of Object.entries(settings)) {
+    await prisma.siteSetting.upsert({
+      where: { key },
+      update: {},
+      create: { key, value },
+    });
+  }
+  console.log(`Seeded ${Object.keys(settings).length} settings.`);
 }
 
 main()

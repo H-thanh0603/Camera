@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { articles } from "@/lib/data/articles";
+import { dbArticleSlugs, dbGetArticleBySlug, dbPublishedArticles } from "@/lib/server/article-db";
 import { getProductBySlug } from "@/lib/repositories/product-repository";
 import { ProductCard } from "@/components/product/product-card";
 import { formatDate } from "@/lib/utils/format";
@@ -11,13 +11,14 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams() {
-  return articles.map((a) => ({ slug: a.slug }));
+export async function generateStaticParams() {
+  const slugs = await dbArticleSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const article = articles.find((a) => a.slug === slug);
+  const article = await dbGetArticleBySlug(slug);
   if (!article) return { title: "Bài viết không tồn tại" };
   return {
     title: article.title,
@@ -33,14 +34,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ArticlePage({ params }: PageProps) {
   const { slug } = await params;
-  const article = articles.find((a) => a.slug === slug);
+  const article = await dbGetArticleBySlug(slug);
   if (!article) notFound();
 
   const relatedProducts = article.relatedProductSlugs
     .map((s) => getProductBySlug(s))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
-  const related = articles.filter((a) => a.slug !== article.slug);
+  const related = (await dbPublishedArticles()).filter((a) => a.slug !== article.slug);
 
   return (
     <article className="flex flex-col">

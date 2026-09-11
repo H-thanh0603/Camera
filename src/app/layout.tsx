@@ -3,6 +3,7 @@ import { Hanken_Grotesk, JetBrains_Mono, Syne } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/state/store";
 import { Header } from "@/components/layout/header";
+import { AnnouncementBar } from "@/components/layout/announcement-bar";
 import { Footer } from "@/components/layout/footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SearchOverlay } from "@/components/search/search-overlay";
@@ -95,6 +96,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <StoreProvider>
           <QueryProvider>
+          <AnnouncementBar />
           <Header />
           <main id="main" className="w-full bg-background pt-20 lg:pt-[125px]">
             {children}

@@ -33,6 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         { href: "/admin/stock", label: "Kho hàng", icon: "warehouse" },
         { href: "/admin/orders", label: "Đơn hàng", icon: "receipt_long", badge: pendingOrders },
         { href: "/admin/coupons", label: "Mã giảm giá", icon: "sell" },
+        { href: "/admin/content", label: "Nội dung", icon: "article" },
         { href: "/admin/users", label: "Tài khoản", icon: "group" },
         { href: "/admin/reviews", label: "Kiểm duyệt", icon: "rate_review", badge: pendingReviews },
         { href: "/admin/trade-in", label: "Thu cũ", icon: "autorenew", badge: newTradeIns },

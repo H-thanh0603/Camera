@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { dbProductRoutes } from "@/lib/server/product-db";
-import { articles } from "@/lib/data/articles";
+import { dbPublishedArticles } from "@/lib/server/article-db";
 
 // ISR: admin sửa giá/stock hiển thị trong ~30s
 export const revalidate = 30;
@@ -9,6 +9,7 @@ export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const products = await dbProductRoutes();
+  const articles = await dbPublishedArticles();
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: siteUrl, changeFrequency: "daily", priority: 1 },

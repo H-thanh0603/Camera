@@ -165,4 +165,23 @@ test.describe("Admin panel", () => {
     expect(text).toContain("Mã đơn");
     expect(text.split("\n").length).toBeGreaterThan(1);
   });
+
+  test("admin: bật banner site → trang chủ hiện, tắt → ẩn", async ({ page }) => {
+    await adminLogin(page);
+    await page.goto("/admin/content");
+    await page.getByLabel("Nội dung banner", { exact: true }).fill("Banner test E2E — ưu đãi đặc biệt");
+    await page.getByRole("checkbox", { name: "Hiển thị banner" }).check();
+    await page.getByRole("button", { name: "Lưu banner" }).click();
+    await expect(page.getByText("Đã lưu banner site.")).toBeVisible({ timeout: 10_000 });
+
+    await page.goto("/");
+    await expect(page.getByText("Banner test E2E — ưu đãi đặc biệt")).toBeVisible({ timeout: 10_000 });
+
+    await page.goto("/admin/content");
+    await page.getByRole("checkbox", { name: "Hiển thị banner" }).uncheck();
+    await page.getByRole("button", { name: "Lưu banner" }).click();
+    await expect(page.getByText("Đã lưu banner site.")).toBeVisible({ timeout: 10_000 });
+    await page.goto("/");
+    await expect(page.getByText("Banner test E2E — ưu đãi đặc biệt")).toHaveCount(0);
+  });
 });

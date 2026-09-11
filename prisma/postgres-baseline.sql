@@ -369,6 +369,36 @@ CREATE INDEX "StockMovement_productId_idx" ON "StockMovement"("productId");
 -- CreateIndex
 CREATE INDEX "StockMovement_createdAt_idx" ON "StockMovement"("createdAt");
 
+CREATE TABLE "SiteSetting" (
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("key")
+);
+
+CREATE TABLE "Article" (
+    "slug" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "category" TEXT NOT NULL DEFAULT 'Camera Guides',
+    "excerpt" TEXT NOT NULL DEFAULT '',
+    "author" TEXT NOT NULL DEFAULT 'Biên tập Lumina Journal',
+    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "readingTimeMinutes" INTEGER NOT NULL DEFAULT 5,
+    "heroImage" TEXT NOT NULL DEFAULT '',
+    "heroAlt" TEXT NOT NULL DEFAULT '',
+    "body" JSONB NOT NULL,
+    "relatedSlugs" JSONB NOT NULL,
+    "published" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Article_pkey" PRIMARY KEY ("slug")
+);
+
+-- CreateIndex
+CREATE INDEX "Article_published_idx" ON "Article"("published");
+
 -- AddForeignKey
 ALTER TABLE "TotpChallenge" ADD CONSTRAINT "TotpChallenge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
