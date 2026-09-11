@@ -55,6 +55,21 @@ export async function POST(request: NextRequest) {
 
     revalidatePath("/", "layout");
     revalidateTag(CATALOG_TAG, "max");
+    const actor = await getSessionUser();
+    // Sổ kho: tồn đầu kỳ khi tạo SP
+    if (row.stock > 0) {
+      await prisma.stockMovement.create({
+        data: {
+          productId: row.id,
+          variantId: null,
+          type: "in",
+          quantity: row.stock,
+          balanceAfter: row.stock,
+          reason: "Tồn đầu kỳ (tạo sản phẩm)",
+          createdBy: actor?.id ?? null,
+        },
+      });
+    }
     await logAudit(await getSessionUser(), "product.created", "product", row.id, { name: row.name, price: row.price });
     return NextResponse.json({ product: dbProductToDomain(row) }, { status: 201 });
   } catch (e) {

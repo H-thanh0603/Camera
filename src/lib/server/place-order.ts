@@ -298,6 +298,45 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       },
       tx,
     );
+    // Sổ kho: đọc tồn SAU trừ trong cùng tx (khóa dòng giữ tới commit nên
+    // balanceAfter chính xác dù đơn khác chen ngang) rồi ghi dòng ledger.
+    const movements: {
+      productId: string;
+      variantId: string | null;
+      type: string;
+      quantity: number;
+      balanceAfter: number | null;
+      reason: string;
+      refOrderId: string;
+      createdBy: string | null;
+    }[] = [];
+    for (const l of finalLines) {
+      const prod = await tx.product.findUnique({ where: { id: l.productId }, select: { stock: true } });
+      movements.push({
+        productId: l.productId,
+        variantId: null,
+        type: "out",
+        quantity: -l.quantity,
+        balanceAfter: prod?.stock ?? null,
+        reason: `Đơn ${created.number}`,
+        refOrderId: created.id,
+        createdBy: user?.id ?? null,
+      });
+      if (l.variantId) {
+        const vari = await tx.productVariant.findUnique({ where: { id: l.variantId }, select: { stock: true } });
+        movements.push({
+          productId: l.productId,
+          variantId: l.variantId,
+          type: "out",
+          quantity: -l.quantity,
+          balanceAfter: vari?.stock ?? null,
+          reason: `Đơn ${created.number}`,
+          refOrderId: created.id,
+          createdBy: user?.id ?? null,
+        });
+      }
+    }
+    await tx.stockMovement.createMany({ data: movements });
     return created;
   });
   } catch (error) {

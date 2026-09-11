@@ -30,6 +30,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const variantData = validateVariants(body, Number(data.price));
     const json = sanitizeProductJson(body);
+    const stockReason = String(body.stockReason ?? "").slice(0, 200);
+    const actor = await getSessionUser();
+
+    const before = await prisma.product.findUnique({ where: { id }, select: { stock: true } });
+    if (!before) return NextResponse.json({ error: "Không tìm thấy sản phẩm." }, { status: 404 });
 
     const row = await prisma.product.update({
       where: { id },
@@ -41,6 +46,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
       include: { variants: true },
     });
+    // Sổ kho: tồn đổi → ghi adjust (delta có dấu + tồn sau)
+    if (before.stock !== row.stock) {
+      await prisma.stockMovement.create({
+        data: {
+          productId: id,
+          variantId: null,
+          type: "adjust",
+          quantity: row.stock - before.stock,
+          balanceAfter: row.stock,
+          reason: stockReason || "Admin chỉnh tồn",
+          createdBy: actor?.id ?? null,
+        },
+      });
+    }
     revalidatePath("/", "layout");
     revalidateTag(CATALOG_TAG, "max");
     await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });

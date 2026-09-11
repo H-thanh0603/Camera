@@ -134,4 +134,15 @@ test.describe("Admin panel", () => {
     await expect(nav.getByRole("link", { name: /Đơn hàng/ })).not.toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("link", { name: "Về cửa hàng" })).toBeVisible();
   });
+
+  test("admin: phiếu nhập kho +5 → tồn tăng, lịch sử có dòng", async ({ page }) => {
+    await adminLogin(page);
+    await page.goto("/admin/stock");
+    await page.getByLabel("Sản phẩm", { exact: true }).selectOption({ index: 0 });
+    await page.getByLabel("Số lượng").fill("5");
+    await page.getByLabel("Lý do (bắt buộc)").fill("Nhập NCC test E2E");
+    await page.getByRole("button", { name: "Ghi phiếu kho" }).click();
+    await expect(page.getByText(/Đã ghi phiếu/)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("cell", { name: "Nhập NCC test E2E" }).first()).toBeVisible();
+  });
 });

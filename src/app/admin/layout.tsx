@@ -30,6 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       items={[
         { href: "/admin", label: "Dashboard", icon: "dashboard" },
         { href: "/admin/products", label: "Sản phẩm", icon: "inventory_2", badge: lowStocks },
+        { href: "/admin/stock", label: "Kho hàng", icon: "warehouse" },
         { href: "/admin/orders", label: "Đơn hàng", icon: "receipt_long", badge: pendingOrders },
         { href: "/admin/coupons", label: "Mã giảm giá", icon: "sell" },
         { href: "/admin/users", label: "Tài khoản", icon: "group" },
