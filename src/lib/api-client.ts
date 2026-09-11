@@ -171,11 +171,11 @@ export async function apiCancelOrder(id: string): Promise<Order> {
   }).then((r) => r.order);
 }
 
-export async function apiPayDemo(id: string): Promise<Order> {
-  return request<{ order: Order }>(`/api/orders/${id}/pay-demo`, {
+export async function apiVnpayUrl(id: string): Promise<string> {
+  return request<{ url: string }>(`/api/orders/${id}/vnpay-url`, {
     method: "POST",
     headers: guestHeaders(id),
-  }).then((r) => r.order);
+  }).then((r) => r.url);
 }
 
 export async function apiLookupGuestOrder(number: string, token: string): Promise<Order> {

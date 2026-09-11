@@ -215,7 +215,7 @@ export interface ShippingInfo {
 
 export type DeliveryMethod = "standard" | "express" | "pickup";
 
-export type PaymentMethod = "bank_transfer" | "cod" | "card_on_delivery";
+export type PaymentMethod = "bank_transfer" | "cod" | "card_on_delivery" | "vnpay";
 
 export type OrderStatus =
   | "pending"

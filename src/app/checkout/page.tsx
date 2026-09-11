@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ContactInfo, Order, ShippingInfo } from "@/lib/types";
 import { placeOrder } from "@/lib/services/order-service";
-import { ApiError, apiPayDemo, newGuestToken } from "@/lib/api-client";
+import { ApiError, apiVnpayUrl, newGuestToken } from "@/lib/api-client";
 import { track } from "@/lib/analytics";
 import { contactSchema, shippingSchema, type ContactInput, type ShippingInput } from "@/lib/schemas";
 import { formatVND, cn } from "@/lib/utils/format";
@@ -22,8 +22,9 @@ const DELIVERY_OPTIONS: { value: "standard" | "express" | "pickup"; label: strin
   { value: "pickup", label: "Nhận tại Vault", desc: "Quận 1 (HCM) hoặc Hoàn Kiếm (HN)", price: 0 },
 ];
 
-const PAYMENT_OPTIONS: { value: "bank_transfer" | "cod" | "card_on_delivery"; label: string; desc: string }[] = [
+const PAYMENT_OPTIONS: { value: "bank_transfer" | "cod" | "card_on_delivery" | "vnpay"; label: string; desc: string }[] = [
   { value: "bank_transfer", label: "Chuyển khoản ngân hàng", desc: "Xác nhận chuyển khoản trong 30 phút, hỗ trợ trả góp 0%" },
+  { value: "vnpay", label: "VNPay — QR / thẻ / ví", desc: "Thanh toán online, xác nhận tự động qua IPN" },
   { value: "card_on_delivery", label: "Quẹt thẻ khi nhận máy", desc: "POS di động hỗ trợ Visa/Master/JCB" },
   { value: "cod", label: "COD — Thanh toán khi nhận hàng", desc: "Chỉ áp dụng đơn dưới 200 triệu" },
 ];
@@ -48,7 +49,7 @@ export default function CheckoutPage() {
   const [shipping, setShipping] = useState<ShippingInfo | null>(null);
   const [wantInvoice, setWantInvoice] = useState(false);
   const [delivery, setDelivery] = useState<"standard" | "express" | "pickup">("standard");
-  const [payment, setPayment] = useState<"bank_transfer" | "cod" | "card_on_delivery">("bank_transfer");
+  const [payment, setPayment] = useState<"bank_transfer" | "cod" | "card_on_delivery" | "vnpay">("bank_transfer");
 
   // Coupon: server là nguồn chuẩn (POST /api/coupons/validate để preview,
   // placeOrder gửi kèm mã để server tính lại + trừ lượt dùng).
@@ -125,12 +126,14 @@ export default function CheckoutPage() {
                   ? `Chuyển khoản đúng số tiền ${formatVND(placedOrder.totals.total)} với nội dung "${placedOrder.number}" tới STK 0123456789 — LUMINA OPTICS (VCB).`
                   : placedOrder.payment === "cod"
                     ? "Chuẩn bị số tiền đúng khi nhận máy. Kỹ thuật viên sẽ hỗ trợ kiểm tra thiết bị trước khi thanh toán."
-                    : "Quẹt thẻ tại chỗ với kỹ thuật viên khi nhận máy (Visa/Master/JCB)."}
+                    : placedOrder.payment === "vnpay"
+                      ? `Bấm nút bên dưới để sang VNPay thanh toán ${formatVND(placedOrder.totals.total)} cho đơn ${placedOrder.number}. Trạng thái tự cập nhật sau khi VNPay xác nhận.`
+                      : "Quẹt thẻ tại chỗ với kỹ thuật viên khi nhận máy (Visa/Master/JCB)."}
               </p>
-              {process.env.NEXT_PUBLIC_PAYMENT_DEMO_MODE === "true" && (
+              {placedOrder.payment === "vnpay" && (
                 <div className="flex items-center justify-between gap-space-sm border-t border-surface-container-high pt-space-sm">
                   <p className="font-telemetry-xs text-[10px] uppercase leading-relaxed text-outline">
-                    DEMO — không có giao dịch thật. Nút dưới mô phỏng webhook của cổng payment để test order tracking.
+                    Chuyển sang cổng VNPay (QR / thẻ ATM / Visa / ví). Không nhập OTP lạ ngoài trang VNPay.
                   </p>
                   <button
                     type="button"
@@ -138,16 +141,17 @@ export default function CheckoutPage() {
                     onClick={async () => {
                       setPaying(true);
                       try {
-                        setPlacedOrder(await apiPayDemo(placedOrder.id));
+                        const url = await apiVnpayUrl(placedOrder.id);
+                        window.location.href = url;
                       } catch {
-                        pushToast("Không xác nhận được thanh toán demo. Thử lại.", "error");
+                        pushToast("Chưa tạo được liên kết VNPay (kênh chưa cấu hình?). Thử lại.", "error");
                       } finally {
                         setPaying(false);
                       }
                     }}
-                    className="shrink-0 rounded-lg bg-surface-container-high px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface transition-colors hover:bg-surface-container-highest disabled:opacity-50"
+                    className="shrink-0 rounded-lg bg-primary px-space-sm py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim disabled:opacity-50"
                   >
-                    {paying ? "Đang xử lý..." : "Mô phỏng đã thanh toán"}
+                    {paying ? "Đang xử lý..." : "Thanh toán qua VNPay"}
                   </button>
                 </div>
               )}

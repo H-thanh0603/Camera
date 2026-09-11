@@ -121,6 +121,7 @@ export default function AccountPage() {
 
           {serverError && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{serverError}</p>}
           <OAuthNotice pushToast={pushToast} />
+          <VnpayNotice />
           <div className="flex rounded-lg bg-surface-container-low p-space-2xs" role="tablist" aria-label="Chọn chế độ đăng nhập">
             {(["login", "register"] as const).map((m) => (
               <button
@@ -221,6 +222,7 @@ export default function AccountPage() {
 
   return (
     <div className="container-page flex flex-col gap-space-xl py-space-xl">
+      <VnpayNotice />
       <header className="flex flex-wrap items-center justify-between gap-space-md">
         <div className="flex flex-col gap-space-2xs">
           <span className="section-telemetry">MY LUMINA ACCOUNT</span>
@@ -600,4 +602,33 @@ function OAuthNotice({ pushToast }: { pushToast: (message: string, type: "succes
     window.history.replaceState(null, "", window.location.pathname);
   }, [pushToast]);
   return null;
+}
+
+/** Banner kết quả redirect VNPay (?pay=vnpay&order=&result=) — hiển thị cho cả khách vãng lai. */
+function VnpayNotice() {
+  const [notice, setNotice] = useState<{ order: string; result: string } | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("pay") !== "vnpay") return;
+    setNotice({ order: params.get("order") ?? "", result: params.get("result") ?? "invalid" });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  if (!notice) return null;
+  const body =
+    notice.result === "success"
+      ? `VNPay báo thanh toán thành công${notice.order ? ` đơn ${notice.order}` : ""}. Trạng thái chuẩn sẽ cập nhật sau khi IPN xác nhận — tải lại trang sau ít phút.`
+      : notice.result === "failed"
+        ? `Thanh toán VNPay${notice.order ? ` cho đơn ${notice.order}` : ""} chưa thành công. Bạn có thể đặt lại đơn hoặc thử phương thức khác.`
+        : `Không xác thực được kết quả VNPay${notice.order ? ` (đơn ${notice.order})` : ""}. Liên hệ concierge để được hỗ trợ.`;
+  const ok = notice.result === "success";
+  return (
+    <p
+      role="status"
+      className={ok
+        ? "rounded-lg bg-primary/10 p-space-sm font-body-sm text-body-sm text-on-surface-variant"
+        : "rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error"}
+    >
+      {body}
+    </p>
+  );
 }

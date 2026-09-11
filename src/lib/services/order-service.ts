@@ -1,4 +1,4 @@
-import type { CartSnapshot, ContactInfo, Order, ShippingInfo } from "@/lib/types";
+import type { CartSnapshot, ContactInfo, Order, PaymentMethod, ShippingInfo } from "@/lib/types";
 import { apiCancelOrder, apiListOrders, apiPlaceOrder, newGuestToken } from "@/lib/api-client";
 
 /**
@@ -11,7 +11,7 @@ export interface PlaceOrderDraft {
   contact: ContactInfo;
   shipping: ShippingInfo;
   delivery: "standard" | "express" | "pickup";
-  payment: "bank_transfer" | "cod" | "card_on_delivery";
+  payment: PaymentMethod;
   snapshot: CartSnapshot;
   couponCode?: string;
   /**

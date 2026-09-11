@@ -15,6 +15,11 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
   // Phase 1 production:
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
+  // VNPay (sandbox khi chưa có keys thật — thiếu keys thì vnpay-url 503):
+  VNPAY_TMN_CODE: z.string().min(1).optional(),
+  VNPAY_HASH_SECRET: z.string().min(8).optional(),
+  VNPAY_PAY_URL: z.string().url().default("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"),
+  VNPAY_RETURN_URL: z.string().url().optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),
   SENTRY_DSN: z.string().url().optional(),
@@ -48,15 +53,15 @@ export function getEnv(): AppEnv {
   // Production không bao giờ được bật demo payment (nhận tiền giả).
   if (env.NODE_ENV === "production" && env.PAYMENT_DEMO_MODE === "true") {
     throw new Error(
-      "PAYMENT_DEMO_MODE=true bị cấm ở production — tắt demo và cấu hình PAYMENT_WEBHOOK_SECRET.",
+      "PAYMENT_DEMO_MODE=true bị cấm ở production — tắt demo và cấu hình VNPAY_TMN_CODE + VNPAY_HASH_SECRET.",
     );
   }
   if (env.NODE_ENV === "production" && !env.ADMIN_PASSWORD) {
     throw new Error("ADMIN_PASSWORD là bắt buộc ở production.");
   }
-  if (env.NODE_ENV === "production" && !env.PAYMENT_WEBHOOK_SECRET) {
+  if (env.NODE_ENV === "production" && !(env.VNPAY_TMN_CODE && env.VNPAY_HASH_SECRET)) {
     throw new Error(
-      "PAYMENT_WEBHOOK_SECRET là bắt buộc ở production — không có secret thì webhook 503, shop chết thanh toán.",
+      "VNPAY_TMN_CODE + VNPAY_HASH_SECRET là bắt buộc ở production — không có keys thì vnpay-url 503, shop chết thanh toán.",
     );
   }
   // Redis rate-limit: đa instance mà thiếu Redis là bypass hết limiter.

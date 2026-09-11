@@ -85,7 +85,7 @@ export const placeOrderSchema = z.object({
   contact: contactSchema,
   shipping: shippingSchema,
   delivery: z.enum(["standard", "express", "pickup"]),
-  payment: z.enum(["bank_transfer", "cod", "card_on_delivery"]),
+  payment: z.enum(["bank_transfer", "cod", "card_on_delivery", "vnpay"]),
   lines: z.array(orderLineSchema).min(1, "Đơn hàng trống."),
   idempotencyKey: z.string().min(8).max(64).optional(),
   guestToken: z
