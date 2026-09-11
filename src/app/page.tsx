@@ -13,6 +13,14 @@ export const metadata: Metadata = {
   title: "LUMINA Optics — Nghệ Thuật Thu Nhận Ánh Sáng Đẳng Cấp Thuần Khiết",
   description:
     "Khám phá Lumina X-1 Monolith 61.2MP, medium format 100MP, ống kính cine anamorphic và phụ kiện studio cao cấp — kiểm chuẩn collimator, bảo hành 5 năm tận nơi.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "LUMINA Optics — Nghệ Thuật Thu Nhận Ánh Sáng Đẳng Cấp Thuần Khiết",
+    description:
+      "Khám phá Lumina X-1 Monolith 61.2MP, medium format 100MP, ống kính cine anamorphic và phụ kiện studio cao cấp — kiểm chuẩn collimator, bảo hành 5 năm tận nơi.",
+    url: "/",
+    type: "website",
+  },
 };
 
 export default function HomePage() {

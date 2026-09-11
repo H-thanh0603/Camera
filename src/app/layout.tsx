@@ -27,6 +27,12 @@ export const metadata: Metadata = {
     locale: "vi_VN",
     siteName: "LUMINA Optics",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "LUMINA Optics — Thiết Bị Quang Học Cine & Medium Format Cao Cấp",
+    description:
+      "Không gian trưng bày và phân phối máy ảnh flagship, medium format, ống kính cine và phụ kiện cao cấp — kiểm chuẩn collimator, bảo hành 5 năm tận nơi.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
