@@ -184,4 +184,54 @@ test.describe("Admin panel", () => {
     await page.goto("/");
     await expect(page.getByText("Banner test E2E — ưu đãi đặc biệt")).toHaveCount(0);
   });
+
+  test("staff: vào được ops (đơn/kho), bị chặn trang admin-only", async ({ page }) => {
+    const email = `staff-${Date.now()}@lumina.vn`;
+    const password = "matkhau-12345";
+    await page.goto("/account");
+    await page.getByRole("tab", { name: "Đăng ký" }).click();
+    await page.getByLabel("Họ và tên").fill("Nhan Vien Test");
+    await page.getByLabel("Email", { exact: true }).fill(email);
+    await page.getByLabel(/Mật khẩu/).fill(password);
+    await page.getByRole("button", { name: "Tạo tài khoản" }).click();
+    await expect(page.getByRole("heading", { name: /Xin chào/ })).toBeVisible({ timeout: 10_000 });
+
+    // Admin cấp role staff qua API
+    await page.context().clearCookies();
+    await adminLogin(page);
+    const origin = new URL(page.url()).origin;
+    const list = await page.request.get(`/api/admin/users?q=${encodeURIComponent(email)}`, {
+      headers: { Origin: origin },
+    });
+    expect(list.status()).toBe(200);
+    const staffId = (await list.json()).users[0]?.id as string | undefined;
+    expect(staffId).toBeTruthy();
+    const promote = await page.request.patch(`/api/admin/users/${staffId}`, {
+      headers: { Origin: origin },
+      data: { role: "staff" },
+    });
+    expect(promote.status()).toBe(200);
+
+    // Đăng nhập lại bằng staff
+    await page.context().clearCookies();
+    await page.goto("/account");
+    await page.getByLabel("Email", { exact: true }).fill(email);
+    await page.getByLabel(/Mật khẩu/).fill(password);
+    await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /Xin chào/ })).toBeVisible({ timeout: 10_000 });
+
+    // Vào được ops
+    await page.goto("/admin/orders");
+    await expect(page.getByRole("heading", { name: "Quản Trị Đơn Hàng" })).toBeVisible({ timeout: 10_000 });
+    await page.goto("/admin/stock");
+    await expect(page.getByRole("heading", { name: "Quản Trị Kho Hàng" })).toBeVisible({ timeout: 10_000 });
+
+    // Bị chặn trang admin-only + sidebar không có link
+    await page.goto("/admin/products");
+    await expect(page).toHaveURL(/\/account/);
+    await page.goto("/admin");
+    const nav = page.getByRole("navigation", { name: "Điều hướng admin" });
+    await expect(nav.getByRole("link", { name: /Sản phẩm/ })).toHaveCount(0);
+    await expect(nav.getByRole("link", { name: /Đơn hàng/ })).toBeVisible();
+  });
 });

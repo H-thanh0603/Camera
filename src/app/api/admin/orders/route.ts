@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 import type { Prisma } from "@/generated/prisma/client";
 
 /** GET /api/admin/orders — đơn mới nhất trước (?status=&page=&pageSize=). */
@@ -8,7 +8,7 @@ import type { Prisma } from "@/generated/prisma/client";
 const VALID_STATUS = ["pending", "paid", "processing", "shipped", "delivered", "cancelled", "refunded"];
 
 export async function GET(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
 
   const params = request.nextUrl.searchParams;

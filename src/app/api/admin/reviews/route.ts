@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 
 /** GET /api/admin/reviews — danh sách review kèm tên sản phẩm (?status=pending|approved|all). */
 
 export async function GET(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
 
   const status = request.nextUrl.searchParams.get("status") ?? "pending";

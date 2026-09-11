@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 import { getSessionUser } from "@/lib/server/session";
 import { logAudit } from "@/lib/server/audit";
 
@@ -15,7 +15,7 @@ import { logAudit } from "@/lib/server/audit";
 const MODES = ["in", "out", "set"] as const;
 
 export async function GET(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
   const params = request.nextUrl.searchParams;
   const productId = params.get("productId")?.trim() || undefined;
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
   let body: Record<string, unknown>;
   try {

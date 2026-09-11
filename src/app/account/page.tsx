@@ -229,7 +229,7 @@ export default function AccountPage() {
           <h1 className="font-headline-lg text-headline-lg text-on-surface">Xin chào, {user.name}</h1>
         </div>
         <div className="flex items-center gap-space-sm">
-          {user.role === "admin" && (
+          {(user.role === "admin" || user.role === "staff") && (
             <Link href="/admin" className="rounded-lg bg-primary px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary transition-colors hover:bg-primary-fixed-dim">
               Quản trị hệ thống
             </Link>

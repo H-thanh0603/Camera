@@ -4,7 +4,7 @@ import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { prisma } from "@/lib/server/prisma";
 import { zodFieldErrors } from "@/lib/schemas";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 
 /**
  * POST /api/trade-in — form thu cũ đổi mới (public, 3/phút/IP).
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
   const status = request.nextUrl.searchParams.get("status") ?? "";
   const leads = await prisma.tradeInLead.findMany({
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
   let body: { id?: string; status?: string };
   try {

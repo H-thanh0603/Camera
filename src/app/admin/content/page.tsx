@@ -1,9 +1,11 @@
+import { requireAdminPage } from "@/lib/server/admin";
 import { prisma } from "@/lib/server/prisma";
 import { ContentAdmin } from "@/components/admin/content-admin";
 
 export const metadata = { title: "Quản trị nội dung" };
 
 export default async function AdminContentPage() {
+  await requireAdminPage();
   const [rows, settingsRows] = await Promise.all([
     prisma.article.findMany({ orderBy: { date: "desc" } }),
     prisma.siteSetting.findMany(),

@@ -6,13 +6,13 @@ import { logAudit } from "@/lib/server/audit";
 import { zodFieldErrors } from "@/lib/schemas";
 
 /**
- * PATCH /api/admin/users/:id — đổi role (customer|admin), khóa/mở khóa.
+ * PATCH /api/admin/users/:id — đổi role (customer|staff|admin), khóa/mở khóa.
  * DELETE — xóa tài khoản (orders/reviews giữ lại, userId set null).
  * Không tự sửa chính mình; luôn giữ ít nhất 1 admin.
  */
 
 const updateSchema = z.object({
-  role: z.enum(["customer", "admin"]).optional(),
+  role: z.enum(["customer", "staff", "admin"]).optional(),
   isBanned: z.boolean().optional(),
 });
 
@@ -47,8 +47,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target) return NextResponse.json({ error: "Không tìm thấy tài khoản." }, { status: 404 });
 
-  // Hạ cấp admin cuối cùng → chặn
-  if (target.role === "admin" && parsed.data.role === "customer") {
+  // Hạ cấp admin cuối cùng (sang staff hay customer đều chặn)
+  if (target.role === "admin" && parsed.data.role && parsed.data.role !== "admin") {
     const adminCount = await prisma.user.count({ where: { role: "admin" } });
     if (adminCount <= 1) {
       return NextResponse.json({ error: "Phải giữ ít nhất 1 tài khoản admin." }, { status: 409 });

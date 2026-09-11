@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CATALOG_TAG } from "@/lib/server/product-db";
 import { prisma } from "@/lib/server/prisma";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { recalcProductRating } from "@/lib/server/ratings";
@@ -15,7 +15,7 @@ import { grantPhotoReviewReward } from "@/lib/server/review-reward";
  */
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
 
   const { id } = await params;
@@ -46,7 +46,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
 
   const { id } = await params;

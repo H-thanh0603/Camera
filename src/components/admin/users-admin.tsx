@@ -98,20 +98,24 @@ export function UsersAdmin() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-space-xs">
-                <span className={cn("rounded-lg px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs uppercase", u.role === "admin" ? "bg-primary/20 text-primary" : "bg-surface-container-high text-on-surface-variant")}>
-                  {u.role === "admin" ? "Admin" : "Khách"}
-                </span>
+                <label className="sr-only" htmlFor={`role-${u.id}`}>Vai trò của {u.email}</label>
+                <select
+                  id={`role-${u.id}`}
+                  value={u.role}
+                  disabled={busyId === u.id}
+                  onChange={(e) => act.mutate({ id: u.id, body: { role: e.target.value } })}
+                  className={cn(
+                    "rounded-lg px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs uppercase outline-none",
+                    u.role === "admin" ? "bg-primary/20 text-primary" : u.role === "staff" ? "bg-tertiary-container/30 text-tertiary" : "bg-surface-container-high text-on-surface-variant",
+                  )}
+                >
+                  <option value="customer">Khách</option>
+                  <option value="staff">Nhân viên</option>
+                  <option value="admin">Admin</option>
+                </select>
                 {u.isBanned && (
                   <span className="rounded-lg bg-error-container/30 px-space-xs py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-error">Bị khóa</span>
                 )}
-                <button
-                  type="button"
-                  disabled={busyId === u.id}
-                  onClick={() => act.mutate({ id: u.id, body: { role: u.role === "admin" ? "customer" : "admin" } })}
-                  className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface hover:bg-surface-container-highest"
-                >
-                  {u.role === "admin" ? "Hạ quyền" : "Cấp admin"}
-                </button>
                 <button
                   type="button"
                   disabled={busyId === u.id}

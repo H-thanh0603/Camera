@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { isCarrier, isTrackingCode } from "@/lib/server/shipping";
@@ -38,7 +38,7 @@ const FORWARD: Partial<Record<OrderStatus, OrderStatus[]>> = {
 const RESTOCKABLE: OrderStatus[] = ["pending", "paid", "processing"];
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
 
   const { id } = await params;

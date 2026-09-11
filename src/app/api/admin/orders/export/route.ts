@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { adminGuardResponse } from "@/lib/server/admin";
+import { staffGuardResponse } from "@/lib/server/admin";
 
 /**
  * GET /api/admin/orders/export?status=&from=&to= — xuất báo cáo đơn CSV.
@@ -16,7 +16,7 @@ function csvCell(value: string | number): string {
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await adminGuardResponse();
+  const denied = await staffGuardResponse();
   if (denied) return denied;
   const params = request.nextUrl.searchParams;
   const status = params.get("status")?.trim();

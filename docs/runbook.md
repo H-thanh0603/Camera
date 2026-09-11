@@ -137,6 +137,13 @@
 - [ ] Sentry nhận event thử, uptime monitor xanh
 - [ ] `npm run check:bundle` xanh, E2E xanh
 
+## 7b. Ma trận phân quyền (customer | staff | admin)
+
+- staff: Đơn hàng (xem/sửa/Xuất CSV), Kho hàng, Thu cũ, Kiểm duyệt review.
+- admin-only: Sản phẩm, Mã giảm giá, Nội dung, Tài khoản/role, Upload,
+  Refund VNPay, hàng đợi mail. Hạ admin cuối + tự sửa mình đều bị chặn.
+- Sidebar /admin tự ẩn mục ngoài quyền; trang admin-only redirect /account.
+
 ## 8. Migration roadmap (khi cần scale)
 
 | Phase | Trigger | Doc | Effort |
