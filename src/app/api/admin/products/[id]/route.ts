@@ -33,7 +33,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const stockReason = String(body.stockReason ?? "").slice(0, 200);
     const actor = await getSessionUser();
 
-    const before = await prisma.product.findUnique({ where: { id }, select: { stock: true } });
+    const before = await prisma.product.findUnique({
+      where: { id },
+      select: { stock: true, variants: { select: { id: true, stock: true } } },
+    });
     if (!before) return NextResponse.json({ error: "Không tìm thấy sản phẩm." }, { status: 404 });
 
     const row = await prisma.product.update({
@@ -60,6 +63,48 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
       });
     }
+    // Sổ kho variant: so tồn cũ/mới theo id (thêm/xóa/sửa đều ghi)
+    const beforeVariants = new Map(before.variants.map((v) => [v.id, v.stock]));
+    const variantMoves = [];
+    for (const v of row.variants) {
+      const old = beforeVariants.get(v.id);
+      if (old === undefined) {
+        if (v.stock > 0) {
+          variantMoves.push({
+            productId: id,
+            variantId: v.id,
+            type: "in",
+            quantity: v.stock,
+            balanceAfter: v.stock,
+            reason: `Thêm variant ${v.sku}`,
+            createdBy: actor?.id ?? null,
+          });
+        }
+      } else if (old !== v.stock) {
+        variantMoves.push({
+          productId: id,
+          variantId: v.id,
+          type: "adjust",
+          quantity: v.stock - old,
+          balanceAfter: v.stock,
+          reason: stockReason || "Admin chỉnh tồn variant",
+          createdBy: actor?.id ?? null,
+        });
+      }
+      beforeVariants.delete(v.id);
+    }
+    for (const [goneId, goneStock] of beforeVariants) {
+      variantMoves.push({
+        productId: id,
+        variantId: goneId,
+        type: "adjust",
+        quantity: -goneStock,
+        balanceAfter: 0,
+        reason: "Xóa variant",
+        createdBy: actor?.id ?? null,
+      });
+    }
+    if (variantMoves.length > 0) await prisma.stockMovement.createMany({ data: variantMoves });
     revalidatePath("/", "layout");
     revalidateTag(CATALOG_TAG, "max");
     await logAudit(await getSessionUser(), "product.update", "product", row.id, { name: row.name, price: row.price });
