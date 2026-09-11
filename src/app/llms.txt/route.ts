@@ -24,6 +24,7 @@ export async function GET() {
     "## Catalogue API (machine-readable)",
     "",
     `- Catalogue JSON: ${siteUrl}/api/catalog`,
+    `- Catalogue phân trang: ${siteUrl}/api/catalog?page=2&pageSize=100 (tối đa 200/trang)`,
     `- Tìm kiếm + phân trang: ${siteUrl}/api/products?q=&brand=&category=&sort=&page=`,
     `- Sitemap: ${siteUrl}/sitemap.xml`,
     "",
