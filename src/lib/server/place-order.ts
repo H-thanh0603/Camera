@@ -294,6 +294,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
           shipping.companyName && shipping.taxCode
             ? { companyName: shipping.companyName, taxCode: shipping.taxCode }
             : null,
+          finalLines.map((l) => ({ name: l.name, variantName: l.variantName, quantity: l.quantity, unitPrice: l.unitPrice })),
         ),
       },
       tx,
