@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <div className="flex w-full flex-col text-on-surface select-none">
+    <div className="flex w-full flex-col text-on-surface">
       <HeroHud />
       <LensAnatomy />
       <CollectionGrid />

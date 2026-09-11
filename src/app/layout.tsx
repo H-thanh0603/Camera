@@ -50,6 +50,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://lh3.googleusercontent.com" />
       </head>
       <body className="bg-background font-body-md text-on-surface antialiased">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:font-semibold focus:text-black focus:outline-none"
+        >
+          Bỏ qua tới nội dung chính
+        </a>
         <StoreProvider>
           <QueryProvider>
           <Header />
