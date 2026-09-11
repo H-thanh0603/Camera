@@ -25,6 +25,7 @@ function toDraft(p?: Product): Draft {
     subcategory: p?.subcategory ?? "",
     price: String(p?.price ?? ""),
     compareAtPrice: p?.compareAtPrice ? String(p.compareAtPrice) : "",
+    saleEndsAt: parseSaleEndsAtToInput(p?.saleEndsAt),
     stock: String(p?.stock ?? 0),
     availability: p?.availability ?? "in_stock",
     monthlyFrom: p?.monthlyFrom ? String(p.monthlyFrom) : "",
@@ -39,6 +40,14 @@ function toDraft(p?: Product): Draft {
     badges: (p?.badges ?? []).join(", "),
     variants: p?.variants ? JSON.stringify(p.variants, null, 2) : "[]",
   };
+}
+
+function parseSaleEndsAtToInput(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function parseJSONField(raw: string, field: string, errors: Record<string, string>): unknown {
@@ -136,6 +145,7 @@ export function ProductsAdmin({ initialProducts }: { initialProducts: Product[] 
         subcategory: draft.subcategory,
         price: Number(draft.price),
         compareAtPrice: draft.compareAtPrice ? Number(draft.compareAtPrice) : null,
+        saleEndsAt: draft.saleEndsAt || null,
         stock: Number(draft.stock),
         availability: draft.availability,
         monthlyFrom: draft.monthlyFrom ? Number(draft.monthlyFrom) : null,
@@ -259,6 +269,7 @@ export function ProductsAdmin({ initialProducts }: { initialProducts: Product[] 
             {field("Phân loại phụ", "subcategory")}
             {field("Giá (₫)", "price", { type: "number" })}
             {field("Giá trước giảm (₫)", "compareAtPrice", { type: "number" })}
+            {field("KM đến ngày", "saleEndsAt", { type: "datetime-local" })}
             {field("Tồn kho", "stock", { type: "number" })}
             <div className="flex flex-col gap-space-2xs">
               <label htmlFor="f-availability" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Tình trạng</label>

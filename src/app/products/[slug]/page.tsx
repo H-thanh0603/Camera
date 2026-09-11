@@ -80,6 +80,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   // Product + Breadcrumb structured data (SEO)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn";
+  // priceValidUntil chỉ emit khi có giá sale + ngày KM còn hiệu lực (tránh structured data giả).
+  // So sánh chuỗi ISO (cùng định dạng nên thứ tự từ điển = thứ tự thời gian).
+  const nowIso = new Date().toISOString();
+  const priceValidUntil =
+    product.compareAtPrice && product.saleEndsAt && product.saleEndsAt > nowIso
+      ? product.saleEndsAt.slice(0, 10)
+      : undefined;
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -100,6 +107,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       url: `${siteUrl}/products/${product.slug}`,
       priceCurrency: product.currency,
       price: product.price,
+      ...(priceValidUntil ? { priceValidUntil } : {}),
       itemCondition: "https://schema.org/NewCondition",
       availability:
         product.availability === "in_stock" || product.availability === "low_stock"

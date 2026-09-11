@@ -27,6 +27,9 @@ export function validateProductPayload(body: Record<string, unknown>): Validated
   if (!Number.isInteger(price) || price <= 0) return { error: "Giá phải là số nguyên dương." };
   if (!sku) return { error: "SKU bắt buộc." };
 
+  const saleEndsAt = parseSaleEndsAt(body.saleEndsAt);
+  if (saleEndsAt === "invalid") return { error: "Ngày kết thúc KM không hợp lệ." };
+
   const data: Record<string, unknown> = {
     name,
     slug,
@@ -39,6 +42,7 @@ export function validateProductPayload(body: Record<string, unknown>): Validated
       String(body.shortDescription ?? "").trim() || String(body.description ?? "").slice(0, 140),
     price,
     compareAtPrice: body.compareAtPrice ? Number(body.compareAtPrice) : null,
+    saleEndsAt: saleEndsAt ?? null,
     stock: Number.isInteger(Number(body.stock)) ? Number(body.stock) : 0,
     availability: AVAILABILITY.includes(String(body.availability)) ? String(body.availability) : "in_stock",
     rating: Math.min(5, Math.max(0, Number(body.rating) || 0)),
@@ -99,6 +103,17 @@ function sanitizeImage(input: unknown): Prisma.InputJsonValue {
     }
   }
   return Prisma.JsonNull as unknown as Prisma.InputJsonValue;
+}
+
+/**
+ * Ngày kết thúc KM: rỗng/null → null (không KM có hạn);
+ * chuỗi hợp lệ → Date; sai định dạng → "invalid".
+ * Không ép tương lai ở đây — PDP chỉ emit priceValidUntil khi ngày còn hiệu lực.
+ */
+function parseSaleEndsAt(input: unknown): Date | null | "invalid" {
+  if (input === undefined || input === null || String(input).trim() === "") return null;
+  const d = new Date(String(input));
+  return Number.isNaN(d.getTime()) ? "invalid" : d;
 }
 
 /** Whitelist JSON tự do của admin — chặn Stored-XSS/data-poisoning qua ảnh/spec/tags. */

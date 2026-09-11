@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeProductJson, validateVariants } from "@/lib/server/product-validation";
+import { sanitizeProductJson, validateProductPayload, validateVariants } from "@/lib/server/product-validation";
+
+const validPayload = {
+  name: "Lumina X-1",
+  slug: "lumina-x-1",
+  brand: "Lumina",
+  category: "camera",
+  price: 100_000_000,
+  sku: "LUM-X1",
+};
+
+describe("validateProductPayload saleEndsAt", () => {
+  it("rỗng → null (không KM có hạn)", () => {
+    const out = validateProductPayload({ ...validPayload });
+    expect(out.error).toBeUndefined();
+    expect(out.data?.saleEndsAt).toBeNull();
+  });
+
+  it("ngày hợp lệ → Date", () => {
+    const out = validateProductPayload({ ...validPayload, saleEndsAt: "2026-12-31T23:59" });
+    expect(out.error).toBeUndefined();
+    expect(out.data?.saleEndsAt).toBeInstanceOf(Date);
+  });
+
+  it("ngày sai định dạng → 422", () => {
+    const out = validateProductPayload({ ...validPayload, saleEndsAt: "không-phải-ngày" });
+    expect(out.error).toBe("Ngày kết thúc KM không hợp lệ.");
+  });
+});
 
 describe("sanitizeProductJson", () => {
   it("loại URL javascript:/data xấu, giữ https + relative", () => {

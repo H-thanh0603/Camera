@@ -33,6 +33,7 @@ export function dbProductToDomain(row: ProductRow, approvedReviews: ApprovedRevi
     shortDescription: row.shortDescription,
     price: row.price,
     compareAtPrice: row.compareAtPrice ?? undefined,
+    saleEndsAt: row.saleEndsAt ? row.saleEndsAt.toISOString() : undefined,
     currency: "VND",
     stock: row.stock,
     availability: row.availability as Product["availability"],

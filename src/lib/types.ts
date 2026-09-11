@@ -77,6 +77,8 @@ export interface Product {
   /** Giá cơ bản (variant rẻ nhất); variant có thể có giá riêng. */
   price: number;
   compareAtPrice?: number;
+  /** Ngày kết thúc KM (ISO) — Offer priceValidUntil chỉ emit khi có sale + ngày tương lai. */
+  saleEndsAt?: string;
   currency: Currency;
   stock: number;
   availability: Availability;
