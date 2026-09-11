@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, JetBrains_Mono, Syne } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/state/store";
 import { Header } from "@/components/layout/header";
 import { AnnouncementBar } from "@/components/layout/announcement-bar";
+import { ServiceWorkerRegister } from "@/components/layout/sw-register";
 import { Footer } from "@/components/layout/footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SearchOverlay } from "@/components/search/search-overlay";
@@ -34,6 +35,17 @@ export const metadata: Metadata = {
     description:
       "Không gian trưng bày và phân phối máy ảnh flagship, medium format, ống kính cine và phụ kiện cao cấp — kiểm chuẩn collimator, bảo hành 5 năm tận nơi.",
   },
+  appleWebApp: {
+    capable: true,
+    title: "LUMINA Optics",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#10141a",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -98,6 +110,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
           <AnnouncementBar />
           <Header />
+          <ServiceWorkerRegister />
           <main id="main" className="w-full bg-background pt-20 lg:pt-[125px]">
             {children}
           </main>

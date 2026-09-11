@@ -33,6 +33,22 @@ test.describe("Catalog & filter URL", () => {
   });
 });
 
+test.describe("PWA", () => {
+  test("manifest + icons tồn tại", async ({ request }) => {
+    const manifest = await request.get("/manifest.webmanifest");
+    expect(manifest.status()).toBe(200);
+    const body = await manifest.json();
+    expect(body.short_name).toBe("LUMINA");
+    expect(body.icons.length).toBeGreaterThanOrEqual(2);
+    for (const icon of body.icons) {
+      const res = await request.get(icon.src);
+      expect(res.status()).toBe(200);
+    }
+    const sw = await request.get("/sw.js");
+    expect(sw.status()).toBe(200);
+  });
+});
+
 test.describe("Catalog API machine-readable", () => {
   test("/api/catalog phân trang đúng + clamp pageSize", async ({ request }) => {
     const p1 = await request.get("/api/catalog?page=1&pageSize=5");
