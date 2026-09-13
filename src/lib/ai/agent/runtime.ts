@@ -39,6 +39,7 @@ export type AgentStreamEvent =
   | { type: "tool_call"; call: AIToolCall }
   | { type: "tool_result"; call: AIToolCall }
   | { type: "tool_error"; call: AIToolCall; message: string }
+  | { type: "usage"; usage: AIUsage }
   | { type: "max_iterations" }
   | { type: "done" }
   | { type: "error"; kind: string; message: string };
@@ -168,10 +169,11 @@ export class AgentRuntime {
       finished: false,
     };
   }
-/** Streaming run — yields text deltas + tool lifecycle events. */
+  /** Streaming run — yields text deltas + tool lifecycle events. */
   async *streamRun(messages: AIChatMessage[]): AsyncGenerator<AgentStreamEvent> {
     const msgs: AIChatMessage[] = [...messages];
     const maxIterations = this.cfg.maxIterations ?? 6;
+    let totalUsage: AIUsage | undefined;
     try {
       for (let i = 0; i < maxIterations; i++) {
         const t0 = Date.now();
@@ -187,6 +189,7 @@ export class AgentRuntime {
             usage = ev.usage;
           }
         }
+        totalUsage = sumUsage(totalUsage, usage);
         this.log("info", "agent.model_turn", {
           provider: this.provider.meta.provider,
           model: this.provider.meta.model,
@@ -197,6 +200,7 @@ export class AgentRuntime {
         });
 
         if (toolCalls.length === 0) {
+          if (totalUsage) yield { type: "usage", usage: totalUsage };
           yield { type: "done" };
           return;
         }
@@ -227,6 +231,7 @@ export class AgentRuntime {
           else yield { type: "tool_error", call, message: outcome.message };
         }
       }
+      if (totalUsage) yield { type: "usage", usage: totalUsage };
       yield { type: "max_iterations" };
     } catch (err) {
       if (isAIError(err)) {

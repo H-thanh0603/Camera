@@ -25,6 +25,7 @@ import {
   streamWithFallback,
   SHOPPING_ASSISTANT_SYSTEM_PROMPT,
 } from "@/lib/ai";
+import { getBudgetUsage, addBudgetUsage } from "@/lib/ai/budget";
 import { getDbCommerceSource } from "@/lib/ai/tools/db-source";
 
 export const runtime = "nodejs";
@@ -83,6 +84,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Kill-switch ngân sách: vượt cap tháng → chặn yêu cầu mới (stream đang chạy
+  // vẫn kết thúc bình thường).
+  const budget = await getBudgetUsage(config.monthlyTokenCap);
+  if (budget.blocked) {
+    logger.warn("agent.budget_exceeded", { route: "agent/chat", ip, used: budget.used, cap: config.monthlyTokenCap });
+    return NextResponse.json(
+      { error: "Trợ lý tạm ngừng do vượt hạn mức chi tiêu tháng. Vui lòng quay lại tháng sau." },
+      { status: 503 },
+    );
+  }
+  if (budget.capped && budget.usedPercent >= 80) {
+    logger.warn("agent.budget_near_limit", { route: "agent/chat", used: budget.used, cap: config.monthlyTokenCap, usedPercent: budget.usedPercent });
+  }
+
   const providers = buildProviderChain(config);
   if (providers.length === 0) {
     return NextResponse.json({ error: "Không có provider AI khả dụng." }, { status: 503 });
@@ -113,6 +128,7 @@ export async function POST(request: NextRequest) {
     async start(ctrl) {
       const enc = new TextEncoder();
       const push = (text: string) => ctrl.enqueue(enc.encode(text));
+      let requestTokens = 0;
       try {
         for await (const ev of streamWithFallback(
           {
@@ -137,6 +153,9 @@ export async function POST(request: NextRequest) {
             case "tool_error":
               push(sseLine({ type: "tool_error", name: ev.call.name, message: ev.message }));
               break;
+            case "usage":
+              requestTokens += ev.usage.totalTokens ?? (ev.usage.inputTokens ?? 0) + (ev.usage.outputTokens ?? 0);
+              break;
             case "max_iterations":
               push(sseLine({ type: "tool_error", name: "assistant", message: "Tôi cần thêm thông tin. Hãy hỏi cụ thể hơn." }));
               break;
@@ -149,7 +168,13 @@ export async function POST(request: NextRequest) {
           }
         }
         push(sseLine({ type: "done" }));
-        logger.info("agent.completed", { route: "agent/chat", requestId, ms: Date.now() - startedAt });
+        // Ghi nhận ngân sách sau khi request kết thúc — lỗi đếm không phá request.
+        if (requestTokens > 0) {
+          const total = await addBudgetUsage(requestTokens);
+          logger.info("agent.completed", { route: "agent/chat", requestId, ms: Date.now() - startedAt, requestTokens, monthTotalTokens: total });
+        } else {
+          logger.info("agent.completed", { route: "agent/chat", requestId, ms: Date.now() - startedAt, requestTokens });
+        }
       } catch (err) {
         const aborted = controller.signal.aborted;
         push(sseLine({ type: "error", message: aborted ? "Yêu cầu đã bị hủy." : "Có lỗi xảy ra với trợ lý. Vui lòng thử lại." }));

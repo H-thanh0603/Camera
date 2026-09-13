@@ -58,6 +58,8 @@ export interface AIConfig {
   /** Ordered fallback chain; first entry may be the primary itself. */
   fallbacks: AIProviderMeta[];
   maxIterations: number;
+  /** Cap token/tháng (AI_MONTHLY_TOKEN_CAP) — 0 = không giới hạn. */
+  monthlyTokenCap: number;
 }
 
 function readProviderMeta(provider: ProviderName, model: string, apiKey: string): { meta: AIProviderMeta; baseUrl?: string; key: string } {
@@ -129,6 +131,7 @@ export function getAIConfig(opts: BuildConfigOptions = {}): AIConfig {
       timeoutMs: Number(env.AI_TIMEOUT_MS || 30_000),
       fallbacks: parseFallbacks(env.AI_FALLBACKS),
       maxIterations: Number(env.AI_MAX_ITERATIONS || 6),
+      monthlyTokenCap: monthlyCap(env),
     };
   }
   const { meta, baseUrl } = readProviderMeta(provider, env.AI_MODEL || "", apiKey);
@@ -140,9 +143,16 @@ export function getAIConfig(opts: BuildConfigOptions = {}): AIConfig {
     baseUrl,
     capabilities: meta.capabilities,
     temperature: env.AI_TEMPERATURE ? Number(env.AI_TEMPERATURE) : undefined,
-    maxTokens: env.AI_MAX_TOKENS ? Number(env.AI_MAX_TOKENS) : undefined,
+    // Default 1024/turn: chặn một turn "viết văn" đốt token; override qua env.
+    maxTokens: env.AI_MAX_TOKENS ? Number(env.AI_MAX_TOKENS) : 1024,
     timeoutMs: Number(env.AI_TIMEOUT_MS || 30_000),
     fallbacks: parseFallbacks(env.AI_FALLBACKS),
     maxIterations: Number(env.AI_MAX_ITERATIONS || 6),
+    monthlyTokenCap: monthlyCap(env),
   };
+}
+
+function monthlyCap(env: NodeJS.ProcessEnv): number {
+  const raw = Number(env.AI_MONTHLY_TOKEN_CAP || 0);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
 }
