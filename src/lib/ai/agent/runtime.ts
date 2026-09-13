@@ -53,6 +53,14 @@ function sumUsage(a: AIUsage | undefined, b: AIUsage | undefined): AIUsage | und
   };
 }
 
+/** Mỗi model turn chỉ được thực thi tối đa 5 tool calls — chống model spam. */
+const MAX_TOOL_CALLS_PER_TURN = 5;
+
+function capToolCalls(calls: AIToolCall[]): { kept: AIToolCall[]; dropped: number } {
+  if (calls.length <= MAX_TOOL_CALLS_PER_TURN) return { kept: calls, dropped: 0 };
+  return { kept: calls.slice(0, MAX_TOOL_CALLS_PER_TURN), dropped: calls.length - MAX_TOOL_CALLS_PER_TURN };
+}
+
 export function userSafeError(e: AIError): string {
   switch (e.kind) {
     case "auth":
@@ -137,7 +145,21 @@ export class AgentRuntime {
         return { text: res.content, iterations: i + 1, usage, finished: true };
       }
       msgs.push({ role: "assistant", content: res.content || "", toolCalls: res.toolCalls });
-      await this.executeCalls(res.toolCalls, msgs);
+      const { kept, dropped } = capToolCalls(res.toolCalls);
+      if (dropped > 0) {
+        this.log("warn", "agent.tool_calls_capped", { requested: res.toolCalls.length, kept, dropped });
+        // Vẫn phải hồi đáp mọi toolCallId để protocol không đứt — phần bị bỏ
+        // nhận kết quả "bị giới hạn" thay vì dữ liệu thật.
+        for (const call of res.toolCalls.slice(MAX_TOOL_CALLS_PER_TURN)) {
+          msgs.push({
+            role: "tool",
+            toolCallId: call.id,
+            name: call.name,
+            content: "Đã đạt giới hạn số công cụ thực thi trong một lượt. Hãy thực hiện các bước còn lại ở lượt sau.",
+          });
+        }
+      }
+      await this.executeCalls(kept, msgs);
     }
     return {
       text: "Tôi cần thêm thông tin hoặc đã đạt giới hạn bước xử lý. Vui lòng hỏi cụ thể hơn.",
@@ -180,7 +202,19 @@ export class AgentRuntime {
         }
 
         msgs.push({ role: "assistant", content: textBuf || "", toolCalls });
-        for (const call of toolCalls) {
+        const { kept, dropped } = capToolCalls(toolCalls);
+        if (dropped > 0) {
+          this.log("warn", "agent.tool_calls_capped", { requested: toolCalls.length, kept: kept.length, dropped });
+          for (const call of toolCalls.slice(MAX_TOOL_CALLS_PER_TURN)) {
+            msgs.push({
+              role: "tool",
+              toolCallId: call.id,
+              name: call.name,
+              content: "Đã đạt giới hạn số công cụ thực thi trong một lượt. Hãy thực hiện các bước còn lại ở lượt sau.",
+            });
+          }
+        }
+        for (const call of kept) {
           yield { type: "tool_call", call };
           const outcome = await this.executor.dispatch(call.name, call.arguments, { requestId: this.cfg.requestId });
           msgs.push({

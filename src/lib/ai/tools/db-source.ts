@@ -41,14 +41,14 @@ export const dbCommerceSource: CommerceDataSource = {
   },
 
   async getProductsByIds(ids: string[]): Promise<Product[]> {
-    const slim = await dbGetProductsByIds(ids.slice(0, 8));
-    // Promote slim rows to full domain products for spec-rich comparisons.
-    const out: Product[] = [];
-    for (const s of slim) {
-      const full = await dbGetProductById(s.id);
-      if (full) out.push(full);
-    }
-    return out;
+    // 1 query instead of 1 + N sequential lookups per comparison.
+    const rows = await dbGetProductsByIds(ids.slice(0, 8));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    // Keep the caller's ordering; rows carry only ids from the request.
+    return ids
+      .slice(0, 8)
+      .map((id) => byId.get(id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p)) as Product[];
   },
 
   async getSimilar(seed: SimilarProductSeed, limit = 4): Promise<Product[]> {
@@ -56,8 +56,6 @@ export const dbCommerceSource: CommerceDataSource = {
   },
 
   async listCategories(): Promise<Category[]> {
-    const distinct = await dbQueryProducts({ pageSize: 1 });
-    void distinct;
     const rows = await import("@/lib/server/prisma").then((m) =>
       m.prisma.product.findMany({ select: { category: true }, distinct: ["category"] }),
     );

@@ -116,6 +116,19 @@ describe("AgentRuntime tool loop (không cần mạng)", () => {
     expect(events).toContainEqual({ type: "max_iterations" });
     expect(provider.requests).toHaveLength(2);
   });
+
+  it("cap 5 tool calls/turn — phần dư nhận outcome giới hạn, không thực thi", async () => {
+    const calls = Array.from({ length: 8 }, (_, i) => toolCall(`c${i}`, "echo_lookup", { q: `x${i}` }));
+    const provider = new MockAIProvider([{ content: "ok", toolCalls: calls }, { content: "xong" }]);
+    const runtime = new AgentRuntime(provider, executorWith(), { requestId: "t4", maxIterations: 4 });
+    const res = await runtime.run([...SYSTEM, { role: "user", content: "spam tools" }]);
+    expect(res.finished).toBe(true);
+    // Turn 2 chứa 8 tool results: 5 thật + 3 "đã đạt giới hạn".
+    const round2 = provider.requests[1]!.messages;
+    const toolMsgs = round2.filter((m) => m.role === "tool");
+    expect(toolMsgs).toHaveLength(8);
+    expect(toolMsgs.filter((m) => String(m.content).includes("giới hạn"))).toHaveLength(3);
+  });
 });
 
 describe("streamWithFallback", () => {

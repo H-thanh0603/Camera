@@ -57,9 +57,54 @@ export function fenceProduct(p: Product | SlimProduct): Record<string, unknown> 
   };
 }
 
+/**
+ * Shrink a JSON string on element boundaries so the model always receives
+ * well-formed JSON: drop trailing array elements / object keys until it fits.
+ */
+function shrinkJson(body: string, maxChars: number): string {
+  if (body.length <= maxChars) return body;
+  // Arrays: keep the longest prefix of complete elements.
+  if (body.startsWith("[") && body.endsWith("]")) {
+    const inner = body.slice(1, -1);
+    // Fast path for arrays of objects/strings.
+    const elements: string[] = [];
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let start = 0;
+    for (let i = 0; i <= inner.length; i++) {
+      const ch = inner[i] ?? ",";
+      if (esc) {
+        esc = false;
+        continue;
+      }
+      if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = !inStr;
+      else if (!inStr) {
+        if (ch === "{" || ch === "[") depth++;
+        else if (ch === "}" || ch === "]") depth--;
+        else if ((ch === "," || i === inner.length) && depth === 0) {
+          if (i === inner.length && start === i) break;
+          elements.push(inner.slice(start, i));
+          start = i + 1;
+        }
+      }
+    }
+    const out: string[] = [];
+    for (const el of elements) {
+      const candidate = `[${out.concat(el).join(",")}]`;
+      if (candidate.length + 20 > maxChars) break; // room for the truncation note
+      out.push(el);
+    }
+    if (out.length > 0) return `[${out.join(",")}]`;
+  }
+  return `${body.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
 /** Wrap data in explicit inert markers so the model clearly reads it as data. */
 export function fencedResult(label: string, value: unknown, maxChars = 6000): string {
   const body = JSON.stringify(value) ?? String(value);
-  const cut = body.length > maxChars ? `${body.slice(0, maxChars)}…` : body;
-  return `<${label}-data>\n${cut}\n</${label}-data>`;
+  const cut = shrinkJson(body, maxChars);
+  const note = cut.length < body.length ? `\n<!-- dữ liệu dài đã được rút gọn -->` : "";
+  return `<${label}-data>\n${cut}${note}\n</${label}-data>`;
 }
