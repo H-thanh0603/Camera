@@ -337,3 +337,13 @@ model Article {  // Bài journal — admin CRUD, public chỉ đọc published.
 
   @@index([published])
 }
+
+model AgentSession {  // Phiên chat trợ lý AI — history server-side, cookie raw id.
+  idHash    String   @id  // SHA-256 của cookie agent_sid (không lưu raw).
+  messages  Json     @default("[]")  // [{role, content, cards?}] — ≤40 tin, đã fence khi ghi.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime  // TTL 30 ngày, dọn dẹp bằng cron job dọn session cũ.
+
+  @@index([expiresAt])
+}

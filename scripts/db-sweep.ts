@@ -7,6 +7,7 @@
  * - TotpChallenge đã dùng/hết hạn (2FA, 5 phút TTL — không để phình).
  * - EmailOutbox đã gửi >30 ngày (giữ log vừa đủ truy vết).
  * - EmailOutbox dead (hết lượt) >90 ngày (giữ lâu để operator xử lý tay).
+ * - AgentSession hết hạn (chat trợ lý, TTL 30 ngày).
  * KHÔNG dọn: orders/reviews/audit/payment events (kế toán + pháp lý).
  */
 import { prisma } from "../src/lib/server/prisma";
@@ -17,7 +18,7 @@ const OUTBOX_MAX_ATTEMPTS = 5;
 
 async function main() {
   const expired = { lt: new Date() };
-  const [sessions, tokens, challenges, outboxSent, outboxDead] = await Promise.all([
+  const [sessions, tokens, challenges, outboxSent, outboxDead, agentSessions] = await Promise.all([
     prisma.session.deleteMany({ where: { expiresAt: expired } }),
     prisma.passwordResetToken.deleteMany({ where: { expiresAt: expired } }),
     prisma.totpChallenge.deleteMany({
@@ -29,6 +30,7 @@ async function main() {
     prisma.emailOutbox.deleteMany({
       where: { sentAt: null, attempts: { gte: OUTBOX_MAX_ATTEMPTS }, nextRunAt: { lt: daysAgo(90) } },
     }),
+    prisma.agentSession.deleteMany({ where: { expiresAt: expired } }),
   ]);
   console.log(
     JSON.stringify({
@@ -39,6 +41,7 @@ async function main() {
       challenges: challenges.count,
       outboxSent: outboxSent.count,
       outboxDead: outboxDead.count,
+      agentSessions: agentSessions.count,
       timestamp: new Date().toISOString(),
     }),
   );

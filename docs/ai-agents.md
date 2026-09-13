@@ -8,15 +8,17 @@ Anthropic**. Mọi model đều chạy qua `AIProvider`; đổi provider/model c
 
 ```text
 Frontend chat widget (components/agent/shopping-assistant.tsx)
-  │  POST /api/agent/chat (SSE, không API key)
+  │  POST /api/agent/chat (SSE, không API key) + bối cảnh trang/giỏ
   ▼
 Commerce Agent (src/lib/ai/agent/runtime.ts — độc lập provider)
   │  tool calls (Agent → ToolExecutor: failure ladder, zod validate)
+  │  show_products → event 'cards' → widget render card + nút mua
   ▼
-Commerce tools (search/details/compare/recommend/price/availability/categories/top)
+Commerce tools (search/details/compare/recommend/price/availability/categories/top/show)
   │  qua CommerceDataSource (seed | db) — tái dùng product-db + services có sẵn
   ▼
 AgentRuntime → AIProvider → Provider adapter → LLM
+History: cookie agent_sid (httpOnly) → AgentSession DB (SHA-256, TTL 30 ngày)
 ```
 
 Thư mục `src/lib/ai/`:
@@ -132,6 +134,10 @@ vấn, web lo checkout — đúng triết lý Commerce Agents "checkout handoff"
 - **History từ client được fence ở cả hai role** (user lẫn assistant) —
   client độc hại không thể nhúng chỉ thị giả vai "assistant" vào history;
   system prompt cũng khai báo history là dữ liệu client gửi, không tin cậy.
+- **History lưu server-side** (bảng `AgentSession`): cookie `agent_sid`
+  httpOnly, DB chỉ lưu SHA-256; nội dung fence trước khi ghi, ≤40 tin,
+  TTL 30 ngày (dọn bởi `scripts/db-sweep.ts`). Nút "hội thoại mới" gọi
+  `POST /api/agent/reset` xoá cả DB row lẫn cookie.
 - Tool JSON truncate theo phần tử mảng — model luôn nhận JSON parse được.
 - Validate args bằng zod; lỗi hệ thống trả generic (không lộ stack/internal).
 - Rate-limit 10 req/phút/IP; message ≤2000 ký tự; history ≤20 turns;

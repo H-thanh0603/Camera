@@ -13,10 +13,12 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { getClientIp } from "@/lib/server/client-ip";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { logger } from "@/lib/server/logger";
+import { AGENT_SID_COOKIE, getAgentHistory, newAgentSid, saveAgentHistory, type StoredChatMessage } from "@/lib/server/agent-session";
 import {
   getAIConfig,
   buildExecutor,
@@ -114,6 +116,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Không có provider AI khả dụng." }, { status: 503 });
   }
   const requestId = newRequestId();
+  // Session server-side: cookie agent_sid (httpOnly), DB lưu SHA-256.
+  const cookieStore = await cookies();
+  const existingSid = cookieStore.get(AGENT_SID_COOKIE)?.value;
+  const sid = existingSid ?? newAgentSid();
+  // History: session là nguồn chân lý; client gửi chỉ là fallback khi
+  // session chưa kịp ghi (request đầu tiên / DB vừa fail).
+  const sessionHistory = await getAgentHistory(existingSid);
+  const history = sessionHistory.length > 0 ? sessionHistory : (parsed.data.history ?? []);
+  if (sessionHistory.length > 0) logger.debug("agent.session_history_used", { route: "agent/chat", requestId, turns: sessionHistory.length });
+
   // Cap stream đồng thời/IP — mỗi stream giữ 1 connection + LLM call 120s.
   const MAX_CONCURRENT_STREAMS = Number(process.env.AI_MAX_CONCURRENT_STREAMS || 3);
   const slot = await acquireStream(ip, Number.isFinite(MAX_CONCURRENT_STREAMS) && MAX_CONCURRENT_STREAMS > 0 ? MAX_CONCURRENT_STREAMS : 3);
@@ -127,7 +139,7 @@ export async function POST(request: NextRequest) {
 
   const messages = buildChatMessages({
     message: parsed.data.message,
-    history: parsed.data.history,
+    history: history as { role: "user" | "assistant"; content: string }[],
     context: parsed.data.context as AgentPageContext | undefined,
     system: SHOPPING_ASSISTANT_SYSTEM_PROMPT,
   });
@@ -148,6 +160,7 @@ export async function POST(request: NextRequest) {
       const enc = new TextEncoder();
       const push = (text: string) => ctrl.enqueue(enc.encode(text));
       let requestTokens = 0;
+      let assistantText = "";
       try {
         for await (const ev of streamWithFallback(
           {
@@ -165,6 +178,7 @@ export async function POST(request: NextRequest) {
           switch (ev.type) {
             case "text":
               push(sseLine({ type: "text", text: ev.text }));
+              assistantText += ev.text;
               break;
             case "tool_call":
               push(sseLine({ type: "tool_call", name: ev.call.name }));
@@ -190,6 +204,17 @@ export async function POST(request: NextRequest) {
           }
         }
         push(sseLine({ type: "done" }));
+        // Lưu history server-side sau khi stream xong: session cũ + tin mới.
+        const userMsg: StoredChatMessage = { role: "user", content: parsed.data.message };
+        const assistantMsg: StoredChatMessage | null = assistantText.trim()
+          ? { role: "assistant", content: assistantText }
+          : null;
+        const nextHistory: StoredChatMessage[] = [
+          ...history.map((h: { role: "user" | "assistant"; content: string }): StoredChatMessage => ({ role: h.role, content: h.content })),
+          userMsg,
+          ...(assistantMsg ? [assistantMsg] : []),
+        ].slice(-40);
+        await saveAgentHistory(sid, nextHistory);
         // Ghi nhận ngân sách sau khi request kết thúc — lỗi đếm không phá request.
         if (requestTokens > 0) {
           const total = await addBudgetUsage(requestTokens);
@@ -219,6 +244,8 @@ export async function POST(request: NextRequest) {
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Request-Id": requestId,
+      // Session cookie chỉ set khi mới sinh; httpOnly + lax + 30 ngày.
+      ...(existingSid ? {} : { "Set-Cookie": `${AGENT_SID_COOKIE}=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${30 * 86_400}${process.env.NODE_ENV === "production" ? "; Secure" : ""}` }),
     },
   });
 }

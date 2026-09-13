@@ -342,6 +342,8 @@ export function ShoppingAssistant() {
                 } catch {
                   /* best-effort */
                 }
+                // Xoá cả phiên server-side để history không quay lại ở tin sau.
+                void fetch("/api/agent/reset", { method: "POST" }).catch(() => undefined);
               }}
               disabled={busy || messages.length === 0}
               aria-label="Bắt đầu hội thoại mới"
