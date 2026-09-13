@@ -6,6 +6,10 @@ import { cn } from "@/lib/utils/format";
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
+  /** requestId của /api/agent/chat đã sinh câu trả lời này (nút 👍👎 dùng). */
+  requestId?: string;
+  /** Trạng thái feedback người dùng đã bấm cho câu trả lời này. */
+  feedback?: "up" | "down";
 }
 
 const QUICK_PROMPTS = [
@@ -97,14 +101,29 @@ export function ShoppingAssistant() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const updateAssistant = (fn: (prev: string) => string) => {
+  const updateAssistant = (fn: (prev: string) => string, requestId?: string) => {
     setMessages((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1]!;
       if (last.role !== "assistant") return prev;
-      return [...prev.slice(0, -1), { ...last, content: fn(last.content) }];
+      return [...prev.slice(0, -1), { ...last, content: fn(last.content), requestId: requestId ?? last.requestId }];
     });
   };
+
+  async function sendFeedback(index: number, rating: "up" | "down") {
+    const msg = messages[index];
+    if (!msg || msg.role !== "assistant" || !msg.requestId || msg.feedback === rating) return;
+    setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, feedback: rating } : m)));
+    try {
+      await fetch("/api/agent/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating, requestId: msg.requestId, snippet: msg.content.slice(0, 280) }),
+      });
+    } catch {
+      // Feedback là best-effort — không báo lỗi cho người dùng
+    }
+  }
 
   async function send(raw: string) {
     const text = raw.trim();
@@ -126,14 +145,15 @@ export function ShoppingAssistant() {
         body: JSON.stringify({ message: text, history }),
         signal: controller.signal,
       });
+      const responseId = res.headers.get("X-Request-Id") ?? undefined;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        updateAssistant(() => (data as { error?: string }).error ?? "Có lỗi xảy ra. Vui lòng thử lại.");
+        updateAssistant((prev) => (data as { error?: string }).error ?? "Có lỗi xảy ra. Vui lòng thử lại.", responseId);
         setFailed(res.status === 503);
         return;
       }
       if (!res.body) {
-        updateAssistant(() => "Không nhận được phản hồi. Vui lòng thử lại.");
+        updateAssistant(() => "Không nhận được phản hồi. Vui lòng thử lại.", responseId);
         return;
       }
       const reader = res.body.getReader();
@@ -249,11 +269,41 @@ export function ShoppingAssistant() {
               <div
                 key={i}
                 className={cn(
-                  "max-w-[90%] whitespace-pre-wrap rounded-xl px-space-sm py-space-xs font-body-sm text-body-sm",
+                  "flex max-w-[90%] flex-col gap-space-2xs rounded-xl px-space-sm py-space-xs font-body-sm text-body-sm",
                   m.role === "user" ? "self-end bg-primary text-on-primary" : "self-start bg-surface-container-high text-on-surface",
                 )}
               >
-                {m.content || (busy && i === messages.length - 1 ? "…" : "")}
+                <div className="whitespace-pre-wrap">{m.content || (busy && i === messages.length - 1 ? "…" : "")}</div>
+                {m.role === "assistant" && m.content && m.requestId && !busy && (
+                  <div className="flex items-center justify-end gap-space-2xs">
+                    <button
+                      type="button"
+                      onClick={() => void sendFeedback(i, "up")}
+                      disabled={m.feedback === "down"}
+                      aria-label="Câu trả lời hữu ích"
+                      title="Câu trả lời hữu ích"
+                      className={cn(
+                        "rounded-md p-1 text-[16px] transition-colors",
+                        m.feedback === "up" ? "bg-primary/20 text-primary" : "text-on-surface-variant hover:bg-surface-container-highest",
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">thumb_up</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void sendFeedback(i, "down")}
+                      disabled={m.feedback === "up"}
+                      aria-label="Câu trả lời chưa tốt"
+                      title="Câu trả lời chưa tốt"
+                      className={cn(
+                        "rounded-md p-1 transition-colors",
+                        m.feedback === "down" ? "bg-error/20 text-error" : "text-on-surface-variant hover:bg-surface-container-highest",
+                      )}
+                    >
+                      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">thumb_down</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {status && (

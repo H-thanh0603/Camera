@@ -109,7 +109,9 @@ export class AgentRuntime {
     for (const call of calls) {
       const t0 = Date.now();
       const outcome = await this.executor.dispatch(call.name, call.arguments, ctx);
-      this.log("debug", "tool.dispatch", {
+      // info (không phải debug): khi điều tra sự cố prod cần thấy tool nào
+      // chạy, thành/bại và mất bao lâu mà không phải hạ log level.
+      this.log("info", "tool.dispatch", {
         tool: call.name,
         ok: outcome.ok,
         kind: outcome.ok ? undefined : outcome.kind,
