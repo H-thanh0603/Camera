@@ -26,6 +26,7 @@ import {
   SHOPPING_ASSISTANT_SYSTEM_PROMPT,
 } from "@/lib/ai";
 import { getBudgetUsage, addBudgetUsage } from "@/lib/ai/budget";
+import { acquireStream } from "@/lib/ai/concurrency";
 import { getDbCommerceSource } from "@/lib/ai/tools/db-source";
 
 export const runtime = "nodejs";
@@ -103,6 +104,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Không có provider AI khả dụng." }, { status: 503 });
   }
   const requestId = newRequestId();
+  // Cap stream đồng thời/IP — mỗi stream giữ 1 connection + LLM call 120s.
+  const MAX_CONCURRENT_STREAMS = Number(process.env.AI_MAX_CONCURRENT_STREAMS || 3);
+  const slot = await acquireStream(ip, Number.isFinite(MAX_CONCURRENT_STREAMS) && MAX_CONCURRENT_STREAMS > 0 ? MAX_CONCURRENT_STREAMS : 3);
+  if (!slot.allowed) {
+    logger.warn("agent.stream_limit", { route: "agent/chat", ip, active: slot.active, max: MAX_CONCURRENT_STREAMS });
+    return NextResponse.json({ error: "Bạn đang mở quá nhiều hội thoại cùng lúc. Vui lòng đợi các phiên kia kết thúc." }, { status: 429 });
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   request.signal.addEventListener("abort", () => controller.abort());
@@ -182,10 +190,12 @@ export async function POST(request: NextRequest) {
       } finally {
         clearTimeout(timeout);
         ctrl.close();
+        await slot.release();
       }
     },
-    cancel() {
+    async cancel() {
       controller.abort();
+      await slot.release();
     },
   });
 
