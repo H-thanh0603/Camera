@@ -55,3 +55,7 @@ prisma/dev.db-journal
 
 # Prisma 7 client sinh ra (postinstall `prisma generate` tạo lại)
 src/generated/
+
+# SQLite DB gốc do prisma migrate dev sinh ở root (khi chạy từ repo root)
+/dev.db
+/dev.db-journal
