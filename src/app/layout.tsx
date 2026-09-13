@@ -8,6 +8,7 @@ import { ServiceWorkerRegister } from "@/components/layout/sw-register";
 import { Footer } from "@/components/layout/footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SearchOverlay } from "@/components/search/search-overlay";
+import { ShoppingAssistant } from "@/components/agent/shopping-assistant";
 import { Toaster } from "@/components/ui/toaster";
 import { WebVitalsReporter } from "@/components/analytics/web-vitals";
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -117,6 +118,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <CartDrawer />
           <SearchOverlay />
+          <ShoppingAssistant />
           <Toaster />
           <WebVitalsReporter />
           </QueryProvider>
