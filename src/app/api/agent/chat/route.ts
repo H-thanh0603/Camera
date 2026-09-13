@@ -169,6 +169,9 @@ export async function POST(request: NextRequest) {
             case "tool_call":
               push(sseLine({ type: "tool_call", name: ev.call.name }));
               break;
+            case "cards":
+              push(sseLine({ type: "cards", cards: ev.cards }));
+              break;
             case "tool_error":
               push(sseLine({ type: "tool_error", name: ev.call.name, message: ev.message }));
               break;

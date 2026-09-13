@@ -1,12 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils/format";
+import { cn, formatVND } from "@/lib/utils/format";
 import { useStore } from "@/state/store";
+
+interface ProductCard {
+  id: string;
+  slug: string;
+  name: string;
+  brand: string;
+  thumbnailUrl: string;
+  thumbnailAlt: string;
+  priceVND: number;
+  compareAtPriceVND?: number;
+  availability: string;
+  stock: number;
+  rating: number;
+  reviewCount: number;
+}
 
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
+  /** Card sản phẩm agent đã hiển thị kèm câu trả lời này. */
+  cards?: ProductCard[];
   /** requestId của /api/agent/chat đã sinh câu trả lời này (nút 👍👎 dùng). */
   requestId?: string;
   /** Trạng thái feedback người dùng đã bấm cho câu trả lời này. */
@@ -21,15 +38,22 @@ const QUICK_PROMPTS = [
 ] as const;
 
 interface StreamEvent {
-  type: "text" | "tool_call" | "tool_error" | "error" | "done";
+  type: "text" | "tool_call" | "tool_error" | "error" | "done" | "cards";
   text?: string;
   name?: string;
   message?: string;
+  cards?: ProductCard[];
 }
 
 const STORAGE_KEY = "lumina.assistant.chat.v1";
 /** Đủ 20 lượt hội thoại — trùng giới hạn history mà server chấp nhận. */
 const MAX_STORED_MESSAGES = 40;
+
+function isProductCard(c: unknown): c is ProductCard {
+  if (!c || typeof c !== "object") return false;
+  const v = c as Record<string, unknown>;
+  return typeof v.id === "string" && typeof v.slug === "string" && typeof v.name === "string" && typeof v.thumbnailUrl === "string" && typeof v.priceVND === "number";
+}
 
 function loadStoredMessages(): ChatMsg[] {
   try {
@@ -39,6 +63,7 @@ function loadStoredMessages(): ChatMsg[] {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map((m) => ({ ...m, cards: Array.isArray(m.cards) ? m.cards.filter(isProductCard).slice(0, 6) : undefined }))
       .slice(-MAX_STORED_MESSAGES);
   } catch {
     return [];
@@ -78,8 +103,73 @@ function buildPageContext(cartCount: number, cartTotal: number): Record<string, 
   return ctx;
 }
 
+const AVAILABILITY_LABEL: Record<string, string> = {
+  in_stock: "Còn hàng",
+  low_stock: "Sắp hết",
+  pre_order: "Đặt trước",
+  out_of_stock: "Hết hàng",
+  contact: "Liên hệ",
+};
+
+function AgentProductCard({ card, onAdd }: { card: ProductCard; onAdd: (card: ProductCard) => void }) {
+  return (
+    <div className="flex items-center gap-space-sm rounded-xl bg-surface-container p-space-2xs ring-1 ring-outline/10">
+      {/* Ảnh thumbnail từ DB catalogue — widget ngoài layout, không cần image optimizer */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={card.thumbnailUrl} alt={card.thumbnailAlt} width={64} height={64} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+      <div className="min-w-0 flex-1">
+        <a href={`/products/${card.slug}`} className="block truncate font-label-md text-label-md text-on-surface hover:text-primary">
+          {card.name}
+        </a>
+        <p className="font-telemetry-xs text-telemetry-xs text-on-surface-variant">
+          {card.brand} · {AVAILABILITY_LABEL[card.availability] ?? card.availability} · ★ {card.rating.toFixed(1)} ({card.reviewCount})
+        </p>
+        <p className="font-label-md text-label-md text-on-surface">
+          {formatVND(card.priceVND)}
+          {card.compareAtPriceVND != null && card.compareAtPriceVND > card.priceVND && (
+            <span className="ml-space-2xs font-body-xs text-body-xs text-outline line-through">{formatVND(card.compareAtPriceVND)}</span>
+          )}
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-col gap-space-2xs">
+        <a
+          href={`/products/${card.slug}`}
+          className="rounded-lg bg-surface-container-highest px-space-2xs py-space-2xs font-label-sm text-label-sm text-on-surface transition-colors hover:bg-outline/20"
+        >
+          Xem
+        </a>
+        {(card.availability === "in_stock" || card.availability === "low_stock") && card.stock > 0 && (
+          <button
+            type="button"
+            onClick={() => onAdd(card)}
+            className="rounded-lg bg-primary px-space-2xs py-space-2xs font-label-sm text-label-sm text-on-primary transition-opacity hover:opacity-90"
+          >
+            Thêm giỏ
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ShoppingAssistant() {
   const { cart, addToCart } = useStore();
+
+  /** Bấm "Thêm giỏ" trên card: resolve product tươi từ DB rồi thêm qua store. */
+  async function addCardToCart(card: ProductCard) {
+    try {
+      const { apiResolveProducts } = await import("@/lib/api-client");
+      await apiResolveProducts([card.id]);
+      const { getProductById } = await import("@/lib/repositories/product-repository");
+      const product = getProductById(card.id);
+      if (!product) return;
+      addToCart(product);
+    } catch {
+      // Resolve fail thì đưa khách sang trang sản phẩm — fallback an toàn.
+      window.location.href = `/products/${card.slug}`;
+    }
+  }
+
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -167,7 +257,7 @@ export function ShoppingAssistant() {
       const responseId = res.headers.get("X-Request-Id") ?? undefined;
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        updateAssistant((prev) => (data as { error?: string }).error ?? "Có lỗi xảy ra. Vui lòng thử lại.", responseId);
+        updateAssistant(() => (data as { error?: string }).error ?? "Có lỗi xảy ra. Vui lòng thử lại.", responseId);
         setFailed(res.status === 503);
         return;
       }
@@ -192,6 +282,13 @@ export function ShoppingAssistant() {
             updateAssistant((prev) => prev + chunk);
           } else if (ev.type === "tool_call") {
             setStatus(ev.name === "compare_products" ? "Đang so sánh sản phẩm…" : ev.name === "recommend_products" ? "Đang gợi ý phù hợp…" : "Đang tra cứu sản phẩm…");
+          } else if (ev.type === "cards" && Array.isArray(ev.cards) && ev.cards.length > 0) {
+            // Gắn card vào tin assistant đang stream — render sau khi text xong.
+            const cards = ev.cards.filter(
+              (c): c is ProductCard =>
+                Boolean(c) && typeof c.id === "string" && typeof c.slug === "string" && typeof c.thumbnailUrl === "string",
+            );
+            if (cards.length > 0) setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, cards: [...(m.cards ?? []), ...cards] } : m)));
           } else if (ev.type === "tool_error" && ev.message) {
             updateAssistant((prev) => (prev ? `${prev}\n${ev.message}` : (ev.message as string)));
           } else if (ev.type === "error" && ev.message) {
@@ -293,6 +390,13 @@ export function ShoppingAssistant() {
                 )}
               >
                 <div className="whitespace-pre-wrap">{m.content || (busy && i === messages.length - 1 ? "…" : "")}</div>
+                {m.role === "assistant" && m.cards && m.cards.length > 0 && (
+                  <div className="flex flex-col gap-space-2xs">
+                    {m.cards.map((card) => (
+                      <AgentProductCard key={card.id} card={card} onAdd={(c) => void addCardToCart(c)} />
+                    ))}
+                  </div>
+                )}
                 {m.role === "assistant" && m.content && m.requestId && !busy && (
                   <div className="flex items-center justify-end gap-space-2xs">
                     <button

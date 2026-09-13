@@ -165,14 +165,16 @@ describe("streamWithFallback", () => {
   });
 });
 describe("commerce tools trên seed source", () => {
-  it("có đủ 8 tool thương mại cần thiết", async () => {
+  it("có đủ 9 tool thương mại cần thiết (gồm show_products)", async () => {
     const { seedCommerceSource } = await import("@/lib/ai/tools/seed-source");
     const { createCommerceTools } = await import("@/lib/ai/tools/commerce-tools");
     const { compareProductsTool, recommendProductsTool } = await import("@/lib/ai/tools/compare-recommend");
+    const { showProductsTool } = await import("@/lib/ai/tools/show-products");
     const ex = new ToolExecutor([
       ...createCommerceTools({ source: seedCommerceSource }),
       compareProductsTool(seedCommerceSource),
       recommendProductsTool(seedCommerceSource),
+      showProductsTool(seedCommerceSource),
     ]);
     expect(ex.names().sort()).toEqual(
       [
@@ -184,8 +186,59 @@ describe("commerce tools trên seed source", () => {
         "get_top_products",
         "compare_products",
         "recommend_products",
+        "show_products",
       ].sort(),
     );
+  });
+
+  it("show_products trả card payload từ sản phẩm thật", async () => {
+    const { seedCommerceSource } = await import("@/lib/ai/tools/seed-source");
+    const { showProductsTool } = await import("@/lib/ai/tools/show-products");
+    const ex = new ToolExecutor([showProductsTool(seedCommerceSource)]);
+    const seed = (await import("@/lib/repositories/product-repository")).queryProducts({ pageSize: 1 }).items[0]!;
+    const out = await ex.dispatch("show_products", { productRefs: [seed.slug] }, { requestId: "sp" });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      const v = out.value as { cards: Array<{ slug: string; thumbnailUrl: string; priceVND: number }> };
+      expect(v.cards).toHaveLength(1);
+      expect(v.cards[0]!.slug).toBe(seed.slug);
+      expect(v.cards[0]!.thumbnailUrl).toBe(seed.thumbnail.url);
+      expect(typeof v.cards[0]!.priceVND).toBe("number");
+    }
+  });
+
+  it("show_products bỏ ref không tồn tại, sai hết thì not_found", async () => {
+    const { seedCommerceSource } = await import("@/lib/ai/tools/seed-source");
+    const { showProductsTool } = await import("@/lib/ai/tools/show-products");
+    const ex = new ToolExecutor([showProductsTool(seedCommerceSource)]);
+    const seed = (await import("@/lib/repositories/product-repository")).queryProducts({ pageSize: 1 }).items[0]!;
+    const mixed = await ex.dispatch("show_products", { productRefs: [seed.slug, "khong-ton-tai"] }, { requestId: "sp" });
+    expect(mixed.ok).toBe(true);
+    if (mixed.ok) {
+      const v = mixed.value as { cards: unknown[]; missing: string };
+      expect(v.cards).toHaveLength(1);
+      expect(v.missing).toContain("khong-ton-tai");
+    }
+    const none = await ex.dispatch("show_products", { productRefs: ["a", "b"] }, { requestId: "sp" });
+    expect(none.ok).toBe(false);
+    if (!none.ok) expect(none.kind).toBe("not_found");
+  });
+
+  it("streamRun phát event cards khi show_products thành công", async () => {
+    const { seedCommerceSource } = await import("@/lib/ai/tools/seed-source");
+    const { buildExecutor } = await import("@/lib/ai");
+    const seed = (await import("@/lib/repositories/product-repository")).queryProducts({ pageSize: 1 }).items[0]!;
+    const provider = new MockAIProvider([
+      { toolCalls: [toolCall("c1", "show_products", { productRefs: [seed.slug] })] },
+      { content: "Đây là gợi ý." },
+    ]);
+    const runtime = new AgentRuntime(provider, buildExecutor(seedCommerceSource), { requestId: "cards1", maxIterations: 4 });
+    const events = [];
+    for await (const ev of runtime.streamRun([...SYSTEM, { role: "user", content: "show" }])) events.push(ev);
+    const cardsEvent = events.find((e) => e.type === "cards");
+    expect(cardsEvent).toBeDefined();
+    expect((cardsEvent as { cards: Array<{ slug: string }> }).cards[0]!.slug).toBe(seed.slug);
+    expect(events[events.length - 1]).toEqual({ type: "done" });
   });
 
   it("search_products tìm được sản phẩm", async () => {

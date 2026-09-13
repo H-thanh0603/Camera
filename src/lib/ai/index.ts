@@ -10,6 +10,7 @@ import { createProvider } from "./providers/factory";
 import { ToolExecutor } from "./agent/executor";
 import { createCommerceTools } from "./tools/commerce-tools";
 import { compareProductsTool, recommendProductsTool } from "./tools/compare-recommend";
+import { showProductsTool } from "./tools/show-products";
 import type { CommerceDataSource } from "./tools/data-source";
 import { fenceText } from "./agent/fencing";
 
@@ -19,6 +20,7 @@ export function buildExecutor(source: CommerceDataSource): ToolExecutor {
     ...createCommerceTools({ source }),
     compareProductsTool(source),
     recommendProductsTool(source),
+    showProductsTool(source),
   ]);
 }
 

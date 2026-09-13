@@ -39,6 +39,7 @@ export type AgentStreamEvent =
   | { type: "tool_call"; call: AIToolCall }
   | { type: "tool_result"; call: AIToolCall }
   | { type: "tool_error"; call: AIToolCall; message: string }
+  | { type: "cards"; cards: unknown[] }
   | { type: "usage"; usage: AIUsage }
   | { type: "max_iterations" }
   | { type: "done" }
@@ -229,6 +230,11 @@ export class AgentRuntime {
             name: call.name,
             content: outcome.ok ? fencedResult(call.name, outcome.value) : outcome.message,
           });
+          // UI tool: card payload phát thẳng ra client, không vào prompt nhiều hơn.
+          if (outcome.ok && call.name === "show_products") {
+            const cards = (outcome.value as { cards?: unknown[] }).cards ?? [];
+            if (cards.length > 0) yield { type: "cards", cards };
+          }
           if (outcome.ok) yield { type: "tool_result", call };
           else yield { type: "tool_error", call, message: outcome.message };
         }
