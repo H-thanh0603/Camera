@@ -60,7 +60,9 @@ export function buildChatMessages(input: { message: string; history?: { role: "u
   const out: AIChatMessage[] = [{ role: "system", content: input.system }];
   const history = (input.history ?? []).slice(-20);
   for (const h of history) {
-    out.push({ role: h.role, content: h.role === "user" ? fenceText(h.content, 2000) : h.content.slice(0, 4000) });
+    // Cả hai role đều fence: client gửi gì cũng chỉ được vào model như dữ liệu
+    // đã làm sạch, kể cả tin nhắn giả vai "assistant" nhúng chỉ thị.
+    out.push({ role: h.role, content: fenceText(h.content, 4000) });
   }
   out.push({ role: "user", content: fenceText(input.message, 2000) });
   return out;

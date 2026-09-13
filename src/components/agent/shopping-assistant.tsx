@@ -22,6 +22,24 @@ interface StreamEvent {
   message?: string;
 }
 
+const STORAGE_KEY = "lumina.assistant.chat.v1";
+/** Đủ 20 lượt hội thoại — trùng giới hạn history mà server chấp nhận. */
+const MAX_STORED_MESSAGES = 40;
+
+function loadStoredMessages(): ChatMsg[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ChatMsg[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .slice(-MAX_STORED_MESSAGES);
+  } catch {
+    return [];
+  }
+}
+
 function parseSse(buffer: string): { events: StreamEvent[]; rest: string } {
   const events: StreamEvent[] = [];
   const parts = buffer.split("\n\n");
@@ -52,6 +70,30 @@ export function ShoppingAssistant() {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status, open]);
+
+  // Khôi phục hội thoại sau khi mount để tránh lệch hydration.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    const stored = loadStoredMessages();
+    if (stored.length > 0) setMessages(stored);
+    hydrated.current = true;
+  }, []);
+
+  // Lưu sau mỗi thay đổi (debounce để không ghi mỗi delta khi stream).
+  useEffect(() => {
+    if (!hydrated.current) return;
+    const t = setTimeout(() => {
+      try {
+        // Bỏ tin assistant rỗng cuối nếu đóng trang giữa lúc đang stream.
+        const toStore = messages.filter((m, i) => !(m.role === "assistant" && !m.content && i === messages.length - 1));
+        if (toStore.length === 0) localStorage.removeItem(STORAGE_KEY);
+        else localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore.slice(-MAX_STORED_MESSAGES)));
+      } catch {
+        // localStorage đầy/tắt — tính năng lưu là best-effort
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [messages]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -156,9 +198,27 @@ export function ShoppingAssistant() {
             </div>
             <button
               type="button"
+              onClick={() => {
+                abortRef.current?.abort();
+                setMessages([]);
+                try {
+                  localStorage.removeItem(STORAGE_KEY);
+                } catch {
+                  /* best-effort */
+                }
+              }}
+              disabled={busy || messages.length === 0}
+              aria-label="Bắt đầu hội thoại mới"
+              title="Bắt đầu hội thoại mới"
+              className="rounded-lg p-1 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined text-[20px]" aria-hidden="true">restart_alt</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setOpen(false)}
               aria-label="Đóng"
-              className="ml-auto rounded-lg p-1 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface"
+              className="rounded-lg p-1 text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface"
             >
               <span className="material-symbols-outlined text-[20px]" aria-hidden="true">close</span>
             </button>
