@@ -24,6 +24,7 @@ import {
   buildChatMessages,
   streamWithFallback,
   SHOPPING_ASSISTANT_SYSTEM_PROMPT,
+  type AgentPageContext,
 } from "@/lib/ai";
 import { getBudgetUsage, addBudgetUsage } from "@/lib/ai/budget";
 import { acquireStream } from "@/lib/ai/concurrency";
@@ -32,6 +33,14 @@ import { getDbCommerceSource } from "@/lib/ai/tools/db-source";
 export const runtime = "nodejs";
 
 const REQUEST_TIMEOUT_MS = 120_000;
+
+const contextSchema = z.object({
+  page: z.string().trim().max(200).optional(),
+  productSlug: z.string().trim().max(200).optional(),
+  category: z.string().trim().max(40).optional(),
+  cartCount: z.number().int().min(0).max(999).optional(),
+  cartTotalVND: z.number().int().min(0).max(10_000_000_000).optional(),
+});
 
 const bodySchema = z.object({
   message: z.string().trim().min(1).max(2000),
@@ -44,6 +53,7 @@ const bodySchema = z.object({
     )
     .max(20)
     .optional(),
+  context: contextSchema.optional(),
 });
 
 /** 10 requests / minute / IP — this route burns LLM tokens. */
@@ -118,6 +128,7 @@ export async function POST(request: NextRequest) {
   const messages = buildChatMessages({
     message: parsed.data.message,
     history: parsed.data.history,
+    context: parsed.data.context as AgentPageContext | undefined,
     system: SHOPPING_ASSISTANT_SYSTEM_PROMPT,
   });
   const executor = buildExecutor(getDbCommerceSource());

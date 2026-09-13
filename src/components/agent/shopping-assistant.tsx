@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils/format";
+import { useStore } from "@/state/store";
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -61,7 +62,24 @@ function parseSse(buffer: string): { events: StreamEvent[]; rest: string } {
   }
   return { events, rest };
 }
+/** Context trang hiện tại để agent "thấy" những gì khách đang xem. */
+function buildPageContext(cartCount: number, cartTotal: number): Record<string, unknown> {
+  if (typeof window === "undefined") return {};
+  const path = window.location.pathname;
+  const ctx: Record<string, unknown> = { page: path.slice(0, 200) };
+  // Trang sản phẩm: /products/[slug] — agent biết "máy này" là máy nào.
+  const m = path.match(/^\/(?:products?|san-pham)\/([^/?#]+)/);
+  if (m) ctx.productSlug = decodeURIComponent(m[1]!).slice(0, 200);
+  const q = new URLSearchParams(window.location.search);
+  const category = q.get("category");
+  if (category) ctx.category = category.slice(0, 40);
+  ctx.cartCount = cartCount;
+  if (cartTotal > 0) ctx.cartTotalVND = cartTotal;
+  return ctx;
+}
+
 export function ShoppingAssistant() {
+  const { cart, addToCart } = useStore();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -132,6 +150,7 @@ export function ShoppingAssistant() {
     const controller = new AbortController();
     abortRef.current = controller;
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
+    const context = buildPageContext(cart.length, 0);
     setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }]);
     setInput("");
     setFailed(false);
@@ -142,7 +161,7 @@ export function ShoppingAssistant() {
       const res = await fetch("/api/agent/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({ message: text, history, context }),
         signal: controller.signal,
       });
       const responseId = res.headers.get("X-Request-Id") ?? undefined;
