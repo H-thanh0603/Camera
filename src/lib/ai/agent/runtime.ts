@@ -25,6 +25,8 @@ export interface AgentRuntimeConfig {
   requestId: string;
   logger?: AgentLogger;
   signal?: AbortSignal;
+  /** Server inject session/approval cho write tools (route truyền vào). */
+  toolContext?: Partial<ToolContext>;
 }
 
 export interface AgentRunResult {
@@ -40,6 +42,7 @@ export type AgentStreamEvent =
   | { type: "tool_result"; call: AIToolCall }
   | { type: "tool_error"; call: AIToolCall; message: string }
   | { type: "cards"; cards: unknown[] }
+  | { type: "action"; actionKey: string; summary: string }
   | { type: "usage"; usage: AIUsage }
   | { type: "max_iterations" }
   | { type: "done" }
@@ -105,8 +108,12 @@ export class AgentRuntime {
     this.cfg.logger?.[level](msg, { requestId: this.cfg.requestId, ...meta });
   }
 
+  private toolCtx(): ToolContext {
+    return { requestId: this.cfg.requestId, ...this.cfg.toolContext };
+  }
+
   private async executeCalls(calls: AIToolCall[], msgs: AIChatMessage[]): Promise<void> {
-    const ctx: ToolContext = { requestId: this.cfg.requestId };
+    const ctx: ToolContext = this.toolCtx();
     for (const call of calls) {
       const t0 = Date.now();
       const outcome = await this.executor.dispatch(call.name, call.arguments, ctx);
@@ -223,7 +230,7 @@ export class AgentRuntime {
         }
         for (const call of kept) {
           yield { type: "tool_call", call };
-          const outcome = await this.executor.dispatch(call.name, call.arguments, { requestId: this.cfg.requestId });
+          const outcome = await this.executor.dispatch(call.name, call.arguments, this.toolCtx());
           msgs.push({
             role: "tool",
             toolCallId: call.id,
@@ -234,6 +241,11 @@ export class AgentRuntime {
           if (outcome.ok && call.name === "show_products") {
             const cards = (outcome.value as { cards?: unknown[] }).cards ?? [];
             if (cards.length > 0) yield { type: "cards", cards };
+          }
+          // Write tool chưa duyệt → phát yêu cầu duyệt cho client.
+          if (outcome.ok && typeof (outcome.value as { action_required?: unknown }).action_required === "string") {
+            const v = outcome.value as { action_required: string; summary: string };
+            yield { type: "action", actionKey: v.action_required, summary: v.summary };
           }
           if (outcome.ok) yield { type: "tool_result", call };
           else yield { type: "tool_error", call, message: outcome.message };

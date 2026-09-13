@@ -165,17 +165,10 @@ describe("streamWithFallback", () => {
   });
 });
 describe("commerce tools trên seed source", () => {
-  it("có đủ 9 tool thương mại cần thiết (gồm show_products)", async () => {
+  it("có đủ 12 tool (read + write + external) qua buildExecutor", async () => {
     const { seedCommerceSource } = await import("@/lib/ai/tools/seed-source");
-    const { createCommerceTools } = await import("@/lib/ai/tools/commerce-tools");
-    const { compareProductsTool, recommendProductsTool } = await import("@/lib/ai/tools/compare-recommend");
-    const { showProductsTool } = await import("@/lib/ai/tools/show-products");
-    const ex = new ToolExecutor([
-      ...createCommerceTools({ source: seedCommerceSource }),
-      compareProductsTool(seedCommerceSource),
-      recommendProductsTool(seedCommerceSource),
-      showProductsTool(seedCommerceSource),
-    ]);
+    const { buildExecutor } = await import("@/lib/ai");
+    const ex = buildExecutor(seedCommerceSource);
     expect(ex.names().sort()).toEqual(
       [
         "search_products",
@@ -187,6 +180,9 @@ describe("commerce tools trên seed source", () => {
         "compare_products",
         "recommend_products",
         "show_products",
+        "add_to_cart",
+        "watch_price",
+        "check_shipping_fee",
       ].sort(),
     );
   });

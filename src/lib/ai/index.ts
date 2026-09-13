@@ -7,20 +7,31 @@
 import type { AIProvider, AIChatMessage } from "./types";
 import { getAIConfig, PROVIDER_PRESETS, type AIConfig, type ProviderName } from "./config";
 import { createProvider } from "./providers/factory";
-import { ToolExecutor } from "./agent/executor";
+import { ToolExecutor, type ToolContext } from "./agent/executor";
 import { createCommerceTools } from "./tools/commerce-tools";
 import { compareProductsTool, recommendProductsTool } from "./tools/compare-recommend";
 import { showProductsTool } from "./tools/show-products";
+import { addToCartTool, watchPriceTool } from "./tools/write-tools";
+import { checkShippingFeeTool } from "./tools/shipping-fee";
 import type { CommerceDataSource } from "./tools/data-source";
 import { fenceText } from "./agent/fencing";
 
+/** Context server inject cho write tools (session + action store). */
+export interface AgentToolDeps {
+  rawSid?: string;
+  persistAction?: ToolContext["persistAction"];
+}
+
 /** Build the executor for a given data source (all commerce tools). */
-export function buildExecutor(source: CommerceDataSource): ToolExecutor {
+export function buildExecutor(source: CommerceDataSource, deps: AgentToolDeps = {}): ToolExecutor {
   return new ToolExecutor([
     ...createCommerceTools({ source }),
     compareProductsTool(source),
     recommendProductsTool(source),
     showProductsTool(source),
+    addToCartTool(source),
+    watchPriceTool(source),
+    checkShippingFeeTool(source),
   ]);
 }
 

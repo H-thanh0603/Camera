@@ -22,6 +22,8 @@ export interface FallbackRuntimeInput {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  /** Truyền thẳng cho runtime → write tools thấy session/approval. */
+  toolContext?: Partial<import("./agent/executor").ToolContext>;
 }
 
 interface Attempt {
@@ -39,6 +41,7 @@ function buildAttempts(input: FallbackRuntimeInput): Attempt[] {
       temperature: input.temperature,
       maxTokens: input.maxTokens,
       signal: input.signal,
+      toolContext: input.toolContext,
     }),
   }));
 }

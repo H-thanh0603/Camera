@@ -6,3 +6,5 @@
 0 8 * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" npx tsx scripts/sensor-reminder.ts >> /var/log/lumina-sensor.log 2>&1
 # Đối soát đơn pending kẹt (webhook fail) mỗi 15 phút; expire đơn >120p về cancelled + hoàn kho
 */15 * * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" npx tsx scripts/payment-reconcile.ts --expire >> /var/log/lumina-reconcile.log 2>&1
+# Theo dõi giá agent — so giá mỗi giờ, email qua outbox khi về ngưỡng
+0 * * * * cd /srv/lumina && DATABASE_URL="$DATABASE_URL" npx tsx scripts/price-watch-check.ts >> /var/log/lumina-price-watch.log 2>&1

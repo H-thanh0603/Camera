@@ -347,3 +347,34 @@ model AgentSession {  // Phiên chat trợ lý AI — history server-side, cooki
 
   @@index([expiresAt])
 }
+
+model AgentAction {  // Hành động nhạy cảm chờ user duyệt (add_to_cart, watch_price…).
+  id          String   @id @default(cuid())
+  sessionHash String   // FK logic → AgentSession.idHash (không raw cookie).
+  actionKey   String   // Key tool tạo — model nhắc lại cho user.
+  tool        String
+  summary     String
+  data        Json
+  status      String   @default("pending")  // pending | executed | expired | rejected
+  createdAt   DateTime @default(now())
+  executedAt  DateTime?
+  expiresAt   DateTime  // 10 phút — duyệt muộn thì phải xin lại.
+
+  @@unique([sessionHash, actionKey])
+  @@index([sessionHash, status])
+}
+
+model PriceWatch {  // Nhiệm vụ "theo dõi giá" user ủy quyền cho agent (cron so giá).
+  id          String   @id @default(cuid())
+  sessionHash String   // Session chat tạo watch (cookie hash).
+  email       String
+  productId   String
+  targetPrice Int      // Ngưỡng khách muốn — báo khi giá bán ≤ ngưỡng.
+  startPrice  Int      // Giá lúc tạo (để email nói "giảm từ X → Y").
+  status      String   @default("active")  // active | triggered | cancelled
+  createdAt   DateTime @default(now())
+  triggeredAt DateTime?
+
+  @@unique([sessionHash, productId])
+  @@index([status])
+}

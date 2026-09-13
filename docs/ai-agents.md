@@ -19,6 +19,7 @@ Commerce tools (search/details/compare/recommend/price/availability/categories/t
   ▼
 AgentRuntime → AIProvider → Provider adapter → LLM
 History: cookie agent_sid (httpOnly) → AgentSession DB (SHA-256, TTL 30 ngày)
+Hành động: add_to_cart/watch_price → AgentAction pending → user duyệt → chạy
 ```
 
 Thư mục `src/lib/ai/`:
@@ -123,8 +124,12 @@ Thiếu key → `/api/agent/chat` trả 503 thân thiện, app còn lại vẫn 
 3. Runtime tự expose qua `executor.specs()` cho mọi provider — **không cần
    viết lại schema theo vendor**.
 
-Quy tắc: tool **read-only** (không đặt/huỷ đơn, không thanh toán — agent chỉ tư
-vấn, web lo checkout — đúng triết lý Commerce Agents "checkout handoff").
+Quy tắc: tool mặc định **read-only**. Ba ngoại lệ ghi — `add_to_cart`,
+`watch_price` — đều **phải qua user approval** (prepareAction → AgentAction
+pending TTL 10 phút → user bấm Duyệt → mới chạy), khai báo `permission` và
+bị executor lọc theo policy (guest/admin). `check_shipping_fee` là tool
+external-service (GHN API, cache Redis 1h). Checkout vẫn của web — agent
+không tạo/huỷ đơn, không thanh toán.
 
 ## 5. Bảo mật
 

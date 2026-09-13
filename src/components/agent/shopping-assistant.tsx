@@ -19,11 +19,19 @@ interface ProductCard {
   reviewCount: number;
 }
 
+interface PendingAgentAction {
+  actionKey: string;
+  summary: string;
+  decision?: "approve" | "reject";
+}
+
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   /** Card sản phẩm agent đã hiển thị kèm câu trả lời này. */
   cards?: ProductCard[];
+  /** Hành động nhạy cảm agent đề xuất — chờ user duyệt. */
+  action?: PendingAgentAction;
   /** requestId của /api/agent/chat đã sinh câu trả lời này (nút 👍👎 dùng). */
   requestId?: string;
   /** Trạng thái feedback người dùng đã bấm cho câu trả lời này. */
@@ -38,11 +46,13 @@ const QUICK_PROMPTS = [
 ] as const;
 
 interface StreamEvent {
-  type: "text" | "tool_call" | "tool_error" | "error" | "done" | "cards";
+  type: "text" | "tool_call" | "tool_error" | "error" | "done" | "cards" | "action";
   text?: string;
   name?: string;
   message?: string;
   cards?: ProductCard[];
+  actionKey?: string;
+  summary?: string;
 }
 
 const STORAGE_KEY = "lumina.assistant.chat.v1";
@@ -233,6 +243,41 @@ export function ShoppingAssistant() {
     }
   }
 
+  /** User duyệt/từ chối hành động agent đề xuất (thêm giỏ, theo dõi giá). */
+  async function resolveAction(index: number, decision: "approve" | "reject") {
+    const msg = messages[index];
+    if (!msg?.action || msg.action.decision) return;
+    const actionKey = msg.action.actionKey;
+    setMessages((prev) => prev.map((m, i) => (i === index && m.action ? { ...m, action: { ...m.action, decision } } : m)));
+    try {
+      const res = await fetch("/api/agent/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionKey, decision }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { result?: { clientApply?: string; productId?: string; variantName?: string; quantity?: number; watching?: boolean }; error?: string };
+      if (res.ok && decision === "approve") {
+        const result = data.result;
+        if (result?.clientApply === "add_to_cart" && result.productId) {
+          // Giỏ là client state — widget tự thêm qua store (toast + drawer).
+          const { apiResolveProducts } = await import("@/lib/api-client");
+          await apiResolveProducts([result.productId]);
+          const { getProductById } = await import("@/lib/repositories/product-repository");
+          const product = getProductById(result.productId);
+          if (product) addToCart(product, undefined, result.quantity ?? 1);
+        }
+        if (result?.watching) {
+          updateAssistant((prev) => `${prev}\n✅ Đã đăng ký theo dõi giá. Bạn sẽ nhận email khi sản phẩm về ngưỡng đã chọn.`);
+        }
+      } else if (!res.ok) {
+        const reason = data.error ?? "Không thực hiện được.";
+        updateAssistant((prev) => `${prev}\n⚠️ ${reason}`);
+      }
+    } catch {
+      updateAssistant((prev) => `${prev}\n⚠️ Không kết nối được. Thử lại sau.`);
+    }
+  }
+
   async function send(raw: string) {
     const text = raw.trim();
     if (!text || busy) return;
@@ -289,6 +334,10 @@ export function ShoppingAssistant() {
                 Boolean(c) && typeof c.id === "string" && typeof c.slug === "string" && typeof c.thumbnailUrl === "string",
             );
             if (cards.length > 0) setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, cards: [...(m.cards ?? []), ...cards] } : m)));
+          } else if (ev.type === "action" && ev.actionKey && ev.summary) {
+            // Tool ghi chờ duyệt — gắn vào tin assistant để render nút duyệt.
+            const action: PendingAgentAction = { actionKey: ev.actionKey, summary: ev.summary };
+            setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, action } : m)));
           } else if (ev.type === "tool_error" && ev.message) {
             updateAssistant((prev) => (prev ? `${prev}\n${ev.message}` : (ev.message as string)));
           } else if (ev.type === "error" && ev.message) {
@@ -397,6 +446,33 @@ export function ShoppingAssistant() {
                     {m.cards.map((card) => (
                       <AgentProductCard key={card.id} card={card} onAdd={(c) => void addCardToCart(c)} />
                     ))}
+                  </div>
+                )}
+                {m.role === "assistant" && m.action && (
+                  <div className={cn("rounded-xl p-space-2xs ring-1", m.action.decision ? "ring-outline/20" : "ring-primary/40")}>
+                    <p className="font-body-sm text-body-sm text-on-surface">{m.action.summary}</p>
+                    {m.action.decision ? (
+                      <p className="font-telemetry-xs text-telemetry-xs uppercase text-on-surface-variant">
+                        {m.action.decision === "approve" ? "✓ Đã duyệt" : "✕ Đã từ chối"}
+                      </p>
+                    ) : (
+                      <div className="mt-space-2xs flex gap-space-2xs">
+                        <button
+                          type="button"
+                          onClick={() => void resolveAction(i, "approve")}
+                          className="rounded-lg bg-primary px-space-sm py-space-2xs font-label-sm text-label-sm text-on-primary transition-opacity hover:opacity-90"
+                        >
+                          Duyệt
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void resolveAction(i, "reject")}
+                          className="rounded-lg bg-surface-container-highest px-space-sm py-space-2xs font-label-sm text-label-sm text-on-surface transition-colors hover:bg-outline/20"
+                        >
+                          Để sau
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 {m.role === "assistant" && m.content && m.requestId && !busy && (

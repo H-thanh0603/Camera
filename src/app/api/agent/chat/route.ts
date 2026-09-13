@@ -19,6 +19,7 @@ import { getClientIp } from "@/lib/server/client-ip";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { logger } from "@/lib/server/logger";
 import { AGENT_SID_COOKIE, getAgentHistory, newAgentSid, saveAgentHistory, type StoredChatMessage } from "@/lib/server/agent-session";
+import { createAgentAction } from "@/lib/server/agent-action";
 import {
   getAIConfig,
   buildExecutor,
@@ -143,7 +144,11 @@ export async function POST(request: NextRequest) {
     context: parsed.data.context as AgentPageContext | undefined,
     system: SHOPPING_ASSISTANT_SYSTEM_PROMPT,
   });
-  const executor = buildExecutor(getDbCommerceSource());
+  const executor = buildExecutor(getDbCommerceSource(), {
+    rawSid: sid,
+    // Write tool soạn hành động → lưu DB chờ user duyệt qua /api/agent/action.
+    persistAction: (action) => createAgentAction(sid, action),
+  });
   const startedAt = Date.now();
   logger.info("agent.request", {
     route: "agent/chat",
@@ -185,6 +190,9 @@ export async function POST(request: NextRequest) {
               break;
             case "cards":
               push(sseLine({ type: "cards", cards: ev.cards }));
+              break;
+            case "action":
+              push(sseLine({ type: "action", actionKey: ev.actionKey, summary: ev.summary }));
               break;
             case "tool_error":
               push(sseLine({ type: "tool_error", name: ev.call.name, message: ev.message }));
