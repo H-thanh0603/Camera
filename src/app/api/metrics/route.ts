@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { logger } from "@/lib/server/logger";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
 import { isAdmin } from "@/lib/server/admin";
-import { isProduction } from "@/lib/server/env";
 
 /**
  * POST /api/metrics — điểm nhận event analytics + web vitals + client error.
@@ -60,7 +59,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const denied = await limited(request, getLimiter);
   if (denied) return denied;
-  if (isProduction() && !(await isAdmin())) {
+  if (!(await isAdmin())) {
     return NextResponse.json({ error: "Chỉ admin mới có quyền này." }, { status: 403 });
   }
   return NextResponse.json({ events: Object.fromEntries(counters) });

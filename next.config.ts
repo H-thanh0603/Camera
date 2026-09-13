@@ -7,19 +7,6 @@ import { withSentryConfig } from "@sentry/nextjs";
  * 'unsafe-inline' cho script là yêu cầu của Next.js App Router (hydration inline).
  * Khi tự host ảnh CDN riêng, thêm domain vào img-src.
  */
-const csp = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'" + (process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""),
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: https://lh3.googleusercontent.com",
-  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://*.ingest.sentry.io",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-].join("; ");
-
 function r2Hostname(): string | null {
   try {
     const raw = process.env.R2_PUBLIC_URL;
@@ -33,7 +20,22 @@ function r2Hostname(): string | null {
 
 const r2Host = r2Hostname();
 
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'" + (process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""),
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https://lh3.googleusercontent.com" + (r2Host ? ` https://${r2Host}` : ""),
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://*.ingest.sentry.io",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
+  // Next 16 mặc định đã tắt, nhưng đặt rõ để không phụ thuộc framework default.
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "lh3.googleusercontent.com" },

@@ -34,9 +34,10 @@ export async function POST(request: NextRequest) {
     return p ? [{ ...p, quantity: i.quantity }] : [];
   });
   const total = lines.reduce((s, l) => s + l.price * l.quantity, 0);
-  const rowsHtml = lines.map((l) => `<tr><td>${l.name} × ${l.quantity}</td><td style="text-align:right">${formatVND(l.price * l.quantity)}</td></tr>`).join("");
+  const rowsHtml = lines.map((l) => `<tr><td>${escapeEmailHtml(l.name)} × ${l.quantity}</td><td style="text-align:right">${formatVND(l.price * l.quantity)}</td></tr>`).join("");
 
   const { queueOutboxEmail } = await import("@/lib/server/email-outbox");
+  const { escapeEmailHtml } = await import("@/lib/server/email");
   queueOutboxEmail({
     kind: "kit-share",
     to: user.email,

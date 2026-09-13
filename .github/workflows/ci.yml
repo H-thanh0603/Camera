@@ -33,6 +33,9 @@ jobs:
         run: |
           ! grep -rEn --exclude-dir=node_modules --exclude-dir=.next --exclude='*.log' '(sk_live_[A-Za-z0-9]+|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[bap]-)' . || (echo "Phát hiện secret?" && exit 1)
 
+      - name: Dependency audit (fail CI khi có vuln high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Setup database
         run: npx prisma migrate deploy
         env:
