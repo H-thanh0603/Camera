@@ -35,6 +35,8 @@ Thư mục `src/lib/ai/`:
 | `agent/prompts.ts` | System prompt Lumina (tiếng Việt, grounding rules) |
 | `tools/*` | 8 commerce tools + 2 data source (`seed`, `db`) |
 | `fallback.ts` | Fallback: lỗi trước khi stream → thử provider tiếp theo (hữu hạn, không loop) |
+| `budget.ts` | Đếm token tháng + kill-switch `AI_MONTHLY_TOKEN_CAP` (Redis/in-memory) |
+| `concurrency.ts` | Cap số stream đồng thời/IP (`AI_MAX_CONCURRENT_STREAMS`) |
 | `structured.ts` | Structured output qua tool-forcing / JSON fallback |
 
 ## 2. Provider được hỗ trợ
@@ -77,8 +79,39 @@ AI_FALLBACKS="provider=deepseek&model=deepseek-chat;provider=openai&model=gpt-4o
 
 Khác: `AI_API_KEY` (key chung), `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
 `TOKENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, `GOOGLE_API_KEY` (gemini),
-`AI_TEMPERATURE`, `AI_MAX_TOKENS`, `AI_TIMEOUT_MS`, `AI_MAX_ITERATIONS`.
+`AI_TEMPERATURE`, `AI_MAX_TOKENS` (mặc định 1024/turn), `AI_TIMEOUT_MS`,
+`AI_MAX_ITERATIONS` (mặc định 6), `AI_MONTHLY_TOKEN_CAP`,
+`AI_MAX_CONCURRENT_STREAMS` (mặc định 3).
 Thiếu key → `/api/agent/chat` trả 503 thân thiện, app còn lại vẫn chạy.
+
+### 3.1 Kiểm soát chi phí (vận hành thực tế)
+
+- `AI_MONTHLY_TOKEN_CAP` — kill-switch: vượt cap tháng → route trả 503
+  "tạm ngừng do vượt hạn mức", log `agent.budget_exceeded`. Đặt `0`/bỏ trống
+  = không giới hạn. Khi dùng ≥80% log `agent.budget_near_limit` để alert.
+- Đếm token qua event `usage` tổng hợp cả mọi iteration; ghi vào
+  `agent.completed` kèm `requestTokens` + `monthTotalTokens`.
+- Cần `UPSTASH_REDIS_*` để đếm đúng khi chạy nhiều instance; fallback
+  in-memory fail-open (mất đếm khi restart — chấp nhận được).
+- Mỗi turn bị `maxTokens` 1024 chặn + tối đa 5 tool calls/turn +
+  `maxIterations` 6 → worst-case mỗi request là hữu hạn và tính trước được.
+
+### 3.2 Giới hạn luồng (rate/concurrency)
+
+- 10 request/phút/IP (rate-limit POST).
+- Tối đa `AI_MAX_CONCURRENT_STREAMS` (default 3) stream đang mở/IP —
+  mỗi stream giữ 1 connection + LLM call tới 120s. Vượt → 429, log
+  `agent.stream_limit`. Slot giải phóng ở `finally` lẫn `cancel()`
+  (idempotent), Redis TTL 3 phút tự dọn nếu process chết.
+
+### 3.3 Vận hành /health và feedback
+
+- `GET /api/agent/health` — cho uptime-monitor: `status`
+  (`ok|unconfigured|no_provider|budget_exhausted`), provider/model, số
+  fallback, token tháng đã dùng/cap, `redisConfigured`. Không gọi LLM.
+- `POST /api/agent/feedback` — widget gửi 👍👎 kèm `requestId` + snippet
+  ≤280 ký tự, log `agent.feedback`. Trace về request gốc qua `X-Request-Id`
+  trong `agent.completed` / `tool.dispatch`.
 
 ## 4. Thêm commerce tool mới
 
@@ -96,22 +129,46 @@ vấn, web lo checkout — đúng triết lý Commerce Agents "checkout handoff"
 - Key server-only; frontend chỉ gọi `/api/agent/chat`.
 - `fenceText`/`fenceProduct`: làm sạch mô tả/tag/review trước khi vào prompt;
   kết quả tool bọc `<tool-data>` và coi như dữ liệu.
+- **History từ client được fence ở cả hai role** (user lẫn assistant) —
+  client độc hại không thể nhúng chỉ thị giả vai "assistant" vào history;
+  system prompt cũng khai báo history là dữ liệu client gửi, không tin cậy.
+- Tool JSON truncate theo phần tử mảng — model luôn nhận JSON parse được.
 - Validate args bằng zod; lỗi hệ thống trả generic (không lộ stack/internal).
-- Rate-limit 10 req/phút/IP; message ≤2000 ký tự; history ≤20 turns.
+- Rate-limit 10 req/phút/IP; message ≤2000 ký tự; history ≤20 turns;
+  ≤5 tool calls mỗi model turn; ≤3 stream đồng thời/IP.
 - Engine ghi log requestId/provider/model/tool/latency/usage — **không log key**.
 
 ## 6. Chạy & kiểm thử
 
 ```bash
-npx vitest run tests/ai-providers.test.ts tests/ai-agent.test.ts tests/ai-fencing.test.ts
+npx vitest run tests/ai-providers.test.ts tests/ai-agent.test.ts tests/ai-fencing.test.ts tests/ai-budget.test.ts tests/ai-concurrency.test.ts
 ```
 
 `tests/ai-mock.ts` là mock provider (scripted replies, như `testing.py` của
-Commerce Agents) để test agent logic mà không cần mạng/key. Toàn bộ 28 test AI
-chạy offline. Test provider thật (Anthropic/OpenRouter/DeepSeek/…) = đổi env và
+Commerce Agents) để test agent logic mà không cần mạng/key. Toàn bộ 40 test
+AI chạy offline. Test provider thật (Anthropic/OpenRouter/DeepSeek/…) = đổi env và
 hỏi trợ lý trên UI; core agent không đổi (xem mục 3).
 
-## 7. Giới hạn do provider
+## 7. Checklist vận hành thực tế (production)
+
+1. **Proxy**: đặt `TRUST_PROXY_COUNT=1` khi chạy sau 1 lớp proxy/LB —
+   nếu không, rate-limit dùng IP spoof được qua `X-Forwarded-For`.
+2. **Redis (Upstash)**: bắt buộc nếu chạy nhiều instance — không có thì
+   rate-limit, đếm token và cap stream chỉ đúng trong 1 process.
+3. **Ngân sách**: đặt `AI_MONTHLY_TOKEN_CAP` theo túi tiền (mỗi request
+   worst-case ≈ 6 turns × (prompt + 1024 output)). Giám sát
+   `agent.budget_near_limit`, `agent.budget_exceeded` trên Sentry/Datadog.
+4. **Fallback**: cấu hình `AI_FALLBACKS` với provider khác hãng chính —
+   đổi env, không sửa code. Kiểm tra `GET /api/agent/health` sau deploy.
+5. **Uptime-monitor**: poll `/api/agent/health` mỗi 1-5 phút; cảnh báo khi
+   `status != "ok"` (riêng `unconfigured` là chủ động tắt, không phải sự cố).
+6. **Chất lượng trả lời**: theo dõi log `agent.feedback` (tỉ lệ 👍/👎 theo
+   tuần); trace câu trả lời xấu qua `requestId` ↔ `agent.completed` +
+   `tool.dispatch`.
+7. **Audit/PII**: app cố tình không lưu nội dung hội thoại — khi cần điều
+   tra abuse, dùng log requestId/provider/tool/latency (không có text).
+
+## 8. Giới hạn do provider
 
 - Tool calling là bắt buộc cho agent loop đầy đủ; provider nào tắt
   `toolCalls` sẽ chỉ còn trả lời chat đơn (runtime tự bỏ tool khỏi request).
