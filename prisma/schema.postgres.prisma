@@ -335,3 +335,27 @@ model Article {  // Bài journal — admin CRUD, public chỉ đọc published.
 
   @@index([published])
 }
+
+// Server-owned description previews; logical IDs retain history after deletion.
+model MerchantDescriptionDraft {
+  id               String   @id @default(cuid())
+  productId        String
+  productName      String
+  before           String
+  after            String
+  productUpdatedAt DateTime
+  status           String   @default("pending") // pending | approved | rejected
+  createdBy        String
+  decidedBy        String?
+  decidedAt        DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([productId, status])
+}
+
+// Conservative, durable token reservations (including failed upstream calls).
+model MerchantDraftBudget {
+  month          String @id
+  reservedTokens Int    @default(0)
+}

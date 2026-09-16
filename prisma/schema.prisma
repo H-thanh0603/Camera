@@ -378,3 +378,29 @@ model PriceWatch {  // Nhiệm vụ "theo dõi giá" user ủy quyền cho agent
   @@unique([sessionHash, productId])
   @@index([status])
 }
+
+// Server-owned description previews. Logical product/actor IDs preserve review history
+// if a product is deleted; approval always verifies the live product and admin.
+model MerchantDescriptionDraft {
+  id               String   @id @default(cuid())
+  productId        String
+  productName      String
+  before           String
+  after            String
+  productUpdatedAt DateTime
+  status           String   @default("pending") // pending | approved | rejected
+  createdBy        String
+  decidedBy        String?
+  decidedAt        DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([productId, status])
+}
+
+// Conservative token reservations, durable across instances/restarts. Failed calls
+// retain their reservation since upstream billing may already have happened.
+model MerchantDraftBudget {
+  month          String @id
+  reservedTokens Int    @default(0)
+}

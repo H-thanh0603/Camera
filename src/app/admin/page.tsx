@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/server/prisma";
 import { recentAuditLogs } from "@/lib/server/audit";
 import { OrdersChart } from "@/components/admin/orders-chart";
+import { MerchantActionCenter } from "@/components/admin/merchant-action-center";
 import { formatVND, formatDate, cn } from "@/lib/utils/format";
 
 export const metadata = { title: "Admin Dashboard" };
@@ -83,6 +84,8 @@ export default async function AdminDashboardPage() {
           <a href="/account" className="underline">Tài khoản → Xác thực 2 bước</a> trước khi tiếp tục quản trị.
         </p>
       )}
+
+      <MerchantActionCenter />
 
       <section className="grid grid-cols-2 gap-space-md lg:grid-cols-4" aria-label="Thống kê">
         {stats.map((s) => (
