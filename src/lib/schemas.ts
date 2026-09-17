@@ -75,19 +75,33 @@ export const reviewSchema = z.object({
   photos: z.array(z.string().url().startsWith("https://", "Ảnh phải là URL https.")).max(3, "Tối đa 3 ảnh.").optional(),
 });
 
+/**
+ * Idempotency-Key: 36–64 ký tự (UUID v4 36 ký tự là chuẩn client gửi).
+ * Validate ở cả header lẫn body (L10) — key rác/lạ không được chạm DB.
+ * Regex chữ/số/gạch nối/gạch dưới chặn injection qua unique lookup.
+ */
+export const idempotencyKeySchema = z
+  .string()
+  .min(8, "Idempotency-Key phải từ 8 ký tự.")
+  .max(64, "Idempotency-Key tối đa 64 ký tự.")
+  .regex(/^[A-Za-z0-9_-]+$/, "Idempotency-Key không hợp lệ.");
+
 export const orderLineSchema = z.object({
   productId: z.string().min(1),
   variantId: z.string().optional(),
   quantity: z.number().int().min(1).max(10),
 });
 
+/** Tối đa 50 dòng/đơn — chặn array khổng lồ đốt DB (M9). */
+export const MAX_ORDER_LINES = 50;
+
 export const placeOrderSchema = z.object({
   contact: contactSchema,
   shipping: shippingSchema,
   delivery: z.enum(["standard", "express", "pickup"]),
   payment: z.enum(["bank_transfer", "cod", "card_on_delivery", "vnpay"]),
-  lines: z.array(orderLineSchema).min(1, "Đơn hàng trống."),
-  idempotencyKey: z.string().min(8).max(64).optional(),
+  lines: z.array(orderLineSchema).min(1, "Đơn hàng trống.").max(MAX_ORDER_LINES, "Tối đa 50 dòng mỗi đơn."),
+  idempotencyKey: idempotencyKeySchema.optional(),
   guestToken: z
     .string()
     .min(32)

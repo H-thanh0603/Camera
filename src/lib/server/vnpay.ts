@@ -26,6 +26,23 @@ export function parseTxnRef(txnRef: string): string {
   return idx === -1 ? txnRef : txnRef.slice(0, idx);
 }
 
+/**
+ * Parse vnp_PayDate (yyyyMMddHHmmss GMT+7) → epoch giây. Null khi sai format
+ * (caller fallback now). Dùng cho replay check webhook có hiệu lực (L9).
+ */
+export function parseVnpayPayDate(payDate: string | undefined): number | null {
+  if (!payDate || !/^\d{14}$/.test(payDate)) return null;
+  const y = Number(payDate.slice(0, 4));
+  const m = Number(payDate.slice(4, 6)) - 1;
+  const d = Number(payDate.slice(6, 8));
+  const h = Number(payDate.slice(8, 10));
+  const min = Number(payDate.slice(10, 12));
+  const s = Number(payDate.slice(12, 14));
+  const ms = Date.UTC(y, m, d, h - 7, min, s); // GMT+7 → UTC
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor(ms / 1000);
+}
+
 export interface VnpayConfig {
   tmnCode: string;
   hashSecret: string;

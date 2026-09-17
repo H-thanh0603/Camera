@@ -50,12 +50,37 @@ export interface WebhookOutcome {
 export async function handlePaymentWebhook(
   input: PaymentWebhookInput,
   meta?: Record<string, string>,
+  expectedProvider?: string,
 ): Promise<WebhookOutcome> {
   const skew = Math.abs(Date.now() / 1000 - input.timestamp);
   if (skew > WEBHOOK_MAX_SKEW_SECONDS) {
     throw new PaymentWebhookError("Webhook đã hết hạn (timestamp lệch quá 5 phút).", 400);
   }
-  // Claim event TRƯỚC mọi xử lý: retry/replay cùng event → P2002 → deduped,
+  // Validate TRƯỚC khi claim (L9): đơn không tồn tại / sai tiền / sai cổng
+  // không được phình bảng PaymentEvent bằng chữ ký hợp lệ.
+  const order = await prisma.order.findUnique({
+    where: { number: input.orderNumber },
+    include: { lines: true },
+  });
+  if (!order) throw new PaymentWebhookError("Không tìm thấy đơn hàng.", 404);
+
+  const expected = (order.totals as { total?: number })?.total ?? 0;
+  if (input.amount !== expected) {
+    logger.error("payment.amount_mismatch", { orderNumber: input.orderNumber, expected, got: input.amount });
+    throw new PaymentWebhookError("Số tiền webhook không khớp tổng đơn hàng.", 400);
+  }
+  // Provider phải khớp phương thức của đơn (L9): một secret webhook chung
+  // không được dùng event cổng A để mark đơn cổng B.
+  if (expectedProvider && order.payment !== expectedProvider) {
+    logger.error("payment.provider_mismatch", {
+      orderNumber: input.orderNumber,
+      expected: expectedProvider,
+      got: order.payment,
+    });
+    throw new PaymentWebhookError("Cổng thanh toán không khớp đơn hàng.", 400);
+  }
+
+  // Claim event sau validate: retry/replay cùng event → P2002 → deduped,
   // không bao giờ apply 2 lần dù race.
   try {
     await prisma.paymentEvent.create({
@@ -69,30 +94,30 @@ export async function handlePaymentWebhook(
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      const order = await prisma.order.findUnique({ where: { number: input.orderNumber } });
+      const dup = await prisma.order.findUnique({ where: { number: input.orderNumber } });
       logger.info("payment.webhook_deduped", { provider: input.provider, eventId: input.eventId });
       return {
-        orderId: order?.id ?? "unknown",
+        orderId: dup?.id ?? "unknown",
         orderNumber: input.orderNumber,
-        status: order?.status ?? "unknown",
+        status: dup?.status ?? "unknown",
         deduped: true,
       };
     }
     throw e;
   }
 
-  const order = await prisma.order.findUnique({
-    where: { number: input.orderNumber },
-    include: { lines: true },
-  });
-  if (!order) throw new PaymentWebhookError("Không tìm thấy đơn hàng.", 404);
-
-  const expected = (order.totals as { total?: number })?.total ?? 0;
-  if (input.amount !== expected) {
-    logger.error("payment.amount_mismatch", { orderNumber: input.orderNumber, expected, got: input.amount });
-    throw new PaymentWebhookError("Số tiền webhook không khớp tổng đơn hàng.", 400);
-  }
   if (order.status !== "pending") {
+    // Tiền đã về nhưng đơn không còn pending (thanh toán trùng TxnRef khác —
+    // M10): KHÔNG im lặng. Ghi audit + log error để operator hoàn tay.
+    if (input.status === "paid" && order.status === "paid") {
+      logger.error("payment.overpaid", { orderNumber: input.orderNumber, amount: input.amount, eventId: input.eventId });
+      await logAudit(null, "order.overpaid_needs_refund", "Order", order.id, {
+        number: order.number,
+        amount: input.amount,
+        provider: input.provider,
+        eventId: input.eventId,
+      });
+    }
     return { orderId: order.id, orderNumber: order.number, status: order.status, deduped: true };
   }
   if (input.status === "failed") {

@@ -3,7 +3,7 @@ import { getOwnOrder, OrderForbidden } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
 import { CancelConflict, completeCancel } from "@/lib/server/cancel-order";
 import { CANCELLABLE_STATUSES } from "@/lib/server/order-status";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { logAudit } from "@/lib/server/audit";
 import { logger } from "@/lib/server/logger";
@@ -13,6 +13,8 @@ import { logger } from "@/lib/server/logger";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`cancel:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(

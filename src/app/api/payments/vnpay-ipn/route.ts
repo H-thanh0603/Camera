@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getEnv } from "@/lib/server/env";
 import { handlePaymentWebhook, PaymentWebhookError } from "@/lib/server/payments";
-import { parseTxnRef, parseVnpayIpn } from "@/lib/server/vnpay";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { parseTxnRef, parseVnpayIpn, parseVnpayPayDate } from "@/lib/server/vnpay";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
 
@@ -16,6 +16,8 @@ import { logger } from "@/lib/server/logger";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 60 });
 
 export async function GET(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`vnpayipn:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json({ RspCode: "99", Message: "Unknown error" }, { status: 429 });
@@ -49,13 +51,16 @@ export async function GET(request: NextRequest) {
         orderNumber,
         amount: parsed.amountVnd,
         status: parsed.responseCode === "00" ? "paid" : "failed",
-        timestamp: Math.floor(Date.now() / 1000),
+        // Timestamp thật từ vnp_PayDate (GMT+7) để check replay 5 phút có
+        // hiệu lực (L9); không parse được → now (không phá IPN hợp lệ).
+        timestamp: parseVnpayPayDate(query.vnp_PayDate) ?? Math.floor(Date.now() / 1000),
       },
       {
         transactionNo: parsed.transactionNo,
         payDate: query.vnp_PayDate ?? "",
         txnRef: parsed.txnRef,
       },
+      "vnpay",
     );
     // Đơn đã ở trạng thái cuối (không còn pending) → báo VNPay dừng retry
     if (outcome.deduped && outcome.status !== "pending") {

@@ -10,7 +10,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getClientIp } from "@/lib/server/client-ip";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { logger } from "@/lib/server/logger";
 
 export const runtime = "nodejs";
@@ -24,6 +24,8 @@ const bodySchema = z.object({
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 20 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   if (!(await limiter.check(`agent-fb:${ip}`)).allowed) {
     return NextResponse.json({ error: "Quá nhiều đánh giá trong thời gian ngắn." }, { status: 429 });

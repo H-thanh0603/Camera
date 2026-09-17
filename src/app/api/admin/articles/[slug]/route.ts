@@ -46,7 +46,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         author: String(body.author ?? "").trim().slice(0, 120) || "Biên tập Lumina Journal",
         ...(date ? { date } : {}),
         readingTimeMinutes: Number.isInteger(readingTime) && readingTime > 0 ? readingTime : 5,
-        heroImage: String(body.heroImage ?? "").slice(0, 500),
+        // L6: chỉ https:// hoặc / nội bộ — chặn javascript:/data: persist.
+        heroImage: (() => {
+          const s = String(body.heroImage ?? "").trim().slice(0, 500);
+          return s && (s.startsWith("https://") || s.startsWith("/")) ? s : "";
+        })(),
         heroAlt: String(body.heroAlt ?? "").slice(0, 200),
         body: bodyList,
         relatedSlugs: toList(body.relatedSlugs, 10, 64),

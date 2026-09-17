@@ -10,6 +10,16 @@ import { Prisma } from "@/generated/prisma/client";
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/**
+ * Chỉ https:// hoặc / nội bộ, tối đa 500 ký tự (L6): chặn javascript:/data:
+ * persist qua heroImage rồi render thành link/hình (stored XSS khi đổi render).
+ */
+function safeHttpUrl(input: unknown): string {
+  const s = String(input ?? "").trim().slice(0, 500);
+  if (!s) return "";
+  return s.startsWith("https://") || s.startsWith("/") ? s : "";
+}
+
 function parseList(input: unknown, maxItems: number, maxLen: number): string[] | null {
   if (!Array.isArray(input)) return null;
   const out = input
@@ -42,7 +52,7 @@ function validateArticle(body: Record<string, unknown>): { error?: string; data?
       author: String(body.author ?? "Biên tập Lumina Journal").trim().slice(0, 120),
       date,
       readingTimeMinutes: Number.isInteger(readingTime) && readingTime > 0 ? readingTime : 5,
-      heroImage: String(body.heroImage ?? "").slice(0, 500),
+      heroImage: safeHttpUrl(body.heroImage),
       heroAlt: String(body.heroAlt ?? "").slice(0, 200),
       body: bodyList as unknown as Prisma.InputJsonValue,
       relatedSlugs: related as unknown as Prisma.InputJsonValue,

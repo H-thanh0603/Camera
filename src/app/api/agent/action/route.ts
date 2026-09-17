@@ -14,7 +14,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getClientIp } from "@/lib/server/client-ip";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { logger } from "@/lib/server/logger";
 import { AGENT_SID_COOKIE } from "@/lib/server/agent-session";
 import { getPendingAction, markActionExecuted } from "@/lib/server/agent-action";
@@ -31,6 +31,8 @@ const bodySchema = z.object({
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 20 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   if (!(await limiter.check(`agent-action:${ip}`)).allowed) {
     return NextResponse.json({ error: "Quá nhiều thao tác. Thử lại sau." }, { status: 429 });

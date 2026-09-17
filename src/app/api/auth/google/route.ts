@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { beginGoogleLogin, isGoogleConfigured } from "@/lib/server/oauth";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
 
 /** GET /api/auth/google — bắt đầu OAuth: redirect sang Google. */
 export async function GET(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`oauth:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(

@@ -75,6 +75,9 @@ export async function verifyAndPriceLines(
     throw new OrderValidationError("Một số sản phẩm không còn tồn tại. Vui lòng xóa khỏi giỏ và thử lại.");
   }
 
+  // cap giữ trần/stock từng line (policy 10/line trong cart-service) để
+  // clamp LẠI sau khi gộp trùng (M9).
+  const caps = new Map<string, number>();
   for (const line of inputLines) {
     const product = await resolveProduct(line.productId);
     if (!product) throw new OrderValidationError(`Sản phẩm ${line.productId} không còn tồn tại.`);
@@ -97,9 +100,13 @@ export async function verifyAndPriceLines(
       quantity,
       image: product.thumbnail.url,
     });
+    // Trần sau gộp = min(trần từng lần gửi): 5 line × 10 không thể thành 50.
+    const key = `${product.id}::${variant?.id ?? ""}`;
+    caps.set(key, Math.min(caps.get(key) ?? max, max));
   }
 
-  // Gộp line trùng (product + variant) trước khi tính tiền
+  // Gộp line trùng (product + variant) trước khi tính tiền, clamp LẠI về
+  // trần (M9): mỗi line gửi lên đã clamp nhưng tổng gộp có thể vượt.
   const merged = new Map<string, OrderLine>();
   for (const l of lines) {
     const key = `${l.productId}::${l.variantId ?? ""}`;
@@ -107,9 +114,13 @@ export async function verifyAndPriceLines(
     if (existing) existing.quantity += l.quantity;
     else merged.set(key, l);
   }
-  const finalLines = [...merged.values()];
+  const finalLines = [...merged.values()].map((l) => {
+    const cap = caps.get(`${l.productId}::${l.variantId ?? ""}`);
+    return cap !== undefined && l.quantity > cap ? { ...l, quantity: cap } : l;
+  });
 
-  // Server tính totals: express cộng phí vào shipping
+  // Server tính totals: pickup miễn ship (nhận tại Vault), express cộng phí.
+  // calculateTotals đã cộng STANDARD_SHIPPING_FEE nên pickup phải trừ lại.
   const detailLines = finalLines.map((l) => {
     const product = resolved.find((p) => p.id === l.productId)!;
     const variant = resolveVariant(product, l.variantId);
@@ -139,7 +150,11 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   }
 
   // Idempotency: request trùng key (retry mạng, double-click) trả lại đơn cũ.
-  // Đơn guest: đối chiếu token chống chiếm đơn — token sai → 403, không lộ đơn.
+  // Scope theo principal (M3): đơn của user khác KHÔNG trả về dù biết key —
+  // key rò qua log/proxy không thành oracle đọc đơn người khác.
+  // - Đơn guest: phải khớp guest token (sai → 403).
+  // - Đơn của user: session hiện tại phải đúng chủ (sai → 403).
+  // - Đơn guest cũ nhưng caller đã login / đơn user nhưng caller guest → 403.
   if (input.idempotencyKey) {
     const existing = await prisma.order.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
@@ -149,8 +164,13 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       const { dbOrderToDomain, OrderForbidden } = await import("./order-mapper");
       const { verifyGuestToken } = await import("./guest-token");
       const row = existing as unknown as { userId?: string | null; guestTokenHash?: string | null };
-      if (!row.userId && row.guestTokenHash) {
-        if (!verifyGuestToken(input.guestToken ?? "", row.guestTokenHash)) {
+      const me = await getSessionUser();
+      if (row.userId) {
+        if (!me || me.id !== row.userId) {
+          throw new OrderForbidden("Token bảo mật đơn hàng không đúng.");
+        }
+      } else if (row.guestTokenHash) {
+        if (me || !verifyGuestToken(input.guestToken ?? "", row.guestTokenHash)) {
           throw new OrderForbidden("Token bảo mật đơn hàng không đúng.");
         }
       }
@@ -220,11 +240,15 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         if (res.count === 0) {
           throw new OrderValidationError(`"${l.name}" vừa hết hàng. Vui lòng giảm số lượng.`);
         }
-        // trừ kho tổng của product để số hiển thị khớp
-        await tx.product.updateMany({
+        // trừ kho tổng của product để số hiển thị khớp — fail khi không
+        // đủ (M9): variant trừ được mà tổng không trừ = ledger/display lệch.
+        const agg = await tx.product.updateMany({
           where: { id: l.productId, stock: { gte: l.quantity } },
           data: { stock: { decrement: l.quantity } },
         });
+        if (agg.count === 0) {
+          throw new OrderValidationError(`"${l.name}" vừa hết hàng. Vui lòng giảm số lượng.`);
+        }
       } else {
         const res = await tx.product.updateMany({
           where: { id: l.productId, stock: { gte: l.quantity } },
@@ -356,8 +380,12 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         const { dbOrderToDomain, OrderForbidden } = await import("./order-mapper");
         const { verifyGuestToken } = await import("./guest-token");
         const row = existing as unknown as { userId?: string | null; guestTokenHash?: string | null };
-        if (!row.userId && row.guestTokenHash) {
-          if (!verifyGuestToken(input.guestToken ?? "", row.guestTokenHash)) {
+        if (row.userId) {
+          if (!user || user.id !== row.userId) {
+            throw new OrderForbidden("Token bảo mật đơn hàng không đúng.");
+          }
+        } else if (row.guestTokenHash) {
+          if (user || !verifyGuestToken(input.guestToken ?? "", row.guestTokenHash)) {
             throw new OrderForbidden("Token bảo mật đơn hàng không đúng.");
           }
         }

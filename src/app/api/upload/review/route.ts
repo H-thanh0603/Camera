@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
 import { hashId } from "@/lib/server/scrub";
@@ -9,6 +9,7 @@ import {
   isStorageConfigured,
   uploadImage,
   validateImageBytes,
+  validateImageDimensions,
   validateUploadFile,
 } from "@/lib/server/storage";
 
@@ -25,6 +26,10 @@ const dailyQuota = getRequestLimiter({ windowMs: 24 * 60 * 60_000, max: 20 });
 const MAX_REVIEW_BYTES = 3 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  // Production thiếu Redis → quota ngày/IP chỉ đếm memory (farm ảnh/R2 bill):
+  // fail-closed 503 thay vì fail-open.
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   const limit = await limiter.check(`upload-review:${ip}`);
   if (!limit.allowed) {
@@ -61,6 +66,8 @@ export async function POST(request: NextRequest) {
     // Mime xác minh từ magic bytes — không dùng file.type để upload.
     const verified = validateImageBytes(bytes, file.type || null);
     if ("error" in verified) return NextResponse.json({ error: verified.error }, { status: 422 });
+    const tooBig = validateImageDimensions(verified.mime, bytes);
+    if (tooBig) return NextResponse.json({ error: tooBig }, { status: 422 });
     const { url } = await uploadImage(bytes, verified.mime, "reviews");
     logger.info("upload.review_ok", {
       ipHash: hashId(ip),

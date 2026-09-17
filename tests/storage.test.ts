@@ -1,13 +1,17 @@
 import { describe, expect, test } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   MAX_UPLOAD_BYTES,
   StorageNotConfigured,
   buildImageKey,
   getStorageConfig,
+  imageDimensions,
   isStorageConfigured,
   sniffImageMime,
   uploadImage,
   validateImageBytes,
+  validateImageDimensions,
   validateUploadFile,
 } from "@/lib/server/storage";
 
@@ -72,6 +76,27 @@ describe("sniffImageMime (magic bytes)", () => {
     expect("error" in mismatch && mismatch.error).toContain("không khớp");
     const fake = validateImageBytes(SVG, "image/png");
     expect("error" in fake).toBe(true);
+  });
+});
+
+describe("imageDimensions (L7, parse header thuần)", () => {
+  const fixture = (name: string) => new Uint8Array(readFileSync(resolve(__dirname, "fixtures", name)));
+  test("PNG 2×3", () => {
+    expect(imageDimensions(fixture("dim-2x3.png"))).toEqual({ width: 2, height: 3 });
+  });
+  test("GIF 4×5", () => {
+    expect(imageDimensions(fixture("dim-4x5.gif"))).toEqual({ width: 4, height: 5 });
+  });
+  test("JPEG SOF0 6×7", () => {
+    expect(imageDimensions(fixture("dim-6x7.jpg"))).toEqual({ width: 6, height: 7 });
+  });
+  test("WebP VP8X 8×9", () => {
+    expect(imageDimensions(fixture("dim-8x9.webp"))).toEqual({ width: 8, height: 9 });
+  });
+  test("validate chấp nhận fixture, AVIF chặn theo file", () => {
+    expect(validateImageDimensions("image/png", fixture("dim-2x3.png"))).toBeNull();
+    expect(validateImageDimensions("image/avif", new Uint8Array(1024))).toBeNull();
+    expect(validateImageDimensions("image/avif", new Uint8Array(3 * 1024 * 1024))).toContain("2MB");
   });
 });
 

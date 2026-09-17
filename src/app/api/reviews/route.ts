@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { getSessionUser } from "@/lib/server/session";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { dbGetProductById } from "@/lib/server/product-db";
+import { isTrustedReviewPhotoUrl } from "@/lib/server/storage";
 import { reviewSchema, zodFieldErrors } from "@/lib/schemas";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -17,6 +18,8 @@ import type { Prisma } from "@/generated/prisma/client";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   if (!(await limiter.check(`review:${ip}`)).allowed) {
     return NextResponse.json({ error: "Quá nhiều đánh giá. Thử lại sau một phút." }, { status: 429 });
@@ -43,6 +46,17 @@ export async function POST(request: NextRequest) {
 
   const user = await getSessionUser();
 
+  // Chỉ nhận ảnh do endpoint upload của shop tạo (R2 bucket mình) —
+  // chặn URL ngoài nhúng tracking/phishing vào review.
+  const photos = parsed.data.photos ?? [];
+  const untrusted = photos.filter((u) => !isTrustedReviewPhotoUrl(u));
+  if (untrusted.length > 0) {
+    return NextResponse.json(
+      { error: "Ảnh phải được tải lên qua nút đính kèm của Lumina.", fieldErrors: { photos: "Ảnh phải được tải lên qua nút đính kèm của Lumina." } },
+      { status: 422 },
+    );
+  }
+
   await prisma.review.create({
     data: {
       productId,
@@ -51,7 +65,7 @@ export async function POST(request: NextRequest) {
       rating: parsed.data.rating,
       title: parsed.data.title,
       body: parsed.data.body,
-      photos: (parsed.data.photos ?? []) as unknown as Prisma.InputJsonValue,
+      photos: photos as unknown as Prisma.InputJsonValue,
       approved: false,
       verified: false,
     },

@@ -2,10 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { placeOrderServer, OrderValidationError } from "@/lib/server/place-order";
 import { getUserOrders, OrderForbidden } from "@/lib/server/order-mapper";
 import { getSessionUser } from "@/lib/server/session";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
-import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
+import { idempotencyKeySchema, placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
 
 /**
  * POST /api/orders — đặt hàng (server verify giá/stock, ghi DB).
@@ -15,6 +15,8 @@ import { placeOrderSchema, zodFieldErrors } from "@/lib/schemas";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const limit = await limiter.check(`order:${ip}`);
@@ -45,7 +47,15 @@ export async function POST(request: NextRequest) {
     // Idempotency key: 1 nguồn duy nhất là header `Idempotency-Key`
     // (chuẩn HTTP). Field body `idempotencyKey` trong schema chỉ giữ để
     // tương thích client cũ — header luôn thắng khi cả hai tồn tại.
-    const idempotencyKey = request.headers.get("idempotency-key") ?? parsed.data.idempotencyKey;
+    // Header cũng phải qua schema (L10): key rác không được chạm DB.
+    const rawHeaderKey = request.headers.get("idempotency-key");
+    if (rawHeaderKey !== null) {
+      const check = idempotencyKeySchema.safeParse(rawHeaderKey.trim());
+      if (!check.success) {
+        return NextResponse.json({ error: "Idempotency-Key không hợp lệ." }, { status: 422 });
+      }
+    }
+    const idempotencyKey = rawHeaderKey?.trim() || parsed.data.idempotencyKey;
     const order = await placeOrderServer({ ...parsed.data, idempotencyKey });
     return NextResponse.json({ order }, { status: 201 });
   } catch (error) {

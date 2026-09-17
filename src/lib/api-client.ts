@@ -215,9 +215,14 @@ export async function apiVnpayUrl(id: string): Promise<string> {
   }).then((r) => r.url);
 }
 
+/**
+ * Tra cứu đơn guest: token qua BODY (M13), không qua URL (rò history/logs).
+ */
 export async function apiLookupGuestOrder(number: string, token: string): Promise<Order> {
-  const params = new URLSearchParams({ number, token });
-  return request<{ order: Order }>(`/api/orders/lookup?${params.toString()}`).then((r) => r.order);
+  return request<{ order: Order }>("/api/orders/lookup", {
+    method: "POST",
+    body: JSON.stringify({ number, token }),
+  }).then((r) => r.order);
 }
 
 /* ---------- Catalog resolve (bounded, thay snapshot full) ---------- */

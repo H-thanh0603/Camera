@@ -97,6 +97,16 @@ export function watchPriceTool(source: CommerceDataSource): CommerceTool<typeof 
       const p = (await source.getProduct({ id: args.productId })) ?? (await source.getProduct({ slug: args.productId }));
       if (!p) throw new ToolRunError("not_found", "Sản phẩm không tồn tại — không theo dõi được.");
       const sessionHash = ctx.rawSid ? (await import("@/lib/server/agent-session")).hashAgentSid(ctx.rawSid) : "anonymous";
+      // L8: quota 5 watch/session + tối đa 20 email distinct/session — chặn
+      // attacker lái agent đăng ký spam email nạn nhân hàng loạt (cron gửi).
+      const existing = await prisma.priceWatch.findMany({ where: { sessionHash }, select: { email: true } });
+      const emails = new Set(existing.map((w) => w.email.toLowerCase()));
+      if (!emails.has(args.email.toLowerCase()) && emails.size >= 20) {
+        throw new ToolRunError("unavailable", "Phiên này đã theo dõi quá nhiều email khác nhau.");
+      }
+      if (existing.length >= 25) {
+        throw new ToolRunError("unavailable", "Phiên này đã tạo quá nhiều theo dõi giá.");
+      }
       try {
         await prisma.priceWatch.upsert({
           where: { sessionHash_productId: { sessionHash, productId: p.id } },

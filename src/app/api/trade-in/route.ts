@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { prisma } from "@/lib/server/prisma";
 import { zodFieldErrors } from "@/lib/schemas";
@@ -27,6 +27,8 @@ const leadSchema = z.object({
 const STATUS = ["new", "contacted", "quoted", "done", "dropped"] as const;
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`tradein:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json({ error: "Gửi quá nhiều. Thử lại sau." }, { status: 429 });

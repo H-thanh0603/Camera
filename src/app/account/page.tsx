@@ -319,7 +319,7 @@ export default function AccountPage() {
                       )}>
                         {STATUS_LABEL[order.status]}
                       </span>
-                      {(order.status === "pending" || order.status === "paid" || order.status === "processing") && (
+                      {(order.status === "pending" || order.status === "processing") && (
                         <button
                           type="button"
                           onClick={async () => {

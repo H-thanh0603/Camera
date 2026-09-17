@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
-import { staffGuardResponse } from "@/lib/server/admin";
+import { adminGuardResponse, staffGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { isCarrier, isTrackingCode } from "@/lib/server/shipping";
@@ -76,6 +76,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const status = body.status as OrderStatus | undefined;
   if (!status || !VALID.includes(status)) {
     return NextResponse.json({ error: "Trạng thái không hợp lệ." }, { status: 422 });
+  }
+
+  // H2: `refunded` chỉ qua route refund (admin + gọi cổng thanh toán thật).
+  // Staff PATCH sang `refunded` = giả hoàn tiền: kho về, coupon thả, nhưng
+  // khách không nhận lại tiền. `cancelled` từ đơn đã thu tiền cũng vậy —
+  // phải qua refund để đảo tiền.
+  if (status === "refunded" || (status === "cancelled" && order.status === "paid")) {
+    const denied = await adminGuardResponse();
+    if (denied) {
+      return NextResponse.json(
+        { error: "Hoàn tiền đơn đã thanh toán phải qua luồng Hoàn tiền (kèm đảo tiền cổng thanh toán)." },
+        { status: 403 },
+      );
+    }
   }
 
   const from = order.status as OrderStatus;

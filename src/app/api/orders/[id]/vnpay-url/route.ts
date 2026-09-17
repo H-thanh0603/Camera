@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getOwnOrder, OrderForbidden } from "@/lib/server/order-mapper";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { getEnv } from "@/lib/server/env";
 import { buildTxnRef, createVnpayPaymentUrl } from "@/lib/server/vnpay";
@@ -25,6 +25,8 @@ function vnpayConfig() {
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`vnpayurl:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -62,6 +64,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const total = (order.totals as { total?: number })?.total ?? 0;
   if (!Number.isInteger(total) || total <= 0) {
     return NextResponse.json({ error: "Tổng đơn hàng chưa hợp lệ." }, { status: 422 });
+  }
+  // M10: VNPay đã báo paid cho đơn (IPN về trước, claim đang chạy hoặc đơn
+  // sắp chuyển) → không tạo URL mới để khách trả lần 2. Tiền thừa (nếu đã
+  // trừ) được flag `overpaid_needs_refund` ở IPN để operator hoàn tay.
+  const { prisma } = await import("@/lib/server/prisma");
+  const paidIpn = await prisma.paymentEvent.findFirst({
+    where: { provider: "vnpay", orderNumber: order.number, status: "paid" },
+    select: { id: true },
+  });
+  if (paidIpn) {
+    return NextResponse.json(
+      { error: "Đơn đã được thanh toán (đang xác nhận). Tải lại trang sau ít phút, không tạo thanh toán mới." },
+      { status: 409 },
+    );
   }
   try {
     // TxnRef duy nhất mỗi lần bấm (cho phép thanh toán lại sau failed)

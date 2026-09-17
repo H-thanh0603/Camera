@@ -10,9 +10,16 @@ import { staffGuardResponse } from "@/lib/server/admin";
 
 const MAX_ROWS = 2000;
 
-function csvCell(value: string | number): string {
+/**
+ * Neutralize công thức spreadsheet (M12): ô bắt đầu bằng = + - @ \t \r
+ * được Excel/Sheets thực thi khi mở CSV (credential theft / command exec).
+ * Prefix `'` + quote chuẩn. Số thuần (tổng tiền) giữ nguyên để kế toán SUM.
+ */
+export function csvCell(value: string | number): string {
   const s = String(value ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (typeof value === "number" && Number.isFinite(value)) return s;
+  const neutralized = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\n]/.test(neutralized) ? `"${neutralized.replace(/"/g, '""')}"` : neutralized;
 }
 
 export async function GET(request: NextRequest) {

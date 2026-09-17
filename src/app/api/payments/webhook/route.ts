@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { handlePaymentWebhook, PaymentWebhookError, verifyWebhookSignature } from "@/lib/server/payments";
 import { getEnv } from "@/lib/server/env";
 import { paymentWebhookSchema, zodFieldErrors } from "@/lib/schemas";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { logger } from "@/lib/server/logger";
 
@@ -15,6 +15,8 @@ import { logger } from "@/lib/server/logger";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 60 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`webhook:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(
@@ -56,7 +58,8 @@ export async function POST(request: NextRequest) {
     );
   }
   try {
-    const outcome = await handlePaymentWebhook(parsed.data);
+    // Bind provider: event cổng X chỉ được mark đơn đặt bằng cổng X (L9).
+    const outcome = await handlePaymentWebhook(parsed.data, undefined, parsed.data.provider);
     return NextResponse.json({ ok: true, ...outcome });
   } catch (error) {
     if (error instanceof PaymentWebhookError) {
