@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse, staffGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
@@ -40,6 +41,8 @@ const RESTOCKABLE: OrderStatus[] = ["pending", "paid", "processing"];
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await staffGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "orders-id");
+  if (limited) return limited;
 
   const { id } = await params;
   let body: { status?: string; trackingCode?: string | null; carrier?: string };

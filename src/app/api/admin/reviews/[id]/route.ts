@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CATALOG_TAG } from "@/lib/server/product-db";
 import { prisma } from "@/lib/server/prisma";
@@ -17,6 +18,8 @@ import { grantPhotoReviewReward } from "@/lib/server/review-reward";
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await staffGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "reviews-id");
+  if (limited) return limited;
 
   const { id } = await params;
   let body: { approved?: boolean };

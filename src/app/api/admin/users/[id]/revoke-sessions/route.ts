@@ -3,14 +3,17 @@ import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse, getSessionUserWithRole } from "@/lib/server/admin";
 import { revokeUserSessions } from "@/lib/server/session";
 import { logAudit } from "@/lib/server/audit";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 
 /**
  * POST /api/admin/users/:id/revoke-sessions — đá toàn bộ phiên của 1 tài
  * khoản (mất máy, nghi lộ session). Không tự đá chính mình (dùng logout).
  */
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "users-revoke");
+  if (limited) return limited;
   const actor = await getSessionUserWithRole();
   const { id } = await params;
   if (actor && actor.id === id) {

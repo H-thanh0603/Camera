@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse, getSessionUserWithRole } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
@@ -9,6 +10,8 @@ import { couponUpdateSchema, zodFieldErrors } from "@/lib/schemas";
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "coupons-code");
+  if (limited) return limited;
   const { code } = await params;
 
   let body: unknown;

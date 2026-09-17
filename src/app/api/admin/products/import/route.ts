@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { CATALOG_TAG } from "@/lib/server/product-db";
 import { prisma } from "@/lib/server/prisma";
@@ -21,6 +22,8 @@ import { Prisma } from "@/generated/prisma/client";
 export async function POST(request: NextRequest) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "products-import", true);
+  if (limited) return limited;
   let body: Record<string, unknown>;
   try {
     body = await request.json();

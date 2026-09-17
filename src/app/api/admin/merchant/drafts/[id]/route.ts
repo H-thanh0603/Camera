@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { adminGuardResponse } from "@/lib/server/admin";
 import { isSameOriginRequest } from "@/lib/csrf";
 import { decideMerchantDraft, MerchantDraftError } from "@/lib/server/merchant-drafts";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "merchant-drafts-id");
+  if (limited) return limited;
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: "Yêu cầu bị chặn (CSRF)." }, { status: 403 });
   let body: unknown;
   try { body = await request.json(); }

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse, getSessionUserWithRole } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
@@ -16,6 +17,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "coupons-post");
+  if (limited) return limited;
 
   let body: unknown;
   try {

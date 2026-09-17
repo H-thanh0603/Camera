@@ -3,19 +3,32 @@ import { z } from "zod";
 import { getSessionUser } from "@/lib/server/session";
 import { prisma } from "@/lib/server/prisma";
 import { formatVND } from "@/lib/utils/format";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 
 /**
  * POST /api/kit/share-email — gửi tóm tắt kit trong giỏ qua email user.
  * User chủ động bấm (không spam). Tối đa 20 món, enqueue qua email queue.
+ * 5 lần/giờ/user — chặn lạm dụng gửi mail hàng loạt.
  */
+const limiter = getRequestLimiter({ windowMs: 60 * 60_000, max: 5 });
 
 const schema = z.object({
   items: z.array(z.object({ productId: z.string().min(1), quantity: z.number().int().min(1).max(10) })).min(1).max(20),
 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Đăng nhập để gửi kit qua email." }, { status: 401 });
+  const limit = await limiter.check(`kit:${user.id}:${getClientIp(request.headers)}`);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Bạn đã gửi quá nhiều email kit. Thử lại sau." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   let body: unknown;
   try {
     body = await request.json();

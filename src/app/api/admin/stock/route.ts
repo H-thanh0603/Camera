@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { prisma } from "@/lib/server/prisma";
 import { staffGuardResponse } from "@/lib/server/admin";
 import { getSessionUser } from "@/lib/server/session";
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const denied = await staffGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "stock-post", true);
+  if (limited) return limited;
   let body: Record<string, unknown>;
   try {
     body = await request.json();

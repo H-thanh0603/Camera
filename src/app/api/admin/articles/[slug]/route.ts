@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { prisma } from "@/lib/server/prisma";
 import { revalidatePath } from "next/cache";
 import { adminGuardResponse } from "@/lib/server/admin";
@@ -10,6 +11,8 @@ import { logAudit } from "@/lib/server/audit";
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "articles-slug");
+  if (limited) return limited;
   const { slug } = await params;
   let body: Record<string, unknown>;
   try {

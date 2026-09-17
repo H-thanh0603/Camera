@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminRateLimit } from "@/lib/server/rate-limit-redis";
 import { z } from "zod";
 import { prisma } from "@/lib/server/prisma";
 import { adminGuardResponse, getSessionUserWithRole } from "@/lib/server/admin";
@@ -26,6 +27,8 @@ async function guardSelfTarget(actorId: string, targetId: string): Promise<NextR
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = await adminGuardResponse();
   if (denied) return denied;
+  const limited = await adminRateLimit(request, "users-id");
+  if (limited) return limited;
   const actor = await getSessionUserWithRole();
   const { id } = await params;
   const selfBlock = actor ? await guardSelfTarget(actor.id, id) : null;

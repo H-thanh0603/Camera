@@ -4,6 +4,7 @@ vi.mock("@/lib/server/prisma", () => ({
   prisma: {
     priceWatch: {
       upsert: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     agentAction: {
       upsert: vi.fn().mockResolvedValue({}),
