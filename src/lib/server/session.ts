@@ -8,7 +8,14 @@ import { prisma } from "./prisma";
  * SHA-256(token) — lộ DB không đủ để mạo danh phiên.
  */
 
-export const SESSION_COOKIE = "lumina.session";
+/**
+ * Cookie phiên. Production dùng prefix `__Host-` (browser ép Secure +
+ * Path=/ + không Domain — chống cookie tossing từ subdomain). Dev/test
+ * http không set được `__Host-` (browser từ chối khi thiếu Secure) nên
+ * giữ tên trần. Đổi tên = phiên cũ hết hiệu lực (user login lại 1 lần).
+ */
+export const SESSION_COOKIE =
+  process.env.NODE_ENV === "production" ? "__Host-lumina.session" : "lumina.session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 ngày sliding
 const SESSION_ABSOLUTE_MAX_MS = 90 * 24 * 60 * 60 * 1000; // trần tuyệt đối 90 ngày
 const MAX_SESSIONS_PER_USER = 5; // quá → thu hồi phiên cũ nhất (chống session farm)

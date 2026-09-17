@@ -37,17 +37,45 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export type LoginResult =
   | { user: SessionUser }
-  | { twoFactorRequired: true; challengeToken: string };
+  | { twoFactorRequired: true; challengeToken: string }
+  | { adminRequires2fa: true; challengeToken: string };
 
 export async function apiLogin(email: string, password: string): Promise<LoginResult> {
-  const data = await request<{ user?: SessionUser; twoFactorRequired?: true; challengeToken?: string }>(
-    "/api/auth/login",
-    { method: "POST", body: JSON.stringify({ email, password }) },
-  );
+  // Fetch thủ công (không qua request()) để đọc được cả body 403
+  // (adminRequires2fa challenge) lẫn 200 — request() vứt body khi !ok.
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    user?: SessionUser;
+    twoFactorRequired?: true;
+    adminRequires2fa?: true;
+    challengeToken?: string;
+    error?: string;
+    fieldErrors?: Record<string, string>;
+  };
   if (data.twoFactorRequired && data.challengeToken) {
     return { twoFactorRequired: true, challengeToken: data.challengeToken };
   }
+  if (data.adminRequires2fa && data.challengeToken) {
+    return { adminRequires2fa: true, challengeToken: data.challengeToken };
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, data.error ?? "Có lỗi xảy ra. Vui lòng thử lại.", data.fieldErrors);
+  }
   return { user: data.user as SessionUser };
+}
+
+/** Challenge 2FA do OAuth callback để lại (cookie httpOnly, đọc 1 lần). */
+export async function apiGoogleChallenge(): Promise<string | null> {
+  try {
+    const { challengeToken } = await request<{ challengeToken: string }>("/api/auth/google/challenge");
+    return challengeToken;
+  } catch {
+    return null;
+  }
 }
 
 export async function apiVerify2fa(challengeToken: string, code: string): Promise<SessionUser> {
@@ -74,12 +102,21 @@ export async function api2faDisable(code: string): Promise<void> {
   await request("/api/auth/2fa/disable", { method: "POST", body: JSON.stringify({ code }) });
 }
 
-export async function apiRegister(name: string, email: string, password: string): Promise<SessionUser> {
-  const { user } = await request<{ user: SessionUser }>("/api/auth/register", {
+/**
+ * Đăng ký: server luôn trả 202 + message chung (chống enumerate email).
+ * `user` non-null khi tạo mới (auto-login); null khi email đã tồn tại
+ * (không session — user kiểm tra email / đăng nhập).
+ */
+export async function apiRegister(
+  name: string,
+  email: string,
+  password: string,
+): Promise<{ user: SessionUser | null; message: string }> {
+  const data = await request<{ user: SessionUser | null; message: string }>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ name, email, password }),
   });
-  return user;
+  return { user: data.user, message: data.message };
 }
 
 export async function apiLogout(): Promise<void> {

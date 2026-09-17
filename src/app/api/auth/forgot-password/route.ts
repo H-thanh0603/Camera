@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requestPasswordReset } from "@/lib/server/password-reset";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 
 const schema = z.object({ email: z.string().trim().email("Email không hợp lệ.") });
@@ -9,6 +9,8 @@ const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
 
 /** POST /api/auth/forgot-password — luôn trả ok (chống enumerate email). */
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   const limit = await limiter.check(`forgot:${ip}`);
   if (!limit.allowed) {

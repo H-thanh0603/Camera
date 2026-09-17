@@ -6,7 +6,7 @@ const { currentToken } = vi.hoisted(() => ({ currentToken: { value: undefined as
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({
-    get: (name: string) => (name === "lumina.session" && currentToken.value ? { value: currentToken.value } : undefined),
+    get: (name: string) => (name.endsWith("lumina.session") && currentToken.value ? { value: currentToken.value } : undefined),
     set: () => undefined,
     delete: () => undefined,
   }),

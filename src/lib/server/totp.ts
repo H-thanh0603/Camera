@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual, createCipheriv, createDecipheriv } from "node:crypto";
 
 /**
  * TOTP (RFC 6238, SHA-1, 30s, 6 số) tự triển khai — không thêm dependency.
@@ -92,18 +92,116 @@ export function verifyTotp(secret: string, code: string, nowMs: number = Date.no
   return false;
 }
 
-/* ---------- Backup codes (dùng 1 lần, DB chỉ lưu SHA-256) ---------- */
+/* ---------- Mã hóa secret khi lưu (at-rest encryption) ---------- */
+
+/**
+ * Mã hóa secret 2FA khi lưu DB (AES-256-GCM). Thiếu TOTP_ENCRYPTION_KEY:
+ * mọi route 2FA trả 503 (fail-closed) — không fallback plaintext.
+ * Key: 32 byte thô hoặc hex 64 ký tự (openssl rand -hex 32).
+ * Định dạng lưu: v2:<ivHex>:<tagHex>:<cipherHex> — bản plaintext cũ
+ * (base32 không prefix) đọc được như cũ để migrate dần.
+ */
+
+const TOTP_ENC_PREFIX = "v2:";
+
+function totpKey(): Buffer {
+  const raw = process.env.TOTP_ENCRYPTION_KEY;
+  if (!raw) {
+    throw new TotpCryptoError("Chưa cấu hình TOTP_ENCRYPTION_KEY — không thể đọc/ghi secret 2FA.");
+  }
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, "hex");
+  if (raw.length === 32) return Buffer.from(raw, "utf8");
+  throw new TotpCryptoError("TOTP_ENCRYPTION_KEY phải là 32 byte hoặc hex 64 ký tự.");
+}
+
+export class TotpCryptoError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TotpCryptoError";
+  }
+}
+
+export function encryptTotpSecret(plain: string): string {
+  const key = totpKey();
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${TOTP_ENC_PREFIX}${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
+}
+
+/** Giải mã secret đã lưu; bản cũ plaintext (không prefix) trả nguyên văn. */
+export function decryptTotpSecret(stored: string): string {
+  if (!stored.startsWith(TOTP_ENC_PREFIX)) return stored;
+  const key = totpKey();
+  const [ivHex, tagHex, cipherHex] = stored.slice(TOTP_ENC_PREFIX.length).split(":");
+  if (!ivHex || !tagHex || !cipherHex) throw new TotpCryptoError("Secret 2FA lưu sai định dạng.");
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivHex, "hex"));
+    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+    return Buffer.concat([decipher.update(Buffer.from(cipherHex, "hex")), decipher.final()]).toString("utf8");
+  } catch {
+    throw new TotpCryptoError("Giải mã secret 2FA thất bại (sai key?).");
+  }
+}
+
+/* ---------- Backup codes (dùng 1 lần, DB chỉ lưu hash + salt) ----------
+ *
+ * Mã mới: 80 bit entropy (20 hex chars), hash SHA-256 với salt ngẫu nhiên
+ * riêng từng mã — lộ DB không brute-force được (không gian 2^80, salt
+ * chống rainbow table). Format lưu: `v1:<saltHex>:<hashHex>`.
+ * Mã cũ (8 hex chars, SHA-256 không salt) vẫn verify được để không khóa
+ * user đang giữ mã cũ — nhưng confirm mới luôn sinh mã v1.
+ */
 
 export function newBackupCodes(count = 8): string[] {
   const codes: string[] = [];
   for (let i = 0; i < count; i++) {
-    codes.push(
-      `${randomBytes(2).toString("hex").toUpperCase()}-${randomBytes(2).toString("hex").toUpperCase()}`,
-    );
+    const hex = randomBytes(10).toString("hex").toUpperCase();
+    codes.push(`${hex.slice(0, 5)}-${hex.slice(5, 10)}-${hex.slice(10, 15)}-${hex.slice(15, 20)}`);
   }
   return codes;
 }
 
+/** Chuẩn hoá input user: hoa, bỏ gạch nối/khoảng trắng (nhập thiếu dấu vẫn đúng). */
+export function normalizeBackupCode(code: string): string {
+  return code.trim().toUpperCase().replace(/[-\s]/g, "");
+}
+
+/** Hash mã mới với salt riêng. */
 export function hashBackupCode(code: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = createHash("sha256").update(salt + normalizeBackupCode(code), "utf8").digest("hex");
+  return `v1:${salt}:${hash}`;
+}
+
+/** Hash legacy (mã 8 hex chars cũ, SHA-256 không salt) — chỉ để verify mã cũ. */
+function hashLegacyBackupCode(code: string): string {
   return createHash("sha256").update(code.trim().toUpperCase(), "utf8").digest("hex");
+}
+
+/**
+ * Tìm mã khớp trong danh sách đã hash. Trả về entry đã lưu (để xóa 1 lần)
+ * hoặc null. Hỗ trợ cả mã v1 (salt) và mã legacy (không salt).
+ */
+export function findBackupCodeMatch(input: string, storedList: string[]): string | null {
+  const normalized = normalizeBackupCode(input);
+  if (!normalized) return null;
+  const legacyHash = hashLegacyBackupCode(input);
+  for (const stored of storedList) {
+    if (typeof stored !== "string") continue;
+    if (stored.startsWith("v1:")) {
+      const [, salt, hash] = stored.split(":");
+      if (!salt || !hash) continue;
+      const candidate = createHash("sha256").update(salt + normalized, "utf8").digest("hex");
+      const a = Buffer.from(candidate, "utf8");
+      const b = Buffer.from(hash, "utf8");
+      if (a.length === b.length && timingSafeEqual(a, b)) return stored;
+    } else {
+      const a = Buffer.from(legacyHash, "utf8");
+      const b = Buffer.from(stored, "utf8");
+      if (a.length === b.length && timingSafeEqual(a, b)) return stored;
+    }
+  }
+  return null;
 }

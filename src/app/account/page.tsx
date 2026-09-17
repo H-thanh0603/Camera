@@ -52,6 +52,8 @@ export default function AccountPage() {
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [twofaCode, setTwofaCode] = useState("");
+  // Admin chưa bật 2FA: bắt enroll ngay bằng challenge bootstrap (L4: kèm OTP email).
+  const [bootstrapToken, setBootstrapToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -73,6 +75,12 @@ export default function AccountPage() {
         // Tài khoản bật 2FA → chuyển sang form nhập code (giữ challenge 5 phút)
         if (err && typeof err === "object" && "twoFactorRequired" in err) {
           setChallengeToken((err as unknown as { challengeToken: string }).challengeToken);
+          return;
+        }
+        // Admin chưa bật 2FA → bắt enroll ngay bằng challenge bootstrap
+        if (err && typeof err === "object" && "adminRequires2fa" in err) {
+          setBootstrapToken((err as unknown as { challengeToken: string }).challengeToken);
+          pushToast("Tài khoản quản trị phải bật 2FA trước khi đăng nhập. Mã xác nhận đã gửi tới email.", "info");
           return;
         }
         setServerError(toAuthError(err).message);
@@ -102,8 +110,8 @@ export default function AccountPage() {
       setBusy(true);
       setServerError(null);
       try {
-        await register(values.name, values.email, values.password);
-        pushToast("Tài khoản đã được tạo. Chào mừng đến Lumina Optics!", "success");
+        const res = await register(values.name, values.email, values.password);
+        pushToast(res.message, res.user ? "success" : "info");
       } catch (err) {
         setServerError(toAuthError(err).message);
       } finally {
@@ -120,7 +128,7 @@ export default function AccountPage() {
           </div>
 
           {serverError && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{serverError}</p>}
-          <OAuthNotice pushToast={pushToast} />
+          <OAuthNotice pushToast={pushToast} onChallenge={setChallengeToken} />
           <VnpayNotice />
           <div className="flex rounded-lg bg-surface-container-low p-space-2xs" role="tablist" aria-label="Chọn chế độ đăng nhập">
             {(["login", "register"] as const).map((m) => (
@@ -140,7 +148,18 @@ export default function AccountPage() {
             ))}
           </div>
 
-          {challengeToken ? (
+          {bootstrapToken ? (
+            <BootstrapEnroll
+              challengeToken={bootstrapToken}
+              busy={busy}
+              setBusy={setBusy}
+              setServerError={setServerError}
+              onDone={() => {
+                setBootstrapToken(null);
+                pushToast("Đã bật 2FA. Đăng nhập lại để vào hệ thống.", "success");
+              }}
+            />
+          ) : challengeToken ? (
             <form onSubmit={doVerify2fa} className="flex flex-col gap-space-sm">
               <p className="rounded-lg bg-primary/10 p-space-sm font-body-sm text-body-sm text-on-surface-variant">
                 Tài khoản bật xác thực 2 bước — nhập mã 6 số từ app Authenticator (hoặc 1 mã dự phòng).
@@ -403,6 +422,114 @@ export default function AccountPage() {
   );
 }
 
+/**
+ * Enroll 2FA lần đầu bằng challenge bootstrap (admin chưa bật 2FA):
+ * setup (lấy secret + OTP gửi tới email) → confirm (code app + OTP email).
+ */
+function BootstrapEnroll({
+  challengeToken,
+  busy,
+  setBusy,
+  setServerError,
+  onDone,
+}: {
+  challengeToken: string;
+  busy: boolean;
+  setBusy: (b: boolean) => void;
+  setServerError: (m: string | null) => void;
+  onDone: () => void;
+}) {
+  const [secret, setSecret] = useState<string | null>(null);
+  const [otpauth, setOtpauth] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+
+  const start = async () => {
+    setBusy(true);
+    setServerError(null);
+    try {
+      const res = await fetch("/api/auth/2fa/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeToken }),
+      }).then((r) => r.json());
+      if (!res.secret) throw new Error(res.error ?? "fail");
+      setSecret(res.secret as string);
+      setOtpauth((res.otpauthUrl as string) ?? null);
+    } catch {
+      setServerError("Không bắt đầu được thiết lập 2FA. Đăng nhập lại.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setServerError(null);
+    try {
+      const res = await fetch("/api/auth/2fa/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ challengeToken, code, emailOtp }),
+      }).then((r) => r.json());
+      if (res.error) {
+        if (res.emailOtpRequired) {
+          setServerError("Cần mã gửi tới email để bật 2FA lần đầu. Kiểm tra hộp thư.");
+        } else {
+          setServerError(res.error as string);
+        }
+        return;
+      }
+      onDone();
+    } catch {
+      setServerError("Xác nhận thất bại. Thử lại.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!secret) {
+    return (
+      <div className="flex flex-col gap-space-sm">
+        <p className="rounded-lg bg-primary/10 p-space-sm font-body-sm text-body-sm text-on-surface-variant">
+          Tài khoản quản trị bắt buộc 2FA. Bấm để nhận secret + mã xác nhận gửi tới email.
+        </p>
+        <button
+          type="button"
+          onClick={start}
+          disabled={busy}
+          className="flex items-center justify-center gap-space-xs rounded-lg bg-primary py-space-sm font-headline-sm text-telemetry-data uppercase text-on-primary disabled:opacity-60"
+        >
+          {busy && <Spinner className="border-on-primary border-t-transparent" />}
+          Bắt đầu bật 2FA
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={confirm} className="flex flex-col gap-space-sm">
+      <p className="font-body-sm text-body-sm text-on-surface-variant">
+        Quét app Authenticator bằng secret (hoặc mở link), rồi nhập mã app + mã đã gửi tới email:
+      </p>
+      <p className="break-all rounded-lg bg-surface-container-low p-space-sm font-telemetry-data text-telemetry-data text-primary">{secret}</p>
+      {otpauth && <a href={otpauth} className="font-body-sm text-body-sm text-primary underline">Mở trong app Authenticator</a>}
+      <div className="flex flex-col gap-space-2xs">
+        <label htmlFor="bootstrap-totp" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mã 6 số từ app</label>
+        <input id="bootstrap-totp" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" className={loginInputClass(false)} />
+      </div>
+      <div className="flex flex-col gap-space-2xs">
+        <label htmlFor="bootstrap-email" className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mã gửi tới email</label>
+        <input id="bootstrap-email" inputMode="numeric" value={emailOtp} onChange={(e) => setEmailOtp(e.target.value)} placeholder="6 số trong email" className={loginInputClass(false)} />
+      </div>
+      <button type="submit" disabled={busy || !code || !emailOtp} className="mt-space-xs flex items-center justify-center gap-space-xs rounded-lg bg-primary py-space-sm font-headline-sm text-telemetry-data uppercase text-on-primary disabled:opacity-60">
+        {busy && <Spinner className="border-on-primary border-t-transparent" />}
+        Xác nhận bật 2FA
+      </button>
+    </form>
+  );
+}
+
 function TwoFactorManager({ pushToast }: { pushToast: (m: string, t: "success" | "error" | "info") => void }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
@@ -597,7 +724,13 @@ function GoogleButton() {
   );
 }
 
-function OAuthNotice({ pushToast }: { pushToast: (message: string, type: "success" | "error" | "info") => void }) {
+function OAuthNotice({
+  pushToast,
+  onChallenge,
+}: {
+  pushToast: (message: string, type: "success" | "error" | "info") => void;
+  onChallenge: (token: string) => void;
+}) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("oauth");
@@ -605,9 +738,21 @@ function OAuthNotice({ pushToast }: { pushToast: (message: string, type: "succes
     if (status === "success") pushToast("Đăng nhập Google thành công!", "success");
     else if (status === "denied") pushToast("Bạn đã từ chối quyền đăng nhập Google.", "info");
     else if (status === "banned") pushToast("Tài khoản đã bị khóa. Liên hệ concierge để được hỗ trợ.", "error");
-    else pushToast("Đăng nhập Google thất bại. Vui lòng thử lại.", "error");
+    else if (status === "2fa") {
+      // Google login trúng tài khoản bật 2FA: lấy challenge rồi mở form nhập code.
+      import("@/lib/api-client").then(({ apiGoogleChallenge }) =>
+        apiGoogleChallenge().then((token) => {
+          if (token) {
+            onChallenge(token);
+            pushToast("Tài khoản bật xác thực 2 bước — nhập mã từ app Authenticator.", "info");
+          } else {
+            pushToast("Phiên xác thực hết hạn. Đăng nhập lại.", "error");
+          }
+        }),
+      );
+    } else pushToast("Đăng nhập Google thất bại. Vui lòng thử lại.", "error");
     window.history.replaceState(null, "", window.location.pathname);
-  }, [pushToast]);
+  }, [pushToast, onChallenge]);
   return null;
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { verifyTotpChallenge, TwoFactorError } from "@/lib/server/two-factor";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { zodFieldErrors } from "@/lib/schemas";
 
@@ -17,6 +17,8 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`2fa:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(

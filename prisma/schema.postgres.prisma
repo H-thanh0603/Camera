@@ -29,6 +29,7 @@ model User {
   reviews      Review[]
   auditLogs    AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  emailOtps EmailOtp[]
   savedBattles SavedBattle[]
   totpChallenges TotpChallenge[]
   // 2FA TOTP: secret base32 (chỉ có nghĩa khi totpEnabled), backup codes SHA-256
@@ -127,6 +128,20 @@ model PasswordResetToken {
   tokenHash String    @unique
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model EmailOtp {
+  id        String    @id @default(cuid())
+  codeHash  String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   String    @default("totp-bootstrap")
+  attempts  Int       @default(0)
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())

@@ -138,7 +138,7 @@ interface StoreContextValue {
   authLoading: boolean;
   login: (email: string, password: string) => Promise<SessionUser>;
   verify2fa: (challengeToken: string, code: string) => Promise<SessionUser>;
-  register: (name: string, email: string, password: string) => Promise<SessionUser>;
+  register: (name: string, email: string, password: string) => Promise<{ user: SessionUser | null; message: string }>;
   logout: () => void;
   toasts: Toast[];
   pushToast: (message: string, tone?: Toast["tone"], action?: Toast["action"]) => void;
@@ -295,6 +295,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           // Tài khoản bật 2FA — UI chuyển sang form nhập code (xem AccountPage).
           throw { twoFactorRequired: true, challengeToken: result.challengeToken };
         }
+        if ("adminRequires2fa" in result) {
+          // Admin chưa bật 2FA: bắt buộc enroll ngay qua challenge bootstrap.
+          throw { adminRequires2fa: true, challengeToken: result.challengeToken };
+        }
         dispatch({ type: "auth/set", user: result.user });
         return result.user;
       },
@@ -305,9 +309,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return u;
       },
       register: async (name, email, password) => {
-        const u = await apiRegister(name, email, password);
-        dispatch({ type: "auth/set", user: u });
-        return u;
+        const res = await apiRegister(name, email, password);
+        if (res.user) dispatch({ type: "auth/set", user: res.user });
+        return res;
       },
       logout: () => {
         apiLogout().catch(() => undefined);

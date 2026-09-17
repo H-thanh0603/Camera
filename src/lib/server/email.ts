@@ -113,6 +113,17 @@ ${ctaButton(`${siteUrl}/account`, "THEO DÕI ĐƠN HÀNG")}`,
   );
 }
 
+/** Mã OTP email cho lần bật 2FA đầu tiên (hết hạn 10 phút, dùng 1 lần). */
+export function twoFactorOtpHtml(code: string): string {
+  return shell(
+    "Mã xác nhận bật 2FA Lumina Optics (hết hạn sau 10 phút)",
+    `<h1 style="color:#ffffff;font-size:22px;margin:0 0 12px;">Xác nhận bật 2FA</h1>
+<p style="margin:0 0 12px;">Nhập mã dưới đây vào trang bật xác thực 2 bước (hết hạn sau 10 phút, dùng 1 lần):</p>
+<p style="text-align:center;font-size:32px;font-weight:bold;letter-spacing:8px;color:#f2ca50;margin:16px 0;">${escapeEmailHtml(code)}</p>
+<p style="margin:12px 0 0;color:#99908c;font-size:13px;">Nếu bạn không yêu cầu, đổi mật khẩu ngay và liên hệ concierge.</p>`,
+  );
+}
+
 export function passwordResetHtml(link: string): string {
   return shell(
     "Đặt lại mật khẩu Lumina Optics (hết hạn sau 60 phút)",

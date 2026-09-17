@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { PasswordResetError, resetPasswordWithToken } from "@/lib/server/password-reset";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 import { zodFieldErrors } from "@/lib/schemas";
 
@@ -15,6 +15,8 @@ const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
 
 /** POST /api/auth/reset-password — đặt mật khẩu mới bằng token 1 lần. */
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`reset:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(
