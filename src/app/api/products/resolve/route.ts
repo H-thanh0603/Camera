@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { dbGetProductsByIds } from "@/lib/server/product-db";
 import { productResolveSchema, zodFieldErrors } from "@/lib/schemas";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { getClientIp } from "@/lib/server/client-ip";
 
 /**
@@ -13,6 +13,8 @@ import { getClientIp } from "@/lib/server/client-ip";
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 30 });
 
 export async function POST(request: NextRequest) {
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const limit = await limiter.check(`resolve:${getClientIp(request.headers)}`);
   if (!limit.allowed) {
     return NextResponse.json(

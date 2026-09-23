@@ -133,7 +133,10 @@ export async function verifyAndPriceLines(
     };
   });
   const totals: CartTotals = calculateTotals(detailLines as never);
-  if (delivery === "express") {
+  if (delivery === "pickup") {
+    totals.total -= totals.shipping;
+    totals.shipping = 0;
+  } else if (delivery === "express") {
     totals.shipping += EXPRESS_FEE;
     totals.total += EXPRESS_FEE;
   }
@@ -141,6 +144,19 @@ export async function verifyAndPriceLines(
 }
 
 const GUEST_TOKEN_RE = /^[A-Za-z0-9_-]{32,128}$/;
+
+/**
+ * TTL idempotency key (L10): key chỉ có nghĩa trong vòng 24h (intent checkout
+ * sống vài phút). Key cũ hơn → 422 bắt client sinh key mới, thay vì trả về
+ * đơn hàng từ tuần trước / tháng trước gây nhầm lẫn và rò PII cũ.
+ */
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60_000;
+
+function assertKeyFresh(createdAt: Date): void {
+  if (Date.now() - createdAt.getTime() > IDEMPOTENCY_TTL_MS) {
+    throw new OrderValidationError("Phiên đặt hàng đã hết hạn. Vui lòng đặt lại đơn mới.");
+  }
+}
 
 export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   const { contact, shipping, delivery, payment } = input;
@@ -161,6 +177,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
       include: { lines: true },
     });
     if (existing) {
+      assertKeyFresh(existing.createdAt);
       const { dbOrderToDomain, OrderForbidden } = await import("./order-mapper");
       const { verifyGuestToken } = await import("./guest-token");
       const row = existing as unknown as { userId?: string | null; guestTokenHash?: string | null };
@@ -377,6 +394,7 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
         include: { lines: true },
       });
       if (existing) {
+        assertKeyFresh(existing.createdAt);
         const { dbOrderToDomain, OrderForbidden } = await import("./order-mapper");
         const { verifyGuestToken } = await import("./guest-token");
         const row = existing as unknown as { userId?: string | null; guestTokenHash?: string | null };
