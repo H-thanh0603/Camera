@@ -38,6 +38,15 @@ const CHALLENGE_TTL_MS = 5 * 60_000;
 const MAX_CHALLENGE_ATTEMPTS = 10;
 const CHALLENGE_FAIL_WINDOW_S = 5 * 60;
 
+/**
+ * Trần thử sai TOTP theo TÀI KHOẢN (F4): cap per-challenge không đủ — attacker
+ * có mật khẩu gọi login lại là nhận challenge mới + 10 lần thử mới. Khóa sinh
+ * challenge khi tài khoản đã sai quá 20 lần trong 15 phút (đếm qua Redis đa
+ * instance, fallback memory).
+ */
+const MAX_USER_FAILS = 20;
+const USER_FAIL_WINDOW_S = 15 * 60;
+
 function hashChallenge(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
@@ -105,6 +114,67 @@ async function clearChallengeFails(token: string): Promise<void> {
 /** Reset state module (test). */
 export function __resetChallengeFails(): void {
   challengeFails.clear();
+  userFails.clear();
+}
+
+const userFails = new Map<string, { count: number; resetAt: number }>();
+
+function userFailKey(userId: string): string {
+  return `lumina:2fafail:user:${userId}`;
+}
+
+/** true khi tài khoản đã sai TOTP quá trần trong cửa sổ — không cấp challenge mới. */
+async function isUserLocked(userId: string): Promise<boolean> {
+  const k = userFailKey(userId);
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const count = Number((await redis.get(k)) ?? 0) || 0;
+      if (count >= MAX_USER_FAILS) return true;
+    } catch {
+      // rớt xuống memory
+    }
+  }
+  const entry = userFails.get(k);
+  if (!entry) return false;
+  if (entry.resetAt <= Date.now()) {
+    userFails.delete(k);
+    return false;
+  }
+  return entry.count >= MAX_USER_FAILS;
+}
+
+async function recordUserFail(userId: string): Promise<void> {
+  const k = userFailKey(userId);
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const count = await redis.incr(k);
+      if (count === 1) await redis.expire(k, USER_FAIL_WINDOW_S);
+    } catch {
+      // rớt xuống memory
+    }
+  }
+  const now = Date.now();
+  const entry = userFails.get(k);
+  if (!entry || entry.resetAt <= now) {
+    userFails.set(k, { count: 1, resetAt: now + USER_FAIL_WINDOW_S * 1000 });
+  } else {
+    entry.count += 1;
+  }
+}
+
+async function clearUserFails(userId: string): Promise<void> {
+  const k = userFailKey(userId);
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      await redis.del(k);
+    } catch {
+      // bỏ qua
+    }
+  }
+  userFails.delete(k);
 }
 
 function backupList(user: { totpBackupCodes: unknown }): string[] {
@@ -157,8 +227,12 @@ export async function disableTotp(userId: string, code: string): Promise<void> {
   await logAudit(user, "user.2fa_disabled", "User", userId, {});
 }
 
-/** Sau password đúng: tạo challenge 5 phút cho bước 2 (chưa tạo session). */
+/** Sau password đúng: tạo challenge 5 phút cho bước 2 (chưa tạo session).
+ * Ném TwoFactorError 429 nếu tài khoản đang khóa do sai TOTP quá nhiều (F4). */
 export async function createTotpChallenge(userId: string): Promise<string> {
+  if (await isUserLocked(userId)) {
+    throw new TwoFactorError("Quá nhiều lần thử 2FA thất bại. Đăng nhập lại sau ít phút.", 429);
+  }
   const token = randomBytes(32).toString("hex");
   await prisma.totpChallenge.create({
     data: { tokenHash: hashChallenge(token), userId, expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS) },
@@ -213,9 +287,11 @@ export async function verifyTotpChallenge(challengeToken: string, code: string):
   }
   if (!ok) {
     await recordChallengeFail(challengeToken);
+    await recordUserFail(user.id);
     throw new TwoFactorError("Mã xác thực không đúng.", 422);
   }
   await clearChallengeFails(challengeToken);
+  await clearUserFails(user.id);
   // Claim single-use trước mọi side-effect — 2 request song song 1 thắng.
   const claimed = await prisma.totpChallenge.updateMany({
     where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } },
@@ -223,10 +299,24 @@ export async function verifyTotpChallenge(challengeToken: string, code: string):
   });
   if (claimed.count === 0) throw new TwoFactorError("Phiên xác thực đã được dùng.", 401);
   if (consumedBackup) {
+    // F8: mã legacy (8 hex, hash không salt — không gian 2^32) dùng 1 lần là
+    // dọn TOÀN BỘ mã legacy còn lại trong DB; user vẫn dùng được app TOTP và
+    // sinh lại backup codes mới từ trang tài khoản.
+    const wasLegacy = !consumedBackup.startsWith("v1:");
+    const remaining = wasLegacy
+      ? backupList(user).filter((h) => typeof h === "string" && h.startsWith("v1:"))
+      : backupList(user).filter((h) => h !== consumedBackup);
     await prisma.user.update({
       where: { id: user.id },
-      data: { totpBackupCodes: backupList(user).filter((h) => h !== consumedBackup) },
+      data: { totpBackupCodes: remaining },
     });
+    await logAudit(
+      { id: user.id, name: user.name, email: user.email },
+      wasLegacy ? "user.legacy_backup_code_used" : "user.backup_code_used",
+      "User",
+      user.id,
+      { remainingBackupCodes: remaining.length },
+    );
   }
   await createSession(user.id);
   await logAudit({ id: user.id, name: user.name, email: user.email }, "user.2fa_verified", "User", user.id, {

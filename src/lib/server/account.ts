@@ -47,8 +47,8 @@ export async function exportAccountData(userId: string): Promise<Record<string, 
 export interface DeleteAccountInput {
   /** Tài khoản mật khẩu: bắt buộc, verify. Tài khoản OAuth: bỏ trống. */
   password?: string;
-  /** Tài khoản OAuth (passwordHash sentinel): email nhập lại phải khớp. */
-  confirmEmail?: string;
+  /** Tài khoản OAuth: mã OTP 6 số gửi tới email (F7 — email public không đủ làm yếu tố 2). */
+  otp?: string;
 }
 
 /** Xóa tài khoản của chính mình (đã xác thực sở hữu) + đăng xuất mọi phiên. */
@@ -63,8 +63,19 @@ export async function deleteOwnAccount(userId: string, input: DeleteAccountInput
   }
   const isOAuth = user.passwordHash.startsWith("oauth:");
   if (isOAuth) {
-    if ((input.confirmEmail ?? "").trim().toLowerCase() !== user.email.toLowerCase()) {
-      throw new AccountError("Email xác nhận không khớp.", 422);
+    // F7: OTP email làm yếu tố thứ hai — phiên bị đánh cắp (XSS) không xóa
+    // được tài khoản vì attacker không đọc được inbox của chủ tài khoản.
+    if (!input.otp) {
+      throw new AccountError("Cần mã xác nhận đã gửi tới email của bạn.", 422);
+    }
+    const { verifyEmailOtp } = await import("./email-otp");
+    try {
+      await verifyEmailOtp(user.id, input.otp, "account-delete");
+    } catch (error) {
+      if (error instanceof Error && error.name === "TwoFactorError") {
+        throw new AccountError(error.message, (error as unknown as { status: number }).status ?? 422);
+      }
+      throw error;
     }
   } else {
     if (!input.password || !(await verifyPassword(input.password, user.passwordHash))) {

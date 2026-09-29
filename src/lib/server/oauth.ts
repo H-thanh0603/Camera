@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 import { createSession } from "./session";
-import { createTotpChallenge } from "./two-factor";
+import { createTotpChallenge, TwoFactorError } from "./two-factor";
 import { logger } from "./logger";
 import { logAudit } from "./audit";
 import { fetchWithTimeout } from "./fetch";
@@ -94,7 +94,7 @@ function sameSecret(a: string, b: string): boolean {
 export async function finishGoogleLogin(
   code: string,
   state: string,
-): Promise<{ isNewUser: boolean; challengeToken?: string }> {
+): Promise<{ isNewUser: boolean; challengeToken?: string; adminRequires2fa?: boolean }> {
   const store = await cookies();
   const expected = store.get(OAUTH_STATE_COOKIE)?.value;
   const verifier = store.get(OAUTH_VERIFIER_COOKIE)?.value;
@@ -157,9 +157,48 @@ export async function finishGoogleLogin(
     logger.warn("oauth.banned_blocked", { userId: user.id });
     throw new OAuthError("Tài khoản đã bị khóa. Liên hệ concierge để được hỗ trợ.", "BANNED");
   }
+  // F2: KHÔNG auto-link Google vào tài khoản mật khẩu. Đăng ký không có bước
+  // xác minh email nên attacker kiểm soát được một email trùng (domain hết hạn,
+  // email tái cấp) có thể tạo Google account + auto-link chiếm tài khoản mà
+  // không cần mật khẩu. Chỉ nhận đăng nhập Google với tài khoản OAuth sentinel.
+  if (!user.passwordHash.startsWith("oauth:")) {
+    logger.warn("oauth.password_account_link_blocked", { userId: user.id });
+    throw new OAuthError(
+      "Email này đã đăng ký bằng mật khẩu. Vui lòng đăng nhập bằng mật khẩu (dùng Quên mật khẩu nếu cần).",
+    );
+  }
+  // F3: admin BẮT BUỘC 2FA — OAuth không được cấp session cho admin chưa bật
+  // (luồng password chặn tại login route, OAuth phải nhất quán). Trả challenge
+  // bootstrap để account page mở form enroll ngay (giống login password).
+  if (user.role === "admin" && !user.totpEnabled) {
+    let challengeToken: string;
+    try {
+      challengeToken = await createTotpChallenge(user.id);
+    } catch (error) {
+      if (error instanceof TwoFactorError) throw new OAuthError(error.message);
+      throw error;
+    }
+    const store2 = await cookies();
+    store2.set(OAUTH_2FA_COOKIE, challengeToken, oauthCookieOpts(300));
+    logger.info("oauth.admin_2fa_required", { userId: user.id });
+    await logAudit(
+      { id: user.id, name: user.name, email: user.email },
+      "auth.google_admin_2fa_required",
+      "User",
+      user.id,
+      { isNewUser },
+    );
+    return { isNewUser, challengeToken, adminRequires2fa: true };
+  }
   // Tài khoản bật 2FA: không session vội — trả challenge bước 2 (như login password).
   if (user.totpEnabled) {
-    const challengeToken = await createTotpChallenge(user.id);
+    let challengeToken: string;
+    try {
+      challengeToken = await createTotpChallenge(user.id);
+    } catch (error) {
+      if (error instanceof TwoFactorError) throw new OAuthError(error.message);
+      throw error;
+    }
     const store2 = await cookies();
     store2.set(OAUTH_2FA_COOKIE, challengeToken, oauthCookieOpts(300));
     logger.info("oauth.google_2fa_required", { userId: user.id });

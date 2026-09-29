@@ -51,10 +51,27 @@ describe("GDPR tự phục vụ", () => {
     await prisma.order.delete({ where: { id: order.id } });
   });
 
-  it("tài khoản OAuth xóa bằng email xác nhận", async () => {
+  it("tài khoản OAuth xóa bằng OTP email (F7): thiếu/sai mã 422, đúng mã thì xóa", async () => {
     const user = await makeUser("oauth:google");
-    await expect(deleteOwnAccount(user.id, { confirmEmail: "sai@t.vn" })).rejects.toMatchObject({ status: 422 });
-    await deleteOwnAccount(user.id, { confirmEmail: EMAIL });
+    // Thiếu OTP → 422
+    await expect(deleteOwnAccount(user.id, {})).rejects.toMatchObject({ status: 422 });
+    // Tạo OTP hợp lệ trong DB (sha256(salt+code) như email-otp.ts)
+    const { createHash, randomBytes } = await import("node:crypto");
+    const code = "123456";
+    const salt = randomBytes(16).toString("hex");
+    const hash = createHash("sha256").update(salt + code, "utf8").digest("hex");
+    await prisma.emailOtp.create({
+      data: {
+        codeHash: `${salt}:${hash}`,
+        userId: user.id,
+        purpose: "account-delete",
+        expiresAt: new Date(Date.now() + 10 * 60_000),
+      },
+    });
+    // Sai mã → 422
+    await expect(deleteOwnAccount(user.id, { otp: "654321" })).rejects.toMatchObject({ status: 422 });
+    // Đúng mã → xóa thành công
+    await deleteOwnAccount(user.id, { otp: code });
     expect(await prisma.user.findUnique({ where: { id: user.id } })).toBeNull();
   });
 

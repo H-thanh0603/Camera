@@ -50,7 +50,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     order = await getOwnOrder(id, request.headers.get("x-guest-token") ?? undefined);
   } catch (error) {
     if (error instanceof OrderForbidden) {
-      return NextResponse.json({ error: error.message }, { status: 403 });
+      // L5: sai chủ đơn trả 404 chung — 403 là oracle lộ sự tồn tại của order id
+      return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
     }
     throw error;
   }

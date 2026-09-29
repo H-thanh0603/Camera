@@ -103,20 +103,19 @@ export async function api2faDisable(code: string): Promise<void> {
 }
 
 /**
- * Đăng ký: server luôn trả 202 + message chung (chống enumerate email).
- * `user` non-null khi tạo mới (auto-login); null khi email đã tồn tại
- * (không session — user kiểm tra email / đăng nhập).
+ * Đăng ký: server luôn trả 202 + body Y HỆT NHAU (user:null — chống enumerate,
+ * F1). Server vẫn tạo session cho email mới: client nhận diện qua GET /me.
  */
 export async function apiRegister(
   name: string,
   email: string,
   password: string,
-): Promise<{ user: SessionUser | null; message: string }> {
-  const data = await request<{ user: SessionUser | null; message: string }>("/api/auth/register", {
+): Promise<{ message: string }> {
+  const data = await request<{ user: unknown; message: string }>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ name, email, password }),
   });
-  return { user: data.user, message: data.message };
+  return { message: data.message };
 }
 
 export async function apiLogout(): Promise<void> {
@@ -250,8 +249,13 @@ export async function apiExportAccount(): Promise<Record<string, unknown>> {
   return data as Record<string, unknown>;
 }
 
-export async function apiDeleteAccount(input: { password?: string; confirmEmail?: string }): Promise<void> {
-  await request<{ ok: true }>("/api/account/delete", { method: "POST", body: JSON.stringify(input) });
+export async function apiDeleteAccount(
+  input: { password?: string; otp?: string; requestOtp?: boolean },
+): Promise<{ ok?: true; otpSent?: boolean }> {
+  return request<{ ok: true; otpSent?: boolean }>("/api/account/delete", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 /* ---------- Reviews ---------- */

@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/server/prisma";
 import { hashPassword, verifyPassword } from "@/lib/server/password";
 import { createSession } from "@/lib/server/session";
-import { createTotpChallenge } from "@/lib/server/two-factor";
+import { createTotpChallenge, TwoFactorError } from "@/lib/server/two-factor";
 import { loginSchema, zodFieldErrors } from "@/lib/schemas";
 import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { clearLoginFails, isAccountLocked, recordLoginFail } from "@/lib/server/login-attempt";
@@ -78,7 +78,16 @@ export async function POST(request: NextRequest) {
   // cảnh báo, vẫn login bình thường — nghĩa là không bắt buộc gì cả).
   if (user.role === "admin" && !user.totpEnabled) {
     await clearLoginFails(parsed.data.email);
-    const challengeToken = await createTotpChallenge(user.id);
+    let challengeToken: string;
+    try {
+      challengeToken = await createTotpChallenge(user.id);
+    } catch (error) {
+      // F4: tài khoản đang khóa do sai TOTP quá nhiều → 429 thay vì challenge mới
+      if (error instanceof TwoFactorError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
+    }
     return NextResponse.json(
       { error: "Tài khoản quản trị phải bật xác thực 2 bước trước khi đăng nhập.", adminRequires2fa: true, challengeToken },
       { status: 403 },
@@ -88,7 +97,15 @@ export async function POST(request: NextRequest) {
 
   // 2FA bật: không tạo session vội — trả challenge 5 phút cho bước 2.
   if (user.totpEnabled) {
-    const challengeToken = await createTotpChallenge(user.id);
+    let challengeToken: string;
+    try {
+      challengeToken = await createTotpChallenge(user.id);
+    } catch (error) {
+      if (error instanceof TwoFactorError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
+    }
     return NextResponse.json({ twoFactorRequired: true, challengeToken });
   }
   await createSession(user.id);

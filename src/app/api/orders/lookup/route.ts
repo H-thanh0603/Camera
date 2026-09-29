@@ -46,24 +46,3 @@ export async function POST(request: NextRequest) {
   if (!order) return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
   return NextResponse.json({ order });
 }
-
-/**
- * GET legacy (?number=&token=) — giữ tương thích, log warn để theo dõi rồi
- * gỡ. Token trong URL rò vào history/logs/proxy (M13): client mới dùng POST.
- */
-export async function GET(request: NextRequest) {
-  const blocked = await redisRequiredResponse();
-  if (blocked) return blocked;
-  const denied = await checkLimit(getClientIp(request.headers));
-  if (denied) return denied;
-  const number = request.nextUrl.searchParams.get("number")?.trim() ?? "";
-  const token = request.nextUrl.searchParams.get("token")?.trim() ?? "";
-  if (!number || !token) {
-    return NextResponse.json({ error: "Thiếu mã đơn hoặc token." }, { status: 422 });
-  }
-  const order = await getGuestOrderByNumber(number, token);
-  if (!order) return NextResponse.json({ error: "Không tìm thấy đơn hàng." }, { status: 404 });
-  const { logger } = await import("@/lib/server/logger");
-  logger.warn("order.lookup_legacy_get", {});
-  return NextResponse.json({ order });
-}

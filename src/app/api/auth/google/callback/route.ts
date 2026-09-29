@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${site}/account?oauth=denied`);
   }
   try {
-    const { challengeToken } = await finishGoogleLogin(code, state);
+    const { challengeToken, adminRequires2fa } = await finishGoogleLogin(code, state);
     if (challengeToken) {
-      return NextResponse.redirect(`${site}/account?oauth=2fa`);
+      // adminRequires2fa: admin chưa bật 2FA — account page mở form enroll bootstrap.
+      return NextResponse.redirect(`${site}/account?oauth=${adminRequires2fa ? "admin2fa" : "2fa"}`);
     }
     return NextResponse.redirect(`${site}/account?oauth=success`);
   } catch (error) {

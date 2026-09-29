@@ -128,7 +128,7 @@ export default function AccountPage() {
           </div>
 
           {serverError && <p className="rounded-lg border border-error/40 bg-error-container/20 p-space-sm font-body-sm text-body-sm text-error" role="alert">{serverError}</p>}
-          <OAuthNotice pushToast={pushToast} onChallenge={setChallengeToken} />
+          <OAuthNotice pushToast={pushToast} onChallenge={setChallengeToken} onBootstrap={setBootstrapToken} />
           <VnpayNotice />
           <div className="flex rounded-lg bg-surface-container-low p-space-2xs" role="tablist" aria-label="Chọn chế độ đăng nhập">
             {(["login", "register"] as const).map((m) => (
@@ -649,6 +649,7 @@ function TwoFactorManager({ pushToast }: { pushToast: (m: string, t: "success" |
 function DeleteAccountButton({ pushToast }: { pushToast: (m: string, t: "success" | "error" | "info") => void }) {
   const [confirming, setConfirming] = useState(false);
   const [secret, setSecret] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!confirming) {
@@ -662,6 +663,21 @@ function DeleteAccountButton({ pushToast }: { pushToast: (m: string, t: "success
       </button>
     );
   }
+  const isOtpFlow = secret.includes("@"); // tài khoản Google: xác nhận bằng OTP email
+  const sendOtp = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiDeleteAccount({ requestOtp: true });
+      setOtpSent(true);
+      setSecret(""); // ô nhập chuyển sang nhập mã OTP
+      pushToast("Mã xác nhận đã gửi tới email của bạn.", "info");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Không gửi được mã xác nhận.");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <form
       className="flex w-full flex-col gap-space-sm rounded-lg border border-error/40 p-space-md"
@@ -670,9 +686,8 @@ function DeleteAccountButton({ pushToast }: { pushToast: (m: string, t: "success
         setBusy(true);
         setError(null);
         try {
-          // Tài khoản mật khẩu nhập password; tài khoản Google nhập lại email.
-          const payload = secret.includes("@") ? { confirmEmail: secret } : { password: secret };
-          await apiDeleteAccount(payload);
+          // Tài khoản mật khẩu nhập password; tài khoản Google qua OTP email (F7).
+          await apiDeleteAccount(isOtpFlow ? { otp: secret.replace(/\D/g, "") } : { password: secret });
           window.location.href = "/";
         } catch (err) {
           setError(err instanceof ApiError ? err.message : "Không xóa được tài khoản.");
@@ -682,23 +697,30 @@ function DeleteAccountButton({ pushToast }: { pushToast: (m: string, t: "success
       }}
     >
       <p className="font-body-sm text-body-sm text-error" role="alert">
-        Hành động không thể hoàn tác. Nhập <strong>mật khẩu</strong> (hoặc <strong>email</strong> nếu đăng nhập bằng Google) để xác nhận.
+        Hành động không thể hoàn tác. Nhập <strong>mật khẩu</strong> (hoặc <strong>email</strong> nếu đăng nhập bằng Google — mã xác nhận sẽ gửi tới email đó).
       </p>
       {error && <p className="font-body-sm text-body-sm text-error" role="alert">{error}</p>}
       <div className="flex flex-wrap gap-space-sm">
         <input
-          type="password"
+          type={isOtpFlow && otpSent ? "text" : "password"}
+          inputMode={isOtpFlow && otpSent ? "numeric" : undefined}
           autoComplete="off"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          placeholder="Mật khẩu hoặc email"
+          placeholder={isOtpFlow && otpSent ? "Mã 6 số trong email" : "Mật khẩu hoặc email"}
           aria-label="Xác nhận xóa tài khoản"
           className="min-w-0 flex-1 rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-error"
         />
-        <button type="submit" disabled={busy || !secret} className="rounded-lg bg-error px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary disabled:opacity-60">
-          {busy ? "Đang xóa…" : "Xác nhận xóa"}
-        </button>
-        <button type="button" onClick={() => { setConfirming(false); setSecret(""); setError(null); pushToast("Đã hủy xóa tài khoản.", "info"); }} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface">
+        {isOtpFlow && !otpSent ? (
+          <button type="button" disabled={busy} onClick={sendOtp} className="rounded-lg bg-error px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary disabled:opacity-60">
+            {busy ? "Đang gửi…" : "Gửi mã xác nhận"}
+          </button>
+        ) : (
+          <button type="submit" disabled={busy || !secret} className="rounded-lg bg-error px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-primary disabled:opacity-60">
+            {busy ? "Đang xóa…" : "Xác nhận xóa"}
+          </button>
+        )}
+        <button type="button" onClick={() => { setConfirming(false); setSecret(""); setOtpSent(false); setError(null); pushToast("Đã hủy xóa tài khoản.", "info"); }} className="rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface">
           Hủy
         </button>
       </div>
@@ -727,9 +749,11 @@ function GoogleButton() {
 function OAuthNotice({
   pushToast,
   onChallenge,
+  onBootstrap,
 }: {
   pushToast: (message: string, type: "success" | "error" | "info") => void;
   onChallenge: (token: string) => void;
+  onBootstrap: (token: string) => void;
 }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -750,9 +774,21 @@ function OAuthNotice({
           }
         }),
       );
+    } else if (status === "admin2fa") {
+      // F3: admin OAuth chưa bật 2FA — mở form enroll bootstrap (kèm OTP email).
+      import("@/lib/api-client").then(({ apiGoogleChallenge }) =>
+        apiGoogleChallenge().then((token) => {
+          if (token) {
+            onBootstrap(token);
+            pushToast("Tài khoản quản trị phải bật 2FA trước khi đăng nhập. Mã xác nhận đã gửi tới email.", "info");
+          } else {
+            pushToast("Phiên xác thực hết hạn. Đăng nhập lại.", "error");
+          }
+        }),
+      );
     } else pushToast("Đăng nhập Google thất bại. Vui lòng thử lại.", "error");
     window.history.replaceState(null, "", window.location.pathname);
-  }, [pushToast, onChallenge]);
+  }, [pushToast, onChallenge, onBootstrap]);
   return null;
 }
 

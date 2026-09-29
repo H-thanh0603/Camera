@@ -15,12 +15,14 @@ import { getClientIp } from "@/lib/server/client-ip";
 // 5 lần/phút/IP — chống spam đăng ký (Redis đa instance, fallback memory)
 const limiter = getRequestLimiter({ windowMs: 60_000, max: 5 });
 
-/** Response đăng ký: luôn 202 + message chung, user chỉ khi tạo mới. */
-function registerResponse(user: { id: string; name: string; email: string } | null) {
+/**
+ * Response đăng ký: luôn 202 + body Y HỆT NHAU (user:null + message chung).
+ * Trả object user khi tạo mới là oracle enumerate email (F1) — client tự
+ * nhận diện phiên mới qua GET /api/auth/me thay vì đọc body.
+ */
+function registerResponse() {
   return NextResponse.json(
-    user
-      ? { user, message: "Tài khoản đã được tạo. Kiểm tra email để xác nhận." }
-      : { user: null, message: "Nếu email chưa được dùng, tài khoản đã được tạo. Kiểm tra email để xác nhận." },
+    { user: null, message: "Nếu email chưa được dùng, tài khoản đã được tạo. Kiểm tra email để xác nhận." },
     { status: 202 },
   );
 }
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
   if (existing) {
     // Email đã tồn tại: TRẢ Y HỆT response thành công (202 + message chung,
     // không session mới) — attacker không phân biệt được qua status/body (M7).
-    return registerResponse(null);
+    return registerResponse();
   }
 
   let user;
@@ -64,11 +66,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // P2002 = unique constraint — 2 request cùng email chạm DB đồng thời
     if ((error as { code?: string }).code === "P2002") {
-      return registerResponse(null);
+      return registerResponse();
     }
     throw error;
   }
 
   await createSession(user.id);
-  return registerResponse({ id: user.id, name: user.name, email: user.email });
+  return registerResponse();
 }

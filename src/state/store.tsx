@@ -310,8 +310,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       },
       register: async (name, email, password) => {
         const res = await apiRegister(name, email, password);
-        if (res.user) dispatch({ type: "auth/set", user: res.user });
-        return res;
+        // Server không trả user qua body (F1 chống enumerate) — session mới
+        // (nếu email chưa dùng) được nhận diện qua GET /me.
+        const me = await apiMe().catch(() => null);
+        if (me) dispatch({ type: "auth/set", user: me });
+        return { user: me, message: res.message };
       },
       logout: () => {
         apiLogout().catch(() => undefined);

@@ -2,8 +2,8 @@
  * Seed: chép catalogue từ seed file vào DB (upsert — chạy lại an toàn)
  * + tạo tài khoản admin mặc định cho đồ án.
  *
- * Chạy: npx prisma db seed
- * Đăng nhập admin: admin@lumina.vn / ADMIN_PASSWORD (mặc định admin-lumina-2026)
+ * Chạy: ADMIN_PASSWORD=... npx prisma db seed
+ * Đăng nhập admin: admin@lumina.vn / ADMIN_PASSWORD (bắt buộc, không mặc định)
  */
 
 import { Prisma } from "../src/generated/prisma/client";
@@ -79,9 +79,10 @@ async function main() {
 
   const adminEmail = "admin@lumina.vn";
   const adminPassword = process.env.ADMIN_PASSWORD;
-  // Production: cấm seed mật khẩu mặc định (backdoor nếu quên env)
-  if (process.env.NODE_ENV === "production" && !adminPassword) {
-    throw new Error("ADMIN_PASSWORD là bắt buộc khi seed ở production.");
+  // L2: không còn mật khẩu mặc định — default hardcode trong repo là backdoor
+  // công khai nếu DB nào được seed mà thiếu env (staging, preview…).
+  if (!adminPassword) {
+    throw new Error("ADMIN_PASSWORD là bắt buộc khi seed admin (mọi môi trường).");
   }
   await prisma.user.upsert({
     where: { email: adminEmail },
@@ -89,11 +90,11 @@ async function main() {
     create: {
       email: adminEmail,
       name: "Lumina Admin",
-      passwordHash: await hashPassword(adminPassword ?? "admin-lumina-2026"),
+      passwordHash: await hashPassword(adminPassword),
       role: "admin",
     },
   });
-  console.log(`Admin ready: ${adminEmail} (password từ ADMIN_PASSWORD hoặc mặc định)`);
+  console.log(`Admin ready: ${adminEmail} (password từ ADMIN_PASSWORD)`);
 
   const coupons = [
     { code: "LUMINA10", kind: "percent", value: 10, minSubtotal: 5_000_000, maxUses: 500 },

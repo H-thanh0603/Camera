@@ -32,6 +32,9 @@ const envSchema = z.object({
   R2_BUCKET: z.string().min(1).optional(),
   R2_PUBLIC_URL: z.string().url().optional(),
   TRUST_PROXY_COUNT: z.string().regex(/^\d+$/).optional(),
+  // 2FA TOTP at-rest encryption (32 byte thô hoặc hex 64) — thiếu thì mọi
+  // route 2FA fail-closed 503, không bao giờ lưu secret plaintext.
+  TOTP_ENCRYPTION_KEY: z.string().refine((v) => v.length === 32 || /^[0-9a-fA-F]{64}$/.test(v), "TOTP_ENCRYPTION_KEY phải là 32 byte hoặc hex 64 ký tự.").optional(),
   // Vận chuyển: thiếu thì admin nhập mã vận đơn tay (manual).
   GHN_TOKEN: z.string().min(1).optional(),
   GHN_SHOP_ID: z.string().min(1).optional(),
@@ -52,6 +55,11 @@ export function getEnv(): AppEnv {
   const env = parsed.data;
   if (env.NODE_ENV === "production" && !env.ADMIN_PASSWORD) {
     throw new Error("ADMIN_PASSWORD là bắt buộc ở production.");
+  }
+  // F9: link reset password / redirect OAuth dựng từ SITE_URL — thiếu là link
+  // rơi về localhost, user không reset được mật khẩu. Fail-fast lúc boot.
+  if (env.NODE_ENV === "production" && !env.NEXT_PUBLIC_SITE_URL) {
+    throw new Error("NEXT_PUBLIC_SITE_URL là bắt buộc ở production (link email + redirect OAuth).");
   }
   if (env.NODE_ENV === "production" && !(env.VNPAY_TMN_CODE && env.VNPAY_HASH_SECRET)) {
     throw new Error(
