@@ -40,14 +40,15 @@ export function UsersAdmin() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
 
   const act = useMutation({
-    mutationFn: async ({ id, body, method = "PATCH" }: { id: string; body?: unknown; method?: "PATCH" | "DELETE" }) => {
-      const res = await fetch(`/api/admin/users/${id}`, {
+    mutationFn: async ({ id, body, method = "PATCH", path }: { id: string; body?: unknown; method?: "PATCH" | "DELETE" | "POST"; path?: string }) => {
+      const res = await fetch(`/api/admin/users/${id}${path ?? ""}`, {
         method,
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined,
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((payload as { error?: string }).error ?? "Thao tác thất bại.");
+      return payload;
     },
     onSuccess: invalidate,
     onError: (e: Error) => alert(e.message),
@@ -123,6 +124,18 @@ export function UsersAdmin() {
                   className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface hover:text-secondary"
                 >
                   {u.isBanned ? "Mở khóa" : "Khóa"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busyId === u.id}
+                  onClick={() => {
+                    if (window.confirm(`Đăng xuất toàn bộ phiên của ${u.email}? (mất máy, nghi lộ session)`)) {
+                      act.mutate({ id: u.id, method: "POST", path: "/revoke-sessions" });
+                    }
+                  }}
+                  className="rounded-lg bg-surface-container-high px-space-md py-space-2xs font-telemetry-xs text-telemetry-xs uppercase text-on-surface hover:text-secondary"
+                >
+                  Thu hồi phiên
                 </button>
                 <button
                   type="button"

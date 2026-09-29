@@ -42,13 +42,13 @@ export default async function AdminDashboardPage() {
       // Chart 14 ngày: query giới hạn theo thời gian + cột nhẹ (không lines/totals)
       prisma.order.findMany({
         where: { createdAt: { gte: fourteenDaysAgo } },
-        select: { createdAt: true },
+        select: { createdAt: true, totalAmount: true, status: true },
       }),
     ]);
 
   const revenue = revenueAgg._sum.totalAmount ?? 0;
 
-  // Đơn hàng 14 ngày gần nhất cho biểu đồ (đã lọc từ DB)
+  // Đơn hàng + doanh thu xác nhận theo từng ngày (chỉ đếm đơn đã có tiền)
   const chartData: { day: string; orders: number; revenue: number }[] = [];
   for (let i = 13; i >= 0; i--) {
     const dayStart = new Date();
@@ -56,11 +56,13 @@ export default async function AdminDashboardPage() {
     dayStart.setDate(dayStart.getDate() - i);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
-    const dayOrders = chartOrders.filter((o) => o.createdAt >= dayStart && o.createdAt < dayEnd).length;
+    const dayRows = chartOrders.filter((o) => o.createdAt >= dayStart && o.createdAt < dayEnd);
     chartData.push({
       day: dayStart.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }),
-      orders: dayOrders,
-      revenue: 0,
+      orders: dayRows.length,
+      revenue: dayRows
+        .filter((o) => (paidStatuses as string[]).includes(o.status))
+        .reduce((sum, o) => sum + o.totalAmount, 0),
     });
   }
 

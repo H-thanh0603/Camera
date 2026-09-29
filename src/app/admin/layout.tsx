@@ -19,9 +19,11 @@ const ALL_ITEMS: (AdminNavItem & { roles: Role[] })[] = [
   { href: "/admin/orders", label: "Đơn hàng", icon: "receipt_long", roles: ["admin", "staff"] },
   { href: "/admin/coupons", label: "Mã giảm giá", icon: "sell", roles: ["admin"] },
   { href: "/admin/content", label: "Nội dung", icon: "article", roles: ["admin"] },
+  { href: "/admin/drafts", label: "Nháp AI", icon: "auto_awesome", roles: ["admin"] },
   { href: "/admin/users", label: "Tài khoản", icon: "group", roles: ["admin"] },
   { href: "/admin/reviews", label: "Kiểm duyệt", icon: "rate_review", roles: ["admin", "staff"] },
   { href: "/admin/trade-in", label: "Thu cũ", icon: "autorenew", roles: ["admin", "staff"] },
+  { href: "/admin/queue", label: "Email queue", icon: "outgoing_mail", roles: ["admin"] },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -31,17 +33,22 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!me || (me.role !== "admin" && me.role !== "staff")) redirect("/account");
   const role = me.role as Role;
 
-  const [pendingOrders, pendingReviews, newTradeIns, lowStocks] = await Promise.all([
+  const OUTBOX_MAX_ATTEMPTS = 5; // đồng bộ với email-outbox.ts
+  const [pendingOrders, pendingReviews, newTradeIns, lowStocks, deadMails, pendingDrafts] = await Promise.all([
     prisma.order.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { approved: false } }),
     prisma.tradeInLead.count({ where: { status: "new" } }),
     prisma.product.count({ where: { OR: [{ stock: 0 }, { availability: "out_of_stock" }] } }),
+    prisma.emailOutbox.count({ where: { sentAt: null, attempts: { gte: OUTBOX_MAX_ATTEMPTS } } }),
+    prisma.merchantDescriptionDraft.count({ where: { status: "pending" } }),
   ]);
   const badges: Record<string, number> = {
     "/admin/products": lowStocks,
     "/admin/orders": pendingOrders,
     "/admin/reviews": pendingReviews,
     "/admin/trade-in": newTradeIns,
+    "/admin/queue": deadMails,
+    "/admin/drafts": pendingDrafts,
   };
 
   return (
