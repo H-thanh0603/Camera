@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
         orderNumber,
         amount: parsed.amountVnd,
         status: parsed.responseCode === "00" ? "paid" : "failed",
-        // Timestamp thật từ vnp_PayDate (GMT+7) để check replay 5 phút có
-        // hiệu lực (L9); không parse được → now (không phá IPN hợp lệ).
+        // Timestamp thật từ vnp_PayDate (GMT+7). Window 24h (M2): retry IPN
+        // sau khi deploy/restart vẫn được nhận — replay chặn bằng dedupe
+        // PaymentEvent, không phụ thuộc skew.
         timestamp: parseVnpayPayDate(query.vnp_PayDate) ?? Math.floor(Date.now() / 1000),
       },
       {
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
         txnRef: parsed.txnRef,
       },
       "vnpay",
+      24 * 3600,
     );
     // Đơn đã ở trạng thái cuối (không còn pending) → báo VNPay dừng retry
     if (outcome.deduped && outcome.status !== "pending") {

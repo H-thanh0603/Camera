@@ -16,7 +16,7 @@ const envSchema = z.object({
   PAYMENT_WEBHOOK_SECRET: z.string().min(16).optional(),
   // VNPay (sandbox khi chưa có keys thật — thiếu keys thì vnpay-url 503):
   VNPAY_TMN_CODE: z.string().min(1).optional(),
-  VNPAY_HASH_SECRET: z.string().min(8).optional(),
+  VNPAY_HASH_SECRET: z.string().min(16, "VNPAY_HASH_SECRET tối thiểu 16 ký tự.").optional(),
   VNPAY_PAY_URL: z.string().url().default("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"),
   VNPAY_API_URL: z.string().url().default("https://sandbox.vnpayment.vn/merchant_webapi/api/transaction"),
   VNPAY_RETURN_URL: z.string().url().optional(),

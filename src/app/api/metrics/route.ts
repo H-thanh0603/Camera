@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { logger } from "@/lib/server/logger";
 import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getClientIp } from "@/lib/server/client-ip";
 import { isAdmin } from "@/lib/server/admin";
+import { isSameOriginRequest } from "@/lib/csrf";
 
 /**
  * POST /api/metrics — điểm nhận event analytics + web vitals + client error.
@@ -20,15 +22,13 @@ const counters = new Map<string, number>();
 const postLimiter = getRequestLimiter({ windowMs: 60_000, max: 120 });
 const getLimiter = getRequestLimiter({ windowMs: 60_000, max: 60 });
 
-function clientIp(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-}
-
 async function limited(
   request: NextRequest,
   limiter: ReturnType<typeof getRequestLimiter>,
 ): Promise<NextResponse | null> {
-  const result = await limiter.check(clientIp(request));
+  // Dùng getClientIp thống nhất (tôn trọng TRUST_PROXY_COUNT) thay vì parse
+  // X-Forwarded-For riêng — tránh spoof IP khi self-host không proxy.
+  const result = await limiter.check(getClientIp(request.headers));
   return result.allowed
     ? null
     : NextResponse.json({ error: "Quá nhiều yêu cầu." }, { status: 429, headers: { "Retry-After": String(result.retryAfterSeconds) } });
@@ -44,8 +44,13 @@ export async function POST(request: NextRequest) {
     }
     counters.set(body.event, (counters.get(body.event) ?? 0) + 1);
     // Lỗi client đi qua logger.error để forward sang Sentry (server-side,
-    // không tốn bundle client) — event thường chỉ info.
+    // không tốn bundle client) — event thường chỉ info. client_error bắt
+    // buộc same-origin (L1): route exempt CSRF, form text/plain cross-site
+    // không có Origin khớp — chặn spam Sentry chéo site.
     if (body.event === "client_error") {
+      if (!isSameOriginRequest(request)) {
+        return NextResponse.json({ error: "Yêu cầu bị chặn." }, { status: 403 });
+      }
       logger.error("client_error", { props: body.props ?? {} });
     } else {
       logger.info("analytics_event", { event: body.event, props: body.props ?? {} });

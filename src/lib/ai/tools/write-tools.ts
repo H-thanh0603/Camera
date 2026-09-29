@@ -83,7 +83,7 @@ export function watchPriceTool(source: CommerceDataSource): CommerceTool<typeof 
       void ctx.persistAction?.({
         actionKey: key,
         tool: "watch_price",
-        summary: `Theo dõi giá sản phẩm ${args.productId}, báo email ${args.email.replace(/(.{2}).+(@.+)/, "$1…$2")} khi giảm xuống ≤ ${args.targetPrice.toLocaleString("vi-VN")}đ`,
+        summary: `Theo dõi giá sản phẩm ${args.productId}, báo email ${args.email} khi giảm xuống ≤ ${args.targetPrice.toLocaleString("vi-VN")}đ`,
         data: { productId: args.productId, email: args.email, targetPrice: args.targetPrice },
       });
       return {

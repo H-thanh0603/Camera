@@ -46,15 +46,22 @@ export interface WebhookOutcome {
  * Xử lý sự kiện đã verify: dedupe theo (provider, eventId), đối soát số
  * tiền với totals server đã tính, chuyển pending → paid bằng claim có điều
  * kiện. Webhook "failed" giữ nguyên pending để khách thanh toán lại.
+ *
+ * maxSkewSeconds: generic webhook (secret tự quản) mặc định 5 phút. IPN VNPay
+ * truyền window dài hơn (M2) — retry của VNPay sau >5 phút khi deploy/restart
+ * từng bị reject vĩnh viễn → đơn kẹt pending rồi reconcile hủy nhầm đơn đã có
+ * tiền. Replay vẫn chặn bằng dedupe (provider, eventId) + claim pending→paid,
+ * không phụ thuộc skew window.
  */
 export async function handlePaymentWebhook(
   input: PaymentWebhookInput,
   meta?: Record<string, string>,
   expectedProvider?: string,
+  maxSkewSeconds: number = WEBHOOK_MAX_SKEW_SECONDS,
 ): Promise<WebhookOutcome> {
   const skew = Math.abs(Date.now() / 1000 - input.timestamp);
-  if (skew > WEBHOOK_MAX_SKEW_SECONDS) {
-    throw new PaymentWebhookError("Webhook đã hết hạn (timestamp lệch quá 5 phút).", 400);
+  if (skew > maxSkewSeconds) {
+    throw new PaymentWebhookError("Webhook đã hết hạn (timestamp lệch quá xa).", 400);
   }
   // Validate TRƯỚC khi claim (L9): đơn không tồn tại / sai tiền / sai cổng
   // không được phình bảng PaymentEvent bằng chữ ký hợp lệ.
