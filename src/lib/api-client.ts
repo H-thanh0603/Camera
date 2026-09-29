@@ -258,6 +258,33 @@ export async function apiDeleteAccount(
   });
 }
 
+/* ---------- Hồ sơ & bảo mật tài khoản ---------- */
+
+export async function apiUpdateProfile(name: string): Promise<SessionUser> {
+  const data = await request<{ user: SessionUser }>("/api/account/profile", {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  return data.user;
+}
+
+export async function apiChangePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await request("/api/account/password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+/* ---------- Tra cứu đơn khách vãng lai ---------- */
+
+export async function apiLookupOrder(orderNumber: string, token: string): Promise<Order> {
+  const data = await request<{ order: Order }>("/api/orders/lookup", {
+    method: "POST",
+    body: JSON.stringify({ number: orderNumber, token }),
+  });
+  return data.order;
+}
+
 /* ---------- Reviews ---------- */
 
 export async function apiSubmitReview(input: {

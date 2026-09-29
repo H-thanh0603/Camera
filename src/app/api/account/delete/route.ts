@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
         "account-delete",
         "Mã xác nhận xóa tài khoản — Lumina Optics",
         "account-delete-otp",
+        "Nhập mã dưới đây để xác nhận xóa tài khoản",
       );
       return NextResponse.json({ otpSent: true });
     }

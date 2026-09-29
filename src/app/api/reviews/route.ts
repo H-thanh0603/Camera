@@ -46,6 +46,22 @@ export async function POST(request: NextRequest) {
 
   const user = await getSessionUser();
 
+  // Verified purchase (đối chiếu lịch sử đơn): user đã mua sản phẩm này trong
+  // đơn đã có tiền/giao → đánh dấu verified để PDP hiện badge "Đã mua tại
+  // Lumina". Trước đây verified không bao giờ bật (mất tín hiệu tin cậy).
+  let verified = false;
+  if (user) {
+    const purchased = await prisma.order.findFirst({
+      where: {
+        userId: user.id,
+        status: { in: ["paid", "processing", "shipped", "delivered"] },
+        lines: { some: { productId } },
+      },
+      select: { id: true },
+    });
+    verified = Boolean(purchased);
+  }
+
   // Chỉ nhận ảnh do endpoint upload của shop tạo (R2 bucket mình) —
   // chặn URL ngoài nhúng tracking/phishing vào review.
   const photos = parsed.data.photos ?? [];
@@ -67,7 +83,7 @@ export async function POST(request: NextRequest) {
       body: parsed.data.body,
       photos: photos as unknown as Prisma.InputJsonValue,
       approved: false,
-      verified: false,
+      verified,
     },
   });
 

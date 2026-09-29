@@ -5,6 +5,7 @@ import { adminGuardResponse, staffGuardResponse } from "@/lib/server/admin";
 import { logAudit } from "@/lib/server/audit";
 import { getSessionUser } from "@/lib/server/session";
 import { isCarrier, isTrackingCode } from "@/lib/server/shipping";
+import { orderStatusEmail } from "@/lib/server/email";
 import type { OrderStatus } from "@/lib/types";
 
 /**
@@ -141,6 +142,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { couponCodeOfTotals, releaseCouponUsage } = await import("@/lib/server/coupons");
     const coupon = couponCodeOfTotals(order.totals);
     if (coupon) await releaseCouponUsage(coupon);
+  }
+  // Email cập nhật trạng thái cho khách (qua outbox bền vững — không chặn
+  // response, gửi hỏng còn retry). orderStatusEmail tự trả null với status
+  // không cần mail; trackingCode đọc lại từ DB (có thể vừa cập nhật).
+  const contact = order.contact as { email?: string } | null;
+  if (contact?.email) {
+    const fresh = await prisma.order.findUnique({ where: { id }, select: { trackingCode: true } });
+    const tpl = orderStatusEmail(order.number, status, fresh?.trackingCode ?? null);
+    if (tpl) {
+      const { saveOutboxEmail } = await import("@/lib/server/email-outbox");
+      await saveOutboxEmail({
+        kind: `order-status-${status}`,
+        to: contact.email,
+        subject: tpl.subject,
+        html: tpl.html,
+      });
+    }
   }
   return NextResponse.json({ ok: true, status, currentStep });
 }

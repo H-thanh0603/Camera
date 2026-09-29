@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import type { Order, OrderStep } from "@/lib/types";
 import { ORDER_STEP_ORDER } from "@/lib/types";
 import { listOrders, cancelOrder } from "@/lib/services/order-service";
-import { toAuthError, apiExportAccount, apiDeleteAccount, ApiError } from "@/lib/api-client";
+import { toAuthError, apiExportAccount, apiDeleteAccount, apiUpdateProfile, apiChangePassword, ApiError } from "@/lib/api-client";
+import type { SessionUser } from "@/lib/types";
 import { AppImage } from "@/components/ui/app-image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -232,7 +233,7 @@ export default function AccountPage() {
           )}
 
           <p className="text-center font-telemetry-xs text-telemetry-xs uppercase leading-relaxed text-outline">
-            Demo authentication phía client — khi tích hợp backend sẽ dùng JWT/session cookie, không lưu thông tin nhạy cảm trong localStorage.
+            Phiên đăng nhập bảo vệ bằng cookie httpOnly (server session) — mật khẩu băm scrypt, 2FA TOTP tùy chọn.
           </p>
         </div>
       </div>
@@ -387,6 +388,8 @@ export default function AccountPage() {
       </section>
 
       <TwoFactorManager pushToast={pushToast} />
+
+      <ProfileSecuritySection user={user} pushToast={pushToast} />
 
       <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg" aria-label="Dữ liệu cá nhân">
         <h2 className="font-headline-md text-headline-md text-on-surface">Dữ Liệu Của Tôi</h2>
@@ -642,6 +645,110 @@ function TwoFactorManager({ pushToast }: { pushToast: (m: string, t: "success" |
         </div>
       )}
       {error && <p className="font-body-sm text-body-sm text-error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+/** Hồ sơ & bảo mật: đổi tên hiển thị + đổi mật khẩu (yếu tố 1 hiện tại). */
+function ProfileSecuritySection({
+  user,
+  pushToast,
+}: {
+  user: SessionUser;
+  pushToast: (m: string, t: "success" | "error" | "info") => void;
+}) {
+  const [name, setName] = useState(user.name);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const saveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileBusy(true);
+    setProfileError(null);
+    try {
+      await apiUpdateProfile(name.trim());
+      pushToast("Đã cập nhật tên hiển thị.", "success");
+      window.location.reload(); // header + store đọc user từ server — reload đồng bộ
+    } catch (err) {
+      setProfileError(err instanceof ApiError ? err.message : "Không cập nhật được hồ sơ.");
+    } finally {
+      setProfileBusy(false);
+    }
+  };
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordBusy(true);
+    setPasswordError(null);
+    try {
+      await apiChangePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      pushToast("Đã đổi mật khẩu. Các phiên trên thiết bị khác đã bị đăng xuất.", "success");
+    } catch (err) {
+      setPasswordError(err instanceof ApiError ? err.message : "Không đổi được mật khẩu.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
+
+  return (
+    <section className="flex flex-col gap-space-md rounded-xl bg-surface-container p-space-lg" aria-label="Hồ sơ và bảo mật">
+      <h2 className="font-headline-md text-headline-md text-on-surface">Hồ Sơ & Bảo Mật</h2>
+
+      <form onSubmit={saveProfile} className="flex flex-col gap-space-sm">
+        <label className="flex flex-col gap-space-2xs">
+          <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Tên hiển thị</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={80}
+            className="max-w-md rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary"
+          />
+        </label>
+        {profileError && <p className="font-body-sm text-body-sm text-error" role="alert">{profileError}</p>}
+        <button type="submit" disabled={profileBusy || !name.trim()} className="self-start rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface hover:bg-surface-container-highest disabled:opacity-60">
+          {profileBusy ? "Đang lưu…" : "Lưu tên"}
+        </button>
+      </form>
+
+      <form onSubmit={changePassword} className="flex flex-col gap-space-sm border-t border-surface-container-high pt-space-md">
+        <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Đổi mật khẩu</span>
+        <div className="grid gap-space-sm sm:grid-cols-2">
+          <label className="flex flex-col gap-space-2xs">
+            <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mật khẩu hiện tại</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+              className="rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+          <label className="flex flex-col gap-space-2xs">
+            <span className="font-telemetry-xs text-telemetry-xs uppercase text-outline">Mật khẩu mới (tối thiểu 8 ký tự)</span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              required
+              minLength={8}
+              className="rounded-lg bg-surface-container-low px-space-sm py-space-xs font-body-md text-body-md text-on-surface outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+        </div>
+        {passwordError && <p className="font-body-sm text-body-sm text-error" role="alert">{passwordError}</p>}
+        <button type="submit" disabled={passwordBusy || !currentPassword || newPassword.length < 8} className="self-start rounded-lg bg-surface-container-high px-space-md py-space-xs font-telemetry-data text-telemetry-data uppercase text-on-surface hover:bg-surface-container-highest disabled:opacity-60">
+          {passwordBusy ? "Đang đổi…" : "Đổi mật khẩu"}
+        </button>
+      </form>
     </section>
   );
 }

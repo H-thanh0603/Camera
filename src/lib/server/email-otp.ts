@@ -29,6 +29,7 @@ export async function sendEmailOtp(
   purpose: string,
   subject: string,
   kind: string,
+  intro?: string,
 ): Promise<void> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const salt = randomBytes(16).toString("hex");
@@ -48,7 +49,7 @@ export async function sendEmailOtp(
     kind,
     to: email,
     subject,
-    html: twoFactorOtpHtml(code),
+    html: twoFactorOtpHtml(code, intro),
   });
   logger.info("auth.email_otp_sent", { userId, purpose });
 }

@@ -55,6 +55,17 @@ export async function revokeUserSessions(userId: string): Promise<number> {
   return res.count;
 }
 
+/** Đổi mật khẩu: đá mọi phiên KHÁC (thiết bị lạ mất quyền), giữ phiên hiện tại. */
+export async function revokeOtherSessions(userId: string): Promise<number> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const currentHash = token ? hashToken(token) : null;
+  const res = await prisma.session.deleteMany({
+    where: { userId, ...(currentHash ? { tokenHash: { not: currentHash } } : {}) },
+  });
+  return res.count;
+}
+
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

@@ -114,11 +114,11 @@ ${ctaButton(`${siteUrl}/account`, "THEO DÕI ĐƠN HÀNG")}`,
 }
 
 /** Mã OTP email cho lần bật 2FA đầu tiên (hết hạn 10 phút, dùng 1 lần). */
-export function twoFactorOtpHtml(code: string): string {
+export function twoFactorOtpHtml(code: string, intro = "Nhập mã dưới đây vào trang bật xác thực 2 bước"): string {
   return shell(
-    "Mã xác nhận bật 2FA Lumina Optics (hết hạn sau 10 phút)",
-    `<h1 style="color:#ffffff;font-size:22px;margin:0 0 12px;">Xác nhận bật 2FA</h1>
-<p style="margin:0 0 12px;">Nhập mã dưới đây vào trang bật xác thực 2 bước (hết hạn sau 10 phút, dùng 1 lần):</p>
+    "Mã xác nhận Lumina Optics (hết hạn sau 10 phút)",
+    `<h1 style="color:#ffffff;font-size:22px;margin:0 0 12px;">Xác nhận bằng mã email</h1>
+<p style="margin:0 0 12px;">${escapeEmailHtml(intro)} (hết hạn sau 10 phút, dùng 1 lần):</p>
 <p style="text-align:center;font-size:32px;font-weight:bold;letter-spacing:8px;color:#f2ca50;margin:16px 0;">${escapeEmailHtml(code)}</p>
 <p style="margin:12px 0 0;color:#99908c;font-size:13px;">Nếu bạn không yêu cầu, đổi mật khẩu ngay và liên hệ concierge.</p>`,
   );
@@ -132,4 +132,59 @@ export function passwordResetHtml(link: string): string {
 ${ctaButton(link, "ĐẶT MẬT KHẨU MỚI")}
 <p style="margin:12px 0 0;color:#99908c;font-size:13px;">Nếu bạn không yêu cầu, bỏ qua email này — tài khoản của bạn vẫn an toàn.</p>`,
   );
+}
+
+/* ---------- Email cập nhật trạng thái đơn (shipped/delivered/cancelled…) ---------- */
+
+const ORDER_STATUS_EMAIL: Record<string, { subject: string; heading: string; body: string }> = {
+  processing: {
+    subject: "Đơn hàng đang được xử lý",
+    heading: "Đơn hàng đang được xử lý",
+    body: "Đội ngũ Lumina đã xác nhận đơn và đang chuẩn bị đóng gói. Bạn sẽ nhận email tiếp khi hàng được gửi đi.",
+  },
+  shipped: {
+    subject: "Đơn hàng đã được gửi đi",
+    heading: "Đơn hàng đã trên đường tới bạn",
+    body: "Đơn hàng đã được bàn giao cho đơn vị vận chuyển.",
+  },
+  delivered: {
+    subject: "Đơn hàng đã được giao",
+    heading: "Đơn hàng đã được giao",
+    body: "Đơn hàng đã được giao thành công. Chúc bạn sáng tạo cùng thiết bị mới — đừng quên viết đánh giá nhé!",
+  },
+  cancelled: {
+    subject: "Đơn hàng đã bị hủy",
+    heading: "Đơn hàng đã bị hủy",
+    body: "Đơn hàng đã được hủy theo yêu cầu. Nếu đây không phải thao tác của bạn, liên hệ concierge ngay.",
+  },
+  refunded: {
+    subject: "Đơn hàng đã được hoàn tiền",
+    heading: "Hoàn tiền đã được xử lý",
+    body: "Hoàn tiền cho đơn hàng đã được xử lý qua cổng thanh toán — tiền về tài khoản trong 5–7 ngày làm việc tùy ngân hàng.",
+  },
+};
+
+/** Trả subject + html cho email trạng thái đơn; status không có email → null. */
+export function orderStatusEmail(
+  orderNumber: string,
+  status: string,
+  trackingCode?: string | null,
+  siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn",
+): { subject: string; html: string } | null {
+  const t = ORDER_STATUS_EMAIL[status];
+  if (!t) return null;
+  const tracking =
+    trackingCode && status === "shipped"
+      ? `<p style="margin:0 0 12px;">Mã vận đơn: <strong style="color:#f2ca50;">${escapeEmailHtml(trackingCode)}</strong> — theo dõi hành trình trên trang tài khoản.</p>`
+      : "";
+  return {
+    subject: `${t.subject} — ${orderNumber}`,
+    html: shell(
+      `Đơn ${orderNumber}: ${t.subject}`,
+      `<h1 style="color:#ffffff;font-size:22px;margin:0 0 12px;">${t.heading}</h1>
+<p style="margin:0 0 12px;">Đơn hàng <strong style="color:#f2ca50;">${escapeEmailHtml(orderNumber)}</strong>: ${t.body}</p>
+${tracking}
+${ctaButton(`${siteUrl}/account`, "THEO DÕI ĐƠN HÀNG")}`,
+    ),
+  };
 }
