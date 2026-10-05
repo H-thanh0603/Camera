@@ -7,12 +7,20 @@
  */
 import { emailQueueDepths, getQueueRedis, processOneEmailJob } from "../src/lib/server/email-queue";
 import { dispatchDueOutbox, outboxDepths } from "../src/lib/server/email-outbox";
+import { acquireCronLock } from "../src/lib/server/cron-lock";
 
 const POLL_MS = Number(process.env.EMAIL_WORKER_POLL_MS ?? 2000);
 const MAX_JOBS = process.env.EMAIL_WORKER_MAX_JOBS ? Number(process.env.EMAIL_WORKER_MAX_JOBS) : Infinity;
 const IDLE_EXIT_MS = process.env.EMAIL_WORKER_IDLE_EXIT_MS ? Number(process.env.EMAIL_WORKER_IDLE_EXIT_MS) : null;
 
 async function main(): Promise<void> {
+  // Chống 2 worker cùng gửi (đa container / cron overlap) — outbox đã có
+  // claim conditional nhưng lock ở đây giảm race + log rõ.
+  const release = await acquireCronLock("email-worker");
+  if (!release) {
+    console.log("email-worker: skip (worker khác đang giữ lock)");
+    process.exit(0);
+  }
   const redis = getQueueRedis();
   let done = 0;
   let idleSince: number | null = null;
@@ -53,6 +61,7 @@ async function main(): Promise<void> {
     }
     idleSince = null;
   }
+  await release();
   console.log(`email-worker: stopped after ${done} jobs`);
   process.exit(0);
 }

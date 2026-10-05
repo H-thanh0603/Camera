@@ -9,15 +9,18 @@ import Link from "next/link";
 export function HeroHud() {
   return (
     <section className="relative flex min-h-[94vh] w-full select-none items-end overflow-hidden bg-surface-container-lowest">
-      {/* Video nền — cùng reel CraftFilm, cover kín, không crop chữ */}
+      {/* Video nền — cùng reel CraftFilm, cover kín, không crop chữ.
+          Poster JPEG (130KB) là LCP element: vẽ ngay lập tức, video fetch
+          sau qua preload="none" nên không cướp bandwidth lần render đầu. */}
       <video
         className="absolute inset-0 h-full w-full object-cover"
         src="/videos/craft.mp4"
+        poster="/videos/craft-poster.jpg"
         autoPlay
         muted
         loop
         playsInline
-        preload="metadata"
+        preload="none"
         aria-hidden="true"
         tabIndex={-1}
       />

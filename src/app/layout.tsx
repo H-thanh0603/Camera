@@ -95,6 +95,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://lh3.googleusercontent.com" />
+        {/* Poster hero home — preload sớm để LCP không chờ React hydration */}
+        <link rel="preload" as="image" href="/videos/craft-poster.jpg" fetchPriority="high" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd).replace(/</g, "\u003c") }}

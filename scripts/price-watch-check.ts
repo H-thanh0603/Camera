@@ -9,6 +9,7 @@
 import { prisma } from "../src/lib/server/prisma";
 import { saveOutboxEmail } from "../src/lib/server/email-outbox";
 import { dbGetProductById } from "../src/lib/server/product-db";
+import { acquireCronLock } from "../src/lib/server/cron-lock";
 import { logger } from "../src/lib/server/logger";
 
 function priceDropEmail(productName: string, currentPrice: number, startPrice: number, targetPrice: number): string {
@@ -23,21 +24,36 @@ function priceDropEmail(productName: string, currentPrice: number, startPrice: n
 }
 
 async function main(): Promise<void> {
-  const watches = await prisma.priceWatch.findMany({ where: { status: "active" }, take: 500 });
-  let triggered = 0;
-  for (const w of watches) {
-    const product = await dbGetProductById(w.productId);
-    if (!product || product.price > w.targetPrice) continue;
-    await saveOutboxEmail({
-      kind: "price_watch",
-      to: w.email,
-      subject: `Giảm giá: ${product.name} về ${product.price.toLocaleString("vi-VN")}₫`,
-      html: priceDropEmail(product.name, product.price, w.startPrice, w.targetPrice),
-    });
-    await prisma.priceWatch.update({ where: { id: w.id }, data: { status: "triggered", triggeredAt: new Date() } });
-    triggered++;
+  const release = await acquireCronLock("price-watch-check");
+  if (!release) {
+    console.log("price-watch-check: skip (worker khác đang giữ lock)");
+    process.exit(0);
   }
-  logger.info("price_watch.checked", { watched: watches.length, triggered });
+  try {
+    const watches = await prisma.priceWatch.findMany({ where: { status: "active" }, take: 500 });
+    let triggered = 0;
+    for (const w of watches) {
+      const product = await dbGetProductById(w.productId);
+      if (!product || product.price > w.targetPrice) continue;
+      // Claim TRƯỚC khi gửi mail: 2 worker/cron overlap thì chỉ 1 thắng
+      // (count==0 → bỏ qua), không gửi mail trùng.
+      const claimed = await prisma.priceWatch.updateMany({
+        where: { id: w.id, status: "active" },
+        data: { status: "triggered", triggeredAt: new Date() },
+      });
+      if (claimed.count === 0) continue;
+      await saveOutboxEmail({
+        kind: "price_watch",
+        to: w.email,
+        subject: `Giảm giá: ${product.name} về ${product.price.toLocaleString("vi-VN")}₫`,
+        html: priceDropEmail(product.name, product.price, w.startPrice, w.targetPrice),
+      });
+      triggered++;
+    }
+    logger.info("price_watch.checked", { watched: watches.length, triggered });
+  } finally {
+    await release();
+  }
 }
 
 main()

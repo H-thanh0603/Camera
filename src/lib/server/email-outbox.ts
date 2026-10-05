@@ -123,6 +123,39 @@ export async function dispatchOutboxSoon(id: string): Promise<void> {
   }
 }
 
+/**
+ * Tái gửi mail dead (hết lượt) — operator bấm từ dashboard.
+ * Reset attempts + nextRunAt=now để worker quét lại. Trả số job được hồi sinh.
+ */
+export async function retryDeadOutbox(limit = 20): Promise<{ revived: number }> {
+  const dead = await prisma.emailOutbox.findMany({
+    where: { sentAt: null, attempts: { gte: OUTBOX_MAX_ATTEMPTS } },
+    orderBy: { nextRunAt: "asc" },
+    take: limit,
+  });
+  let revived = 0;
+  for (const job of dead) {
+    const claimed = await prisma.emailOutbox.updateMany({
+      where: { id: job.id, sentAt: null, attempts: { gte: OUTBOX_MAX_ATTEMPTS } },
+      data: { attempts: 0, nextRunAt: new Date(), lastError: null },
+    });
+    if (claimed.count > 0) revived += 1;
+  }
+  return { revived };
+}
+
+/** Liệt kê mail dead mới nhất cho dashboard (không lộ HTML đầy đủ). */
+export async function listDeadOutbox(limit = 20): Promise<
+  { id: string; kind: string; to: string; subject: string; attempts: number; lastError: string | null; createdAt: Date }[]
+> {
+  return prisma.emailOutbox.findMany({
+    where: { sentAt: null, attempts: { gte: OUTBOX_MAX_ATTEMPTS } },
+    orderBy: { nextRunAt: "desc" },
+    take: limit,
+    select: { id: true, kind: true, to: true, subject: true, attempts: true, lastError: true, createdAt: true },
+  });
+}
+
 export async function outboxDepths(): Promise<{ pending: number; dead: number }> {
   const [pending, dead] = await Promise.all([
     prisma.emailOutbox.count({ where: { sentAt: null, attempts: { lt: OUTBOX_MAX_ATTEMPTS } } }),

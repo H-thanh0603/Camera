@@ -2,11 +2,14 @@
  * Đối soát đơn kẹt `pending` quá lâu (webhook fail / mất mạng / khách bỏ dở).
  * Read-only mặc định: liệt kê đơn pending > STALE_MINUTES để operator xử lý.
  * --expire: chuyển đơn quá EXPIRE_MINUTES về `cancelled` + hoàn kho (dùng completeCancel).
+ * completeCancel tự hoàn lượt coupon (compensateOrder) nên M11 (quota bị giữ
+ * bởi pending chết) được xử lý cùng — không cần sweeper riêng.
  *
  * Dùng: npx tsx scripts/payment-reconcile.ts [--stale 30] [--expire] [--expire-minutes 120]
  * Cron gợi ý: mỗi 15 phút (xem scripts/backup.cron.example).
  */
 import { prisma } from "../src/lib/server/prisma";
+import { acquireCronLock } from "../src/lib/server/cron-lock";
 
 const args = process.argv.slice(2);
 const val = (flag: string): string | undefined => {
@@ -18,6 +21,15 @@ const EXPIRE_MINUTES = Number(val("--expire-minutes")) || 120;
 const SHOULD_EXPIRE = args.includes("--expire");
 
 async function main(): Promise<void> {
+  // completeCancel đã claim conditional (idempotent) nhưng lock ở đây chặn
+  // 2 cron overlap quét/hủy cùng lúc gây log rối + tranh kho.
+  const release = await acquireCronLock("payment-reconcile");
+  if (!release) {
+    console.log(JSON.stringify({ event: "payment.reconcile_skipped_locked" }));
+    await prisma.$disconnect();
+    return;
+  }
+  try {
   const staleCutoff = new Date(Date.now() - STALE_MINUTES * 60_000);
   const stale = await prisma.order.findMany({
     where: { status: "pending", createdAt: { lt: staleCutoff } },
@@ -57,6 +69,9 @@ async function main(): Promise<void> {
     }
      
     console.log(JSON.stringify({ event: "payment.reconcile_expire_done", cancelled }));
+  }
+  } finally {
+    await release();
   }
 
   await prisma.$disconnect();

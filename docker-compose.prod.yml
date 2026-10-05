@@ -1,0 +1,67 @@
+# Production stack: app + postgres + email worker.
+# Dùng: cp .env.prod.example .env.prod (điền secrets) && docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# Deploy lần đầu: docker compose run --rm migrate (baseline + seed) TRƯỚC khi up app.
+# Cron host (db-sweep, reconcile, price-watch): xem scripts/backup.cron.example —
+# chạy `docker compose exec app node scripts/...` hoặc tsx tương ứng.
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER:-lumina}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD là bắt buộc}
+      POSTGRES_DB: ${PG_DB:-lumina}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-lumina}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: lumina:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${PG_USER:-lumina}:${PG_PASSWORD}@db:5432/${PG_DB:-lumina}?sslmode=disable
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD là bắt buộc}
+    # Baseline đã verify cho lần đầu; lần sau dùng migration mới (xem runbook).
+    command: ["node", "scripts/db-pg-init.mjs", "--seed"]
+    profiles: ["tools"]
+
+  app:
+    image: lumina:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env.prod
+        required: false # cho phép inject env bằng --env-file / environment CI thay thế
+    environment:
+      DATABASE_URL: postgres://${PG_USER:-lumina}:${PG_PASSWORD}@db:5432/${PG_DB:-lumina}?sslmode=disable
+      TRUST_PROXY_COUNT: "1"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+  worker:
+    image: lumina:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env.prod
+        required: false
+    environment:
+      DATABASE_URL: postgres://${PG_USER:-lumina}:${PG_PASSWORD}@db:5432/${PG_DB:-lumina}?sslmode=disable
+      EMAIL_WORKER_IDLE_EXIT_MS: "60000"
+    # Batch mode: thoát khi idle 60s, restart policy chạy lại (cron-less loop).
+    # Thay bằng systemd timer / cron host gọi `exec worker` nếu muốn lịch chuẩn.
+    command: ["tsx", "scripts/email-worker.ts"]
+
+volumes:
+  pgdata:

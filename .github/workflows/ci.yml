@@ -84,14 +84,9 @@ jobs:
         run: npm run build
         env:
           DATABASE_URL: "file:./dev.db"
-          PAYMENT_DEMO_MODE: "true"
-          NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true"
 
       - name: E2E tests
         run: npx playwright test
-        env:
-          PAYMENT_DEMO_MODE: "true"
-          NEXT_PUBLIC_PAYMENT_DEMO_MODE: "true"
 
   # Phase 0.4: chứng minh schema + seed + query chạy trên Postgres thật.
   # Lưu ý: history migrations là SQLite-only nên prod dùng `db push` cho

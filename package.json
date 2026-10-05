@@ -15,6 +15,7 @@
     "db:sweep": "tsx scripts/db-sweep.ts",
     "test:unit": "vitest run",
     "smoke:prod": "node scripts/smoke-prod.mjs",
+    "rollback": "node scripts/rollback.mjs",
     "worker:email": "tsx scripts/email-worker.ts",
     "reminder:sensor": "tsx scripts/sensor-reminder.ts",
     "payment:reconcile": "tsx scripts/payment-reconcile.ts",

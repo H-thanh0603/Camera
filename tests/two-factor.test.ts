@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { base32Decode, base32Encode, newTotpSecret, totpCode, verifyTotp } from "@/lib/server/totp";
+import {
+  base32Decode,
+  base32Encode,
+  decryptTotpSecret,
+  encryptTotpSecret,
+  newTotpSecret,
+  totpCode,
+  verifyTotp,
+} from "@/lib/server/totp";
+
+// 2FA giờ lưu secret encrypted-at-rest — mọi test trong file cần key hợp lệ.
+process.env.TOTP_ENCRYPTION_KEY = "a".repeat(64);
 
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined, set: () => undefined, delete: () => undefined }),
@@ -75,5 +86,48 @@ describe("2FA setup → challenge → verify", () => {
     await prisma.totpChallenge.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
     expect(hashToken("x")).toHaveLength(64);
+  });
+});
+
+describe("TOTP secret at-rest encryption", () => {
+  const KEY = "a".repeat(64); // hex 64 ký tự = 32 byte
+  const EMAIL = "2fa-enc-test@t.vn";
+
+  it("lưu DB là ciphertext (v2:...), không chứa plaintext", async () => {
+    process.env.TOTP_ENCRYPTION_KEY = KEY;
+    await prisma.user.deleteMany({ where: { email: EMAIL } });
+    const user = await prisma.user.create({
+      data: { email: EMAIL, name: "2fa-enc", passwordHash: await hashPassword("matkhau-12345") },
+    });
+    const { secret } = await twofa.startTotpSetup(user.id);
+    const stored = (await prisma.user.findUnique({ where: { id: user.id } }))?.totpSecret ?? "";
+    expect(stored.startsWith("v2:")).toBe(true);
+    expect(stored).not.toContain(secret);
+    // Round-trip: confirm bằng code sinh từ plaintext vẫn chạy được
+    const { backupCodes } = await twofa.confirmTotpSetup(user.id, totpCode(secret));
+    expect(backupCodes).toHaveLength(8);
+    // Verify challenge dùng secret đã giải mã
+    const challenge = await twofa.createTotpChallenge(user.id);
+    const me = await twofa.verifyTotpChallenge(challenge, totpCode(secret));
+    expect(me.email).toBe(EMAIL);
+    await prisma.totpChallenge.deleteMany({ where: { userId: user.id } });
+    await prisma.user.delete({ where: { id: user.id } });
+  });
+
+  it("sai key → giải mã fail, không trả plaintext", () => {
+    process.env.TOTP_ENCRYPTION_KEY = KEY;
+    const stored = encryptTotpSecret("GEZDGNBVGY3TQOJQ");
+    process.env.TOTP_ENCRYPTION_KEY = "b".repeat(64);
+    expect(() => decryptTotpSecret(stored)).toThrow();
+    // Bản plaintext cũ (không prefix) đọc nguyên văn — backward compat
+    expect(decryptTotpSecret("GEZDGNBVGY3TQOJQ")).toBe("GEZDGNBVGY3TQOJQ");
+    delete process.env.TOTP_ENCRYPTION_KEY;
+  });
+
+  it("thiếu key → encrypt/decrypt throw (fail-closed)", () => {
+    delete process.env.TOTP_ENCRYPTION_KEY;
+    expect(() => encryptTotpSecret("X")).toThrow(/TOTP_ENCRYPTION_KEY/);
+    expect(() => decryptTotpSecret("v2:00:00:00")).toThrow(/TOTP_ENCRYPTION_KEY/);
+    process.env.TOTP_ENCRYPTION_KEY = KEY;
   });
 });

@@ -16,7 +16,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getClientIp } from "@/lib/server/client-ip";
-import { getRequestLimiter } from "@/lib/server/rate-limit-redis";
+import { getRequestLimiter, redisRequiredResponse } from "@/lib/server/rate-limit-redis";
 import { logger } from "@/lib/server/logger";
 import { AGENT_SID_COOKIE, getAgentHistory, newAgentSid, saveAgentHistory, type StoredChatMessage } from "@/lib/server/agent-session";
 import { createAgentAction } from "@/lib/server/agent-action";
@@ -73,6 +73,10 @@ function sseLine(payload: unknown): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Production thiếu Redis → budget kill-switch + stream-cap đếm sai trên
+  // memory từng instance (đốt bill LLM): fail-closed 503 thay vì fail-open.
+  const blocked = await redisRequiredResponse();
+  if (blocked) return blocked;
   const ip = getClientIp(request.headers);
   if (!(await limiter.check(`agent:${ip}`)).allowed) {
     return NextResponse.json({ error: "Bạn hỏi quá nhanh. Nghỉ một chút rồi thử lại." }, { status: 429 });

@@ -220,7 +220,10 @@ export default function CheckoutPage() {
 
   const expressFee = DELIVERY_OPTIONS.find((d) => d.value === delivery)?.price ?? 0;
   const couponDiscount = coupon?.discount ?? 0;
-  const grandTotal = totals.total + expressFee - couponDiscount;
+  // Preview phải khớp server (place-order.ts): pickup miễn ship — trừ ship
+  // chuẩn mà cart snapshot client đã cộng; express cộng thêm phí nhanh.
+  const previewShipping = delivery === "pickup" ? 0 : totals.shipping + expressFee;
+  const grandTotal = totals.total - totals.shipping + previewShipping - couponDiscount;
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
@@ -534,7 +537,7 @@ export default function CheckoutPage() {
               </div>
             )}
             {couponDiscount > 0 && <Row label={`Giảm giá (${coupon?.code})`} value={`−${formatVND(couponDiscount)}`} accent />}
-            <Row label="Vận chuyển" value={totals.shipping === 0 && delivery !== "express" ? "Miễn phí" : formatVND(totals.shipping + expressFee)} />
+            <Row label="Vận chuyển" value={previewShipping === 0 ? "Miễn phí" : formatVND(previewShipping)} />
             <div className="flex justify-between border-t border-surface-container-high pt-space-sm">
               <span className="font-headline-sm text-headline-sm text-on-surface">Tổng cộng</span>
               <span className="font-telemetry-data text-[20px] font-bold text-primary">{formatVND(grandTotal)}</span>

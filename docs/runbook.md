@@ -88,6 +88,44 @@
 - Restore Postgres: `psql $DATABASE_URL < backups/lumina-....sql`.
 - Drill restore 1 lần/tháng trên staging.
 
+## 4b. Staging environment
+
+Môi trường staging = bản sao gần production, dữ liệu riêng (không đụng DB prod):
+
+1. **Vercel**: tạo project thứ hai `camera-staging`, trỏ cùng repo, branch
+   `main` (hoặc branch riêng nếu muốn). Vercel auto-preview từng PR cũng đã
+   đóng vai trò staging code — project staging dùng cho **data env**.
+2. **DB**: Postgres riêng (Supabase/Neon project thứ hai) — init bằng
+   `DATABASE_URL=<staging-db> ADMIN_PASSWORD=... node scripts/db-pg-init.mjs --seed`
+   rồi restore snapshot prod khi cần test migration trên dữ liệu thật:
+   `pg_dump <prod> | psql <staging-db>` (restore 1 chiều, KHÔNG ngược lại).
+3. **Env (Vercel project staging)**: đầy đủ như prod nhưng
+   `VNPAY_PAY_URL`/`VNPAY_API_URL` giữ sandbox, `NEXT_PUBLIC_SITE_URL` =
+   domain staging, secrets riêng (không tái dùng `PAYMENT_WEBHOOK_SECRET`,
+   `RESEND_API_KEY`, `TOTP_ENCRYPTION_KEY` của prod).
+4. **Verify mỗi lần deploy staging**: `NODE_ENV=production npx tsx scripts/check-prod-env.ts`
+   + `BASE_URL=<staging-url> REQUIRE_PROD_FLAGS=true npm run smoke:prod` —
+   cùng bộ check như prod để staging không "xanh hơn" prod một cách giả tạo.
+5. Quy trình phát hành: `main` → CI xanh → deploy **staging** → smoke/staging
+   xanh (dải E2E chạy local đã phủ) → promote **production**. Migration DB
+   chạy trên staging TRƯỚC prod ít nhất 1 lần.
+
+## 4c. Rollback
+
+```bash
+npm run rollback              # Vercel: liệt kê 6 deployment gần nhất + id
+npm run rollback <deploymentId>  # hiện kế hoạch, gõ yes → vercel rollback (instant, không rebuild)
+```
+
+- Self-host: `node scripts/rollback.mjs --self-host <gitSha>` — in từng bước
+  checkout/install/build/restart.
+- **Rollback có migration**: code cũ + schema mới thường vẫn chạy (Prisma đọc
+  column thừa vô hại). Chỉ nguy hiểm ngược lại: code MỚI đã ghi dữ liệu dùng
+  column/enum mới, code CŨ rollback về sẽ không hiểu. Khi đó chọn 1 trong 2:
+  (a) giữ deployment mới (bug hotfix-forward), hoặc (b) rollback + chấp nhận
+  tính năng mới tạm lỗi tới khi fix-forward. **Không bao giờ migrate down DB
+  có dữ liệu khách** — viết migration mới đảo chiều thay thế.
+
 ## 5. Rate limit / CSRF / Đa instance
 
 - CSRF: mọi POST/PATCH/DELETE `/api/*` (trừ webhook HMAC + metrics) yêu cầu
@@ -97,6 +135,11 @@
 
 - Có `UPSTASH_*`: sliding-window Redis dùng chung mọi instance.
 - Chưa có: fallback in-memory fail-open + warn (1 instance ok, đa instance yếu).
+  NGOẠI LỆ fail-closed: production thiếu Redis thì 3 route nhạy cảm trả 503 thay
+  vì cho qua — `/api/auth/login` (brute-force), `/api/agent/chat` (đốt bill LLM
+  khi budget đếm sai), `/api/upload/review` (farm ảnh/R2 bill). Gate nằm ở
+  `redisRequiredResponse()` trong `lib/server/rate-limit-redis.ts`. Thấy 503
+  "thiếu rate-limit tập trung" ở prod = gắn `UPSTASH_*` rồi redeploy.
 - Phủ limiter: login 10, register/forgot/reset 5, order/cancel/vnpay-url 10,
   review 5, coupon-validate 30, webhook/vnpay-ipn 60 req/phút/IP.
 - **Client IP** (`lib/server/client-ip.ts`): ưu tiên `cf-connecting-ip` /
@@ -126,7 +169,28 @@
   (`POST /api/admin/users/:id/revoke-sessions`), rồi reset trực tiếp DB:
   `UPDATE "User" SET "totpEnabled"=false, "totpSecret"=NULL,
   "totpBackupCodes"='[]' WHERE email='...';` — ghi audit tay (ai, khi nào,
-  ticket nào). Dashboard cảnh báo admin chưa bật 2FA.
+  ticket nào).
+- Admin BẮT BUỘC 2FA từ 2026-09: login admin chưa bật TOTP trả 403 +
+  `challengeToken` để setup ngay qua `POST /api/auth/2fa/setup`
+  `{challengeToken}` → quét QR → `POST /api/auth/2fa/confirm`
+  `{code, challengeToken}` → login lại. Không còn đường login admin không 2FA.
+- Lockout login: 10 lần sai / 15 phút / email → 429 (kể cả email chưa đăng ký
+  — chống enumerate qua timing). Login đúng xóa đếm.
+
+## 6c. Deploy Docker self-host (thay Vercel khi cần)
+
+- Build: `docker build -t lumina:latest .` (standalone output đã bật trong
+  `next.config.ts`). Compose: `docker compose -f docker-compose.prod.yml
+  --env-file .env.prod up -d --build` (app + postgres:18 + worker).
+- Deploy lần đầu: `docker compose -f docker-compose.prod.yml run --rm migrate`
+  (baseline + seed) TRƯỚC khi up app. Từ sau đó mọi đổi schema là migration mới.
+- Worker trong compose chạy batch (idle 60s thoát, restart lại). Cron host cho
+  sweep/reconcile/price-watch/sensor gọi `docker compose exec app tsx
+  scripts/<job>.ts` theo `scripts/backup.cron.example`. Mọi job đã có
+  `acquireCronLock` (pg_advisory_lock) nên cron overlap / chạy tay cùng lúc
+  không gửi mail trùng hay hủy đơn trùng.
+- Hàng đợi mail xem ở `/admin/queue` (badge sidebar khi có dead): nút "Hồi sinh"
+  reset attempts để worker gửi lại. Pending > 50 hoặc dead > 0 = worker có vấn đề.
 
 ## 7. Checklist bàn giao
 
@@ -136,6 +200,14 @@
 - [ ] Email xác nhận đơn đến tay, reset password end-to-end
 - [ ] Sentry nhận event thử, uptime monitor xanh
 - [ ] `npm run check:bundle` xanh, E2E xanh
+- [ ] Bàn giao chủ shop: `docs/ADMIN_GUIDE.md` (hướng dẫn vận hành không cần
+      dev) + walkthrough 30 phút trên staging với tài khoản thật
+- [ ] Chạy thử `npm run rollback` (chọn deployment) để xác nhận đường
+      rollback hoạt động TRƯỚC khi có sự cố thật
+- [ ] Bảng "tài sản" điền đủ: domain (đăng ký ở đâu, ai nắm), hosting
+      (Vercel team ai owner), DB (Supabase/Neon project ai nắm), backup
+      (thư mục nào, cron máy nào), email (Resend domain verify), payment
+      (VNPay merchant ai nắm terminal), danh sách API key + ai giữ
 
 ## 7b. Ma trận phân quyền (customer | staff | admin)
 

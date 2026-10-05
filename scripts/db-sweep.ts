@@ -11,12 +11,20 @@
  * KHÔNG dọn: orders/reviews/audit/payment events (kế toán + pháp lý).
  */
 import { prisma } from "../src/lib/server/prisma";
+import { acquireCronLock } from "../src/lib/server/cron-lock";
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 3600_000);
 // Đồng bộ tay với OUTBOX_MAX_ATTEMPTS trong src/lib/server/email-outbox.ts
 const OUTBOX_MAX_ATTEMPTS = 5;
 
 async function main() {
+  const release = await acquireCronLock("db-sweep");
+  if (!release) {
+    console.log(JSON.stringify({ level: "info", message: "db.sweep_skipped_locked" }));
+    await prisma.$disconnect();
+    return;
+  }
+  try {
   const expired = { lt: new Date() };
   const [sessions, tokens, challenges, outboxSent, outboxDead, agentSessions] = await Promise.all([
     prisma.session.deleteMany({ where: { expiresAt: expired } }),
@@ -45,6 +53,9 @@ async function main() {
       timestamp: new Date().toISOString(),
     }),
   );
+  } finally {
+    await release();
+  }
 }
 
 main()

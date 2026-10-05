@@ -34,6 +34,9 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Standalone output cho Docker prod (server.js + node_modules tối thiểu).
+  // Vercel bỏ qua field này.
+  output: "standalone",
   // Next 16 mặc định đã tắt, nhưng đặt rõ để không phụ thuộc framework default.
   poweredByHeader: false,
   images: {
