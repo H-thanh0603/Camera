@@ -73,19 +73,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await prisma.review.create({
-    data: {
-      productId,
-      userId: user?.id ?? null,
-      author: parsed.data.author,
-      rating: parsed.data.rating,
-      title: parsed.data.title,
-      body: parsed.data.body,
-      photos: photos as unknown as Prisma.InputJsonValue,
-      approved: false,
-      verified,
-    },
-  });
+  try {
+    await prisma.review.create({
+      data: {
+        productId,
+        userId: user?.id ?? null,
+        author: parsed.data.author,
+        rating: parsed.data.rating,
+        title: parsed.data.title,
+        body: parsed.data.body,
+        photos: photos as unknown as Prisma.InputJsonValue,
+        approved: false,
+        verified,
+      },
+    });
+  } catch (err) {
+    // @@unique([productId, userId]) — user đã review sản phẩm này rồi (P2002).
+    if ((err as Prisma.PrismaClientKnownRequestError)?.code === "P2002") {
+      return NextResponse.json(
+        { error: "Bạn đã đánh giá sản phẩm này rồi.", fieldErrors: { body: "Bạn đã đánh giá sản phẩm này rồi." } },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

@@ -84,9 +84,9 @@ export default function CheckoutPage() {
 
   if (!hydrated) return <div className="container-page py-space-3xl"><EmptyState icon="hourglass_empty" title="Đang tải..." /></div>;
 
-  // Tài khoản admin không mua sắm: chặn ngay đầu checkout (API vẫn cho phép
-  // để test nội bộ — UI là rào chính, server guard khi cần sẽ bổ sung sau).
-  if (user?.role === "admin") {
+  // Tài khoản admin/staff không mua sắm: chặn ở cả UI lẫn server (assertCustomerBuyer
+  // trong place-order.ts → 403).
+  if (user?.role === "admin" || user?.role === "staff") {
     return (
       <div className="container-page py-space-3xl">
         <div className="mx-auto flex max-w-xl flex-col items-center gap-space-md rounded-xl bg-surface-container p-space-2xl text-center shadow-xl">

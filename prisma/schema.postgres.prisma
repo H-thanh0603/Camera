@@ -1,10 +1,14 @@
 // Prisma schema — SQLite cho dev/demo, Postgres cho production.
 // Schema chỉ dùng kiểu portable (String/Int/Json/DateTime/Boolean/Float)
 // nên chuyển provider không đổi gì khác.
-// Deploy Postgres (Supabase/Neon):
-//   1. provider = "postgresql", DATABASE_URL="postgresql://...?sslmode=require"
-//   2. npx prisma migrate deploy && npx prisma db seed
-//   3. Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
+// Deploy Postgres (Supabase/Neon) — QUY TRÌNH DUY NHẤT:
+//   1. DATABASE_URL="postgresql://...?sslmode=require" ADMIN_PASSWORD="..." \
+//      node scripts/db-pg-init.mjs --seed
+//      (apply prisma/postgres-baseline.sql đã verify + extensions — KHÔNG
+//      `migrate deploy` / `db push` trực tiếp, migrations là SQLite-only.
+//      Đổi schema sau này: sửa schema.prisma + schema.postgres.prisma,
+//      regenerate baseline, rồi migration mới cho SQLite dev.)
+//   2. Backup định kỳ: npm run db:backup (pg_dump) — xem docs/runbook.md
 
 generator client {
   provider = "prisma-client"
@@ -90,6 +94,7 @@ model Product {
   inTheBox         Json?
   compatibleWith   Json?
   variants         ProductVariant[]
+  reviews          Review[]
 
   @@index([category])
   @@index([brand])
@@ -217,6 +222,8 @@ model AuditLog {
 model Review {
   id        String   @id @default(cuid())
   productId String
+  // FK thật: xóa product → xóa luôn review (không để orphan). 1 user chỉ review 1 lần/product.
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   // null = guest review
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -232,6 +239,7 @@ model Review {
   rewardCode  String?
   createdAt DateTime @default(now())
 
+  @@unique([productId, userId])
   @@index([productId])
   @@index([approved])
   @@index([productId, approved])
@@ -349,6 +357,47 @@ model Article {  // Bài journal — admin CRUD, public chỉ đọc published.
   updatedAt          DateTime @updatedAt
 
   @@index([published])
+}
+
+model AgentSession {  // Phiên chat trợ lý AI — history server-side, cookie raw id.
+  idHash    String   @id  // SHA-256 của cookie agent_sid (không lưu raw).
+  messages  Json     @default("[]")  // [{role, content, cards?}] — ≤40 tin, đã fence khi ghi.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime  // TTL 30 ngày, dọn dẹp bằng cron job dọn session cũ.
+
+  @@index([expiresAt])
+}
+
+model AgentAction {  // Hành động nhạy cảm chờ user duyệt (add_to_cart, watch_price…).
+  id          String   @id @default(cuid())
+  sessionHash String   // FK logic → AgentSession.idHash (không raw cookie).
+  actionKey   String   // Key tool tạo — model nhắc lại cho user.
+  tool        String
+  summary     String
+  data        Json
+  status      String   @default("pending")  // pending | executed | expired | rejected
+  createdAt   DateTime @default(now())
+  executedAt  DateTime?
+  expiresAt   DateTime  // 10 phút — duyệt muộn thì phải xin lại.
+
+  @@unique([sessionHash, actionKey])
+  @@index([sessionHash, status])
+}
+
+model PriceWatch {  // Nhiệm vụ "theo dõi giá" user ủy quyền cho agent (cron so giá).
+  id          String   @id @default(cuid())
+  sessionHash String   // Session chat tạo watch (cookie hash).
+  email       String
+  productId   String
+  targetPrice Int      // Ngưỡng khách muốn — báo khi giá bán ≤ ngưỡng.
+  startPrice  Int      // Giá lúc tạo (để email nói "giảm từ X → Y").
+  status      String   @default("active")  // active | triggered | cancelled
+  createdAt   DateTime @default(now())
+  triggeredAt DateTime?
+
+  @@unique([sessionHash, productId])
+  @@index([status])
 }
 
 // Server-owned description previews; logical IDs retain history after deletion.

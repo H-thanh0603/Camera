@@ -92,6 +92,7 @@ model Product {
   inTheBox         Json?
   compatibleWith   Json?
   variants         ProductVariant[]
+  reviews          Review[]
 
   @@index([category])
   @@index([brand])
@@ -224,6 +225,8 @@ model AuditLog {
 model Review {
   id        String   @id @default(cuid())
   productId String
+  // FK thật: xóa product → xóa luôn review (không để orphan). 1 user chỉ review 1 lần/product.
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   // null = guest review
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -239,6 +242,7 @@ model Review {
   rewardCode  String?
   createdAt DateTime @default(now())
 
+  @@unique([productId, userId])
   @@index([productId])
   @@index([approved])
   @@index([productId, approved])

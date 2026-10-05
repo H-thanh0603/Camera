@@ -17,6 +17,21 @@ export function isSaleActive(
   return endsAt > (nowIso ?? new Date().toISOString());
 }
 
+/**
+ * Ngày hết hạn (YYYY-MM-DD) để emit vào JSON-LD `priceValidUntil`.
+ * Trả undefined khi KM không hiệu lực HOẶC là sale legacy không hẹn ngày
+ * (không có ngày kết thúc thì không có gì để emit — không cast mù saleEndsAt).
+ */
+export function salePriceValidUntil(
+  item: { compareAtPrice?: number | null; saleEndsAt?: string | null },
+  price: number,
+  nowIso?: string,
+): string | undefined {
+  if (!isSaleActive(item, price, nowIso)) return undefined;
+  const endsAt = item.saleEndsAt?.trim();
+  return endsAt ? endsAt.slice(0, 10) : undefined;
+}
+
 /** Số ngày còn lại của KM (null khi không có KM hiệu lực). */
 export function saleDaysLeft(
   item: { compareAtPrice?: number | null; saleEndsAt?: string | null },

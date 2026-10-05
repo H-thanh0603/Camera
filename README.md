@@ -14,8 +14,8 @@ npx prisma migrate deploy  # tạo SQLite DB (prisma/dev.db)
 npx prisma db seed       # seed catalogue + admin (v7 không tự seed)
 npm run dev              # dev server
 npm run build && npm run start   # production
-npx vitest run           # 143 unit tests
-npx playwright test      # 29 E2E tests (cần `npm run build` trước)
+npx vitest run           # 295 unit tests (42 file)
+npx playwright test      # 37 E2E tests / 9 spec (cần `npm run build` trước)
 npm run db:reset         # migrate reset + seed lại từ đầu
 ```
 
@@ -33,7 +33,7 @@ src/
     cart/ checkout/       # Giỏ hàng + checkout 5 bước (Contact → Shipping → Delivery → Payment → Review)
     wishlist/ compare/    # Wishlist + so sánh 2–4 máy (?ids=)
     camera-finder/        # Wizard gợi ý máy ảnh (scoring tách khỏi UI)
-    account/              # Auth mock + đơn hàng + order timeline
+    account/              # Login/register/2FA thật + đơn hàng + order timeline (guest lookup riêng /orders/lookup)
     journal/              # Editorial / magazine
   components/             # UI theo domain: product, cart, catalog, home, layout, search, ui
   lib/
@@ -46,7 +46,7 @@ src/
     utils/                # format VND, validation, URL params, rate-limit
   app/api/                # auth (register/login/logout/me), orders (+cancel, vnpay-url), payments (vnpay-ipn/return), reviews
   state/store.tsx         # Global state (cart/wishlist/compare/auth/recent/toast) + persistence
-tests/                    # Vitest (57) + Playwright E2E (9): cart, finder, filter, order verification, luồng mua thật
+tests/                    # Vitest (295 test/42 file) + Playwright E2E (37 test/9 spec): checkout, auth, admin, failure paths, review, trade-in, upload, a11y
 ```
 
 ### Công cụ chất lượng

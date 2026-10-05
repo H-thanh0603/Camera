@@ -1,4 +1,4 @@
-import type { CartTotals, ContactInfo, Order, OrderLine, Product, ShippingInfo } from "@/lib/types";
+import type { CartTotals, ContactInfo, Order, OrderLine, Product, ShippingInfo, SessionUser } from "@/lib/types";
 import { calculateTotals, maxQuantityOf, resolveVariant, unitPriceOf, unitCompareAtPriceOf } from "@/lib/services/cart-service";
 import { applyCouponToSubtotal, normalizeCouponCode } from "@/lib/services/coupon-service";
 import { dbGetProductById } from "./product-db";
@@ -8,6 +8,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { randomBytes } from "node:crypto";
 import { prisma } from "./prisma";
 import { getSessionUser } from "./session";
+import { OrderForbidden } from "./order-mapper";
 import { logger } from "./logger";
 import { logAudit } from "./audit";
 
@@ -146,6 +147,17 @@ export async function verifyAndPriceLines(
 const GUEST_TOKEN_RE = /^[A-Za-z0-9_-]{32,128}$/;
 
 /**
+ * Admin/staff không được đặt hàng (khớp rào UI ở checkout): đơn test nội bộ
+ * làm bẩn doanh thu/tồn kho và xung đột vai trò (người duyệt đơn là người mua).
+ * Role thiếu (object dựng tay) coi như customer — không chặn nhầm.
+ */
+export function assertCustomerBuyer(user: SessionUser | null): void {
+  if (user && (user.role === "admin" || user.role === "staff")) {
+    throw new OrderForbidden("Tài khoản quản trị không thể đặt hàng. Vui lòng dùng tài khoản khách hàng.");
+  }
+}
+
+/**
  * TTL idempotency key (L10): key chỉ có nghĩa trong vòng 24h (intent checkout
  * sống vài phút). Key cũ hơn → 422 bắt client sinh key mới, thay vì trả về
  * đơn hàng từ tuần trước / tháng trước gây nhầm lẫn và rò PII cũ.
@@ -160,6 +172,9 @@ function assertKeyFresh(createdAt: Date): void {
 
 export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   const { contact, shipping, delivery, payment } = input;
+
+  const user = await getSessionUser();
+  assertCustomerBuyer(user);
 
   if (input.guestToken && !GUEST_TOKEN_RE.test(input.guestToken)) {
     throw new OrderValidationError("Token bảo mật đơn hàng không hợp lệ.");
@@ -236,7 +251,6 @@ export async function placeOrderServer(input: PlaceOrderInput): Promise<Order> {
   }
 
   const productById = (id: string) => finalProducts.find((p) => p.id === id)!;
-  const user = await getSessionUser();
   // Đơn guest: token client gửi (hoặc server sinh) — DB chỉ lưu hash.
   const rawGuestToken = user ? undefined : (input.guestToken ?? newGuestToken());
   const guestTokenHash = rawGuestToken ? hashGuestToken(rawGuestToken) : null;

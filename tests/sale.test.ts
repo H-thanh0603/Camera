@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSaleActive, saleDaysLeft } from "@/lib/utils/sale";
+import { isSaleActive, saleDaysLeft, salePriceValidUntil } from "@/lib/utils/sale";
 
 const FUTURE = "2026-12-31T23:59:59.000Z";
 const PAST = "2026-01-01T00:00:00.000Z";
@@ -25,6 +25,23 @@ describe("isSaleActive", () => {
 
   it("ngày rác → fail-closed false", () => {
     expect(isSaleActive({ compareAtPrice: 100, saleEndsAt: "không-phải-ngày" }, 80, NOW)).toBe(false);
+  });
+});
+
+describe("salePriceValidUntil", () => {
+  it("sale có hạn tương lai → trả YYYY-MM-DD", () => {
+    expect(salePriceValidUntil({ compareAtPrice: 100, saleEndsAt: FUTURE }, 80, NOW)).toBe("2026-12-31");
+  });
+
+  it("sale legacy không hẹn ngày → undefined (không crash khi emit JSON-LD)", () => {
+    expect(salePriceValidUntil({ compareAtPrice: 100 }, 80, NOW)).toBeUndefined();
+    expect(salePriceValidUntil({ compareAtPrice: 100, saleEndsAt: null }, 80, NOW)).toBeUndefined();
+  });
+
+  it("hết hạn / không KM / ngày rác → undefined", () => {
+    expect(salePriceValidUntil({ compareAtPrice: 100, saleEndsAt: PAST }, 80, NOW)).toBeUndefined();
+    expect(salePriceValidUntil({}, 80, NOW)).toBeUndefined();
+    expect(salePriceValidUntil({ compareAtPrice: 100, saleEndsAt: "không-phải-ngày" }, 80, NOW)).toBeUndefined();
   });
 });
 

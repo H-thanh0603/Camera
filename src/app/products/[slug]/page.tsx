@@ -7,7 +7,7 @@ import { ProductPurchasePanel } from "@/components/product/product-purchase-pane
 import { ProductCard } from "@/components/product/product-card";
 import { RecentlyViewedClient } from "@/components/product/recently-viewed";
 import { ReviewsSection } from "@/components/product/reviews-section";
-import { isSaleActive } from "@/lib/utils/sale";
+import { salePriceValidUntil } from "@/lib/utils/sale";
 
 // ISR: admin sửa giá/stock hiển thị trong ~30s
 export const revalidate = 30;
@@ -81,10 +81,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   // Product + Breadcrumb structured data (SEO)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://luminaoptics.vn";
-  // priceValidUntil emit theo cùng quy tắc isSaleActive với UI (tránh structured data giả)
-  const priceValidUntil = isSaleActive(product, product.price)
-    ? (product.saleEndsAt as string).slice(0, 10)
-    : undefined;
+  // priceValidUntil emit theo cùng quy tắc isSaleActive với UI (tránh structured data giả);
+  // sale legacy không hẹn ngày → undefined, không cast mù saleEndsAt
+  const priceValidUntil = salePriceValidUntil(product, product.price);
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [

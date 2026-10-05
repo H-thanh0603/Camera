@@ -1,3 +1,7 @@
+-- Baseline Postgres sinh từ prisma/schema.postgres.prisma (nguồn chuẩn: prisma/schema.prisma).
+-- Regenerate: npx prisma migrate diff --from-empty --to-schema prisma/schema.postgres.prisma --script
+-- Apply: node scripts/db-pg-init.mjs (--seed). CI khóa drift mỗi push (job postgres-check).
+
 -- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
@@ -261,6 +265,7 @@ CREATE TABLE "TradeInLead" (
     CONSTRAINT "TradeInLead_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
 CREATE TABLE "StockMovement" (
     "id" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
@@ -274,6 +279,102 @@ CREATE TABLE "StockMovement" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "StockMovement_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SiteSetting" (
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("key")
+);
+
+-- CreateTable
+CREATE TABLE "Article" (
+    "slug" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "category" TEXT NOT NULL DEFAULT 'Camera Guides',
+    "excerpt" TEXT NOT NULL DEFAULT '',
+    "author" TEXT NOT NULL DEFAULT 'Biên tập Lumina Journal',
+    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "readingTimeMinutes" INTEGER NOT NULL DEFAULT 5,
+    "heroImage" TEXT NOT NULL DEFAULT '',
+    "heroAlt" TEXT NOT NULL DEFAULT '',
+    "body" JSONB NOT NULL,
+    "relatedSlugs" JSONB NOT NULL,
+    "published" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Article_pkey" PRIMARY KEY ("slug")
+);
+
+-- CreateTable
+CREATE TABLE "AgentSession" (
+    "idHash" TEXT NOT NULL,
+    "messages" JSONB NOT NULL DEFAULT '[]',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AgentSession_pkey" PRIMARY KEY ("idHash")
+);
+
+-- CreateTable
+CREATE TABLE "AgentAction" (
+    "id" TEXT NOT NULL,
+    "sessionHash" TEXT NOT NULL,
+    "actionKey" TEXT NOT NULL,
+    "tool" TEXT NOT NULL,
+    "summary" TEXT NOT NULL,
+    "data" JSONB NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "executedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AgentAction_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PriceWatch" (
+    "id" TEXT NOT NULL,
+    "sessionHash" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "targetPrice" INTEGER NOT NULL,
+    "startPrice" INTEGER NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "triggeredAt" TIMESTAMP(3),
+
+    CONSTRAINT "PriceWatch_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MerchantDescriptionDraft" (
+    "id" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "productName" TEXT NOT NULL,
+    "before" TEXT NOT NULL,
+    "after" TEXT NOT NULL,
+    "productUpdatedAt" TIMESTAMP(3) NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "createdBy" TEXT NOT NULL,
+    "decidedBy" TEXT,
+    "decidedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MerchantDescriptionDraft_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MerchantDraftBudget" (
+    "month" TEXT NOT NULL,
+    "reservedTokens" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "MerchantDraftBudget_pkey" PRIMARY KEY ("month")
 );
 
 -- CreateIndex
@@ -367,6 +468,9 @@ CREATE INDEX "Review_approved_idx" ON "Review"("approved");
 CREATE INDEX "Review_productId_approved_idx" ON "Review"("productId", "approved");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Review_productId_userId_key" ON "Review"("productId", "userId");
+
+-- CreateIndex
 CREATE INDEX "Coupon_active_idx" ON "Coupon"("active");
 
 -- CreateIndex
@@ -390,35 +494,29 @@ CREATE INDEX "StockMovement_productId_idx" ON "StockMovement"("productId");
 -- CreateIndex
 CREATE INDEX "StockMovement_createdAt_idx" ON "StockMovement"("createdAt");
 
-CREATE TABLE "SiteSetting" (
-    "key" TEXT NOT NULL,
-    "value" TEXT NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "SiteSetting_pkey" PRIMARY KEY ("key")
-);
-
-CREATE TABLE "Article" (
-    "slug" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "category" TEXT NOT NULL DEFAULT 'Camera Guides',
-    "excerpt" TEXT NOT NULL DEFAULT '',
-    "author" TEXT NOT NULL DEFAULT 'Biên tập Lumina Journal',
-    "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "readingTimeMinutes" INTEGER NOT NULL DEFAULT 5,
-    "heroImage" TEXT NOT NULL DEFAULT '',
-    "heroAlt" TEXT NOT NULL DEFAULT '',
-    "body" JSONB NOT NULL,
-    "relatedSlugs" JSONB NOT NULL,
-    "published" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Article_pkey" PRIMARY KEY ("slug")
-);
-
 -- CreateIndex
 CREATE INDEX "Article_published_idx" ON "Article"("published");
+
+-- CreateIndex
+CREATE INDEX "AgentSession_expiresAt_idx" ON "AgentSession"("expiresAt");
+
+-- CreateIndex
+CREATE INDEX "AgentAction_sessionHash_status_idx" ON "AgentAction"("sessionHash", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AgentAction_sessionHash_actionKey_key" ON "AgentAction"("sessionHash", "actionKey");
+
+-- CreateIndex
+CREATE INDEX "PriceWatch_status_idx" ON "PriceWatch"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PriceWatch_sessionHash_productId_key" ON "PriceWatch"("sessionHash", "productId");
+
+-- CreateIndex
+CREATE INDEX "MerchantDescriptionDraft_createdAt_idx" ON "MerchantDescriptionDraft"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "MerchantDescriptionDraft_productId_status_idx" ON "MerchantDescriptionDraft"("productId", "status");
 
 -- AddForeignKey
 ALTER TABLE "TotpChallenge" ADD CONSTRAINT "TotpChallenge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -443,6 +541,9 @@ ALTER TABLE "OrderLine" ADD CONSTRAINT "OrderLine_orderId_fkey" FOREIGN KEY ("or
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Review" ADD CONSTRAINT "Review_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Review" ADD CONSTRAINT "Review_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

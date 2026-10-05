@@ -3,6 +3,8 @@ import { csvCell } from "@/app/api/admin/orders/export/route";
 import { idempotencyKeySchema, MAX_ORDER_LINES, placeOrderSchema } from "@/lib/schemas";
 import { parseVnpayPayDate } from "@/lib/server/vnpay";
 import { verifyAndPriceLines } from "@/lib/server/place-order";
+import { assertCustomerBuyer } from "@/lib/server/place-order";
+import { OrderForbidden } from "@/lib/server/order-mapper";
 import { getProductById } from "@/lib/repositories/product-repository";
 
 const resolveProduct = async (id: string) => getProductById(id) ?? null;
@@ -41,6 +43,19 @@ describe("order lines cap (M9)", () => {
     expect(finalLines).toHaveLength(1);
     // Trần line = min(10 policy, stock) — tổng gộp không vượt trần từng line
     expect(finalLines[0]!.quantity).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("admin/staff order guard", () => {
+  it("admin/staff → chặn đặt hàng (OrderForbidden)", () => {
+    expect(() => assertCustomerBuyer({ id: "u1", name: "A", email: "a@b.vn", role: "admin" })).toThrow(OrderForbidden);
+    expect(() => assertCustomerBuyer({ id: "u2", name: "S", email: "s@b.vn", role: "staff" })).toThrow(OrderForbidden);
+  });
+
+  it("customer / guest / role thiếu → cho qua", () => {
+    expect(() => assertCustomerBuyer({ id: "u3", name: "C", email: "c@b.vn", role: "customer" })).not.toThrow();
+    expect(() => assertCustomerBuyer({ id: "u4", name: "N", email: "n@b.vn" })).not.toThrow();
+    expect(() => assertCustomerBuyer(null)).not.toThrow();
   });
 });
 

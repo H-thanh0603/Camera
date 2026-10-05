@@ -1,4 +1,5 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { randomUUID } from "node:crypto";
 
 /**
@@ -76,6 +77,9 @@ function storageClient(cfg: StorageConfig): S3Client {
     region: "auto",
     endpoint: `https://${cfg.accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
+    // Timeout tường minh (15s) — mặc định của SDK không bound request, một
+    // kết nối treo tới R2 sẽ giữ request handler của route chờ vô hạn.
+    requestHandler: new NodeHttpHandler({ requestTimeout: 15_000, connectionTimeout: 5_000 }),
   });
 }
 
